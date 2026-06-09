@@ -1,6 +1,7 @@
 """Configuration management for RIP."""
 
 import os
+from pathlib import Path
 from typing import Literal
 
 from pydantic import ConfigDict
@@ -52,6 +53,10 @@ class Settings(BaseSettings):
     ENABLE_MCP: bool = False
     ENABLE_AGENT: bool = False
     ENABLE_TASK_QUEUE: bool = False
+
+    SAFE_FOLDER_ROOT: str = str(
+        Path(__file__).resolve().parents[2] / "workspace" / "sandbox" / "inbox"
+    )
 
     model_config = ConfigDict(
         env_file=".env",

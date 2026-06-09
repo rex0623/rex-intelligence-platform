@@ -1,8 +1,10 @@
 """AI Router for RIP - The Brain of the System."""
 
+import uuid
 from typing import Any
 
 from app.core.logger import get_logger
+from app.schemas.messages import WorkerRequest
 from app.workers import ClaudeWorker, FolderWorker, GPTWorker, PDFWorker
 
 logger = get_logger(__name__)
@@ -61,6 +63,28 @@ class AIRouter:
             "Worker selected",
             extra={"user_id": user_id, "worker_id": worker_id},
         )
+
+        if worker_id == "folder_worker":
+            folder_name = self._extract_folder_name(message)
+            worker_request = WorkerRequest(
+                worker_id=worker_id,
+                action="analyze_folder",
+                # empty folder_name means analyze the safe root itself
+                payload={"folder_name": folder_name},
+                user_id=user_id,
+                request_id=str(uuid.uuid4()),
+            )
+            worker = self.workers[worker_id]
+            worker_response = await worker.execute(worker_request)
+            response_payload = worker_response.model_dump()
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "intent": intent,
+                "worker_id": worker_id,
+                "worker_response": response_payload,
+                "response": response_payload,
+            }
 
         worker_response = self._generate_fake_response(worker_id)
 
@@ -142,6 +166,44 @@ class AIRouter:
             return "我判斷這是需求分析任務"
 
         return "我還不確定你的需求，可以再說清楚一點嗎？"
+
+    def _extract_folder_name(self, message: str) -> str:
+        """
+        Extract target folder name from the message.
+
+        Args:
+            message: User message
+
+        Returns:
+            Folder name
+        """
+        message_lower = message.lower()
+
+        # explicit patterns: folder:xxx or 資料夾 xxx -> interpret as subfolder under safe root
+        if "folder:" in message_lower:
+            try:
+                return message.split("folder:", 1)[1].strip()
+            except Exception:
+                return ""
+
+        if "資料夾" in message:
+            # look for token after 資料夾
+            parts = message.split()
+            for i, tok in enumerate(parts):
+                if "資料夾" in tok and i + 1 < len(parts):
+                    return parts[i + 1]
+
+        # If user mentions Downloads without explicit folder indicator, treat as request to analyze safe_root itself
+        if "downloads" in message_lower:
+            return ""
+
+        # Fallback: try to find a token that isn't a common verb
+        tokens = message.split()
+        for token in tokens:
+            if token.lower() not in {"整理", "幫我", "請", "我", "的", "資料夾", "download", "downloads"}:
+                return token
+
+        return ""
 
     async def get_health(self) -> dict[str, Any]:
         """

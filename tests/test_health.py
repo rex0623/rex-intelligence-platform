@@ -1,6 +1,7 @@
 """Health check tests."""
 
 import pytest
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -105,6 +106,18 @@ def test_line_webhook_invalid_json(client):
 )
 def test_line_webhook_text_message_routing(client, monkeypatch, text, expected_worker, expected_reply):
     """Test LINE webhook text message routing for different intents."""
+    if expected_worker == "folder_worker":
+        safe_root = Path("/tmp/safe_root")
+        downloads = safe_root / "Downloads"
+        downloads.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("app.core.config.settings.SAFE_FOLDER_ROOT", str(safe_root))
+        # Patch the already-initialized ai_router's FolderWorker instance
+        try:
+            import app.main as main_app
+
+            main_app.ai_router.workers["folder_worker"].safe_root = safe_root.resolve()
+        except Exception:
+            pass
     reply_called = {}
 
     def fake_verify_signature(signature, body):
@@ -145,6 +158,10 @@ def test_line_webhook_text_message_routing(client, monkeypatch, text, expected_w
     assert data["status"] == "ok"
     assert reply_called["verified"] is True
     assert reply_called["reply_token"] == "test_token"
-    assert reply_called["text"] == expected_reply
+    if expected_worker == "folder_worker":
+        assert reply_called["text"].startswith("小雷收到：資料夾分析完成")
+        assert "dry-run 模式" in reply_called["text"]
+    else:
+        assert reply_called["text"] == expected_reply
     assert data["details"]["results"][0]["reply"]["status"] == "dry_run"
     assert data["details"]["results"][0]["worker_id"] == expected_worker

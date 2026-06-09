@@ -193,6 +193,22 @@ python scripts/mock_line.py "處理電費單"
 
 對應輸出會依據 AI Router intent 分流。
 
+### 安全資料夾分析
+
+`整理 Downloads` 會在安全根目錄中分析 `Downloads` 資料夾，預設安全根目錄為：
+
+```bash
+workspace/sandbox/inbox
+```
+
+你也可以在 `.env` 中覆寫：
+
+```bash
+SAFE_FOLDER_ROOT=/path/to/your/sandbox/inbox
+```
+
+此操作為 dry-run，僅做分析，不會搬移或刪除檔案。
+
 ## � 成本管理
 
 RIP 提供完整的成本追蹤：

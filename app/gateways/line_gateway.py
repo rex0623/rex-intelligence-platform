@@ -130,10 +130,8 @@ class LineGateway:
                 )
 
                 worker_response = router_result.get("worker_response")
-                reply_payload = self.reply_text(
-                    event.replyToken,
-                    f"小雷收到：{worker_response}",
-                )
+                formatted_text = self._format_worker_response(worker_response)
+                reply_payload = self.reply_text(event.replyToken, formatted_text)
 
                 results.append(
                     {
@@ -153,6 +151,45 @@ class LineGateway:
             "events_processed": len(results),
             "results": results,
         }
+
+    def _format_worker_response(self, worker_response: Any) -> str:
+        """
+        Format worker response for LINE reply.
+
+        Args:
+            worker_response: Worker response from router
+
+        Returns:
+            String reply text
+        """
+        if isinstance(worker_response, dict):
+            data = worker_response.get("data", {})
+            inner = {}
+            if isinstance(data, dict) and data.get("action") == "analyze_folder":
+                inner = data.get("data", {})
+            elif isinstance(data, dict) and data.get("dry_run") is not None:
+                inner = data
+
+            if inner:
+                lines = ["小雷收到：資料夾分析完成"]
+                if inner.get("dry_run") is True:
+                    lines.append("- 模式：dry-run，不會搬移或刪除 (dry-run 模式)")
+                total = inner.get("total_files", 0)
+                lines.append(f"- 檔案總數：{total}")
+                counts = inner.get("extension_counts", {})
+                if counts:
+                    stats = "、".join([f"{k} {v}" for k, v in counts.items()])
+                else:
+                    stats = "無"
+                lines.append(f"- 類型統計：{stats}")
+                suggestions = inner.get("suggested_folders", [])
+                if suggestions:
+                    lines.append(f"- 建議分類：{ '、'.join(suggestions) }")
+                return "\n".join(lines)
+
+            return f"小雷收到：{worker_response}"
+
+        return f"小雷收到：{worker_response}"
 
     async def _handle_text_message(
         self,

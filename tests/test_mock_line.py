@@ -1,5 +1,8 @@
 """Tests for the local mock LINE CLI."""
 
+from pathlib import Path
+
+from app.core.config import settings
 from scripts.mock_line import mock_line_payload
 
 
@@ -7,8 +10,19 @@ def test_mock_line_pdf_task():
     assert mock_line_payload("處理電費單") == "小雷收到：我判斷這是 PDF 任務"
 
 
-def test_mock_line_folder_task():
-    assert mock_line_payload("整理 Downloads") == "小雷收到：我判斷這是資料夾整理任務"
+def test_mock_line_folder_task(tmp_path, monkeypatch):
+    safe_root = tmp_path / "inbox"
+    downloads = safe_root / "Downloads"
+    downloads.mkdir(parents=True)
+    (downloads / "example.pdf").write_text("dummy")
+
+    monkeypatch.setattr(settings, "SAFE_FOLDER_ROOT", str(safe_root))
+
+    output = mock_line_payload("整理 Downloads")
+    assert output.startswith("小雷收到：資料夾分析完成")
+    assert "檔案總數" in output
+    assert "pdf 1" in output
+    assert "dry-run" in output
 
 
 def test_mock_line_code_task():
