@@ -122,6 +122,43 @@ def test_classify_contract_english():
     assert result["confidence"] == 0.9
 
 
+# priority: taipower overrides invoice when both signals are present
+def test_classify_taipower_beats_invoice_with_購電():
+    text = "本公司購電 電費計算 發票資訊 統一發票號碼 AB12345678"
+    result = classify_document_type(text)
+    assert result["document_type"] == DocumentType.taipower_bill
+    assert result["confidence"] == 0.95
+
+
+def test_classify_taipower_beats_invoice_with_電費通知單():
+    text = "電費通知單 發票號碼 AB-12345678 請於期限內繳納"
+    result = classify_document_type(text)
+    assert result["document_type"] == DocumentType.taipower_bill
+
+
+def test_classify_taipower_電號_計費期間_combination():
+    text = "電號 123456 計費期間 2024-01-01 至 2024-01-31"
+    result = classify_document_type(text)
+    assert result["document_type"] == DocumentType.taipower_bill
+    assert result["confidence"] == 0.95
+
+
+def test_classify_taipower_購電電費():
+    result = classify_document_type("購電電費明細表")
+    assert result["document_type"] == DocumentType.taipower_bill
+
+
+def test_classify_taipower_應付總金額():
+    result = classify_document_type("應付總金額 新台幣 1,234 元")
+    assert result["document_type"] == DocumentType.taipower_bill
+
+
+def test_classify_invoice_without_taipower_signals():
+    text = "統一發票 買受人 王小明 品名 辦公桌"
+    result = classify_document_type(text)
+    assert result["document_type"] == DocumentType.invoice
+
+
 def test_classify_unknown():
     result = classify_document_type("一般文件無法識別類型")
     assert result["document_type"] == DocumentType.unknown

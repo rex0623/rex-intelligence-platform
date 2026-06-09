@@ -8,8 +8,51 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import asyncio
+import uuid
 
 from app.router.ai_router import AIRouter
+from app.schemas.messages import WorkerRequest
+from app.workers.pdf_worker import PDFWorker
+
+
+def _format_document_summary(inner: dict) -> str:
+    """Format an analyze_pdfs payload dict into Document Summary output."""
+    lines = ["小雷收到：PDF 智慧分析完成"]
+    if inner.get("mode") == "dry-run":
+        lines.append("- 模式：dry-run，不會修改 PDF (dry-run 模式)")
+    lines.append(f"- PDF 檔案總數：{inner.get('total_pdfs', 0)}")
+    lines.append(f"- 可讀數量：{inner.get('readable_pdfs', 0)}")
+    classification_counts = inner.get("classification_counts", {})
+    if classification_counts:
+        counts_text = "、".join([f"{k} {v}" for k, v in classification_counts.items()])
+        lines.append(f"- 分類結果：{counts_text}")
+    document_objects = inner.get("document_objects", [])
+    if document_objects:
+        lines.append("- Document Summary：")
+        for doc in document_objects:
+            doc_type = doc.get("document_type", "unknown")
+            confidence = doc.get("confidence", 0.0)
+            source = doc.get("source_file", "")
+            lines.append(f"  * [{doc_type}] {source} (confidence: {confidence:.2f})")
+            for field in doc.get("fields", []):
+                lines.append(f"    - {field.get('name')}：{field.get('value')}")
+    return "\n".join(lines)
+
+
+def _analyze_pdfs_direct() -> str:
+    """Directly call PDFWorker.analyze_pdfs, bypassing the router."""
+    worker = PDFWorker()
+    request = WorkerRequest(
+        worker_id="pdf_worker",
+        action="analyze_pdfs",
+        payload={},
+        user_id="cli",
+        request_id=str(uuid.uuid4()),
+    )
+    response = asyncio.run(worker.execute(request))
+    data = response.model_dump()
+    inner = data.get("data", {}).get("data", {})
+    return _format_document_summary(inner)
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -41,35 +84,7 @@ def format_mock_response(worker_response: object) -> str:
         # handle PDF analysis response
         if isinstance(data, dict) and data.get("action") == "analyze_pdfs":
             inner = data.get("data", {})
-            lines = ["小雷收到：PDF 智慧分析完成"]
-            if inner.get("mode") == "dry-run":
-                lines.append("- 模式：dry-run，不會修改 PDF (dry-run 模式)")
-            lines.append(f"- PDF 檔案總數：{inner.get('total_pdfs', 0)}")
-            lines.append(f"- 可讀數量：{inner.get('readable_pdfs', 0)}")
-            classification_counts = inner.get("classification_counts", {})
-            if classification_counts:
-                counts_text = "、".join([f"{k} {v}" for k, v in classification_counts.items()])
-                lines.append(f"- 分類結果：{counts_text}")
-            document_objects = inner.get("document_objects", [])
-            if document_objects:
-                lines.append("- Document Summary：")
-                for doc in document_objects:
-                    doc_type = doc.get("document_type", "unknown")
-                    confidence = doc.get("confidence", 0.0)
-                    source = doc.get("source_file", "")
-                    lines.append(f"  * [{doc_type}] {source} (confidence: {confidence:.2f})")
-                    fields = doc.get("fields", [])
-                    for field in fields:
-                        lines.append(f"    - {field.get('name')}：{field.get('value')}")
-            else:
-                summaries = inner.get("pdf_summaries", [])
-                if summaries:
-                    lines.append("- PDF 檔案摘要：")
-                    for summary in summaries:
-                        lines.append(
-                            f"  * {summary.get('file_name')} ({summary.get('page_count', 0)}頁, {summary.get('classification', {}).get('type', 'unknown')})"
-                        )
-            return "\n".join(lines)
+            return _format_document_summary(inner)
         # handle nested worker response structure
         inner = {}
         if isinstance(data, dict) and data.get("action") == "analyze_folder":
@@ -102,6 +117,9 @@ def format_mock_response(worker_response: object) -> str:
 
 def mock_line_payload(text: str) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    if "分析 PDF" in text or "分析pdf" in text.lower():
+        return _analyze_pdfs_direct()
+
     router = AIRouter()
     result = asyncio.run(router.route(message=text))
     worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")
