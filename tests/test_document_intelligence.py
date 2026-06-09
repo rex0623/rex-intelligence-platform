@@ -458,9 +458,120 @@ def test_sample_bill_amount_candidates_contains_all():
         assert expected in amounts_str
 
 
-def test_sample_bill_payable_amount_is_last():
+def test_sample_bill_payable_amount_max_nonzero():
+    # amounts = [0,21,155,112,13,280] — no duplicates, max non-zero = 280
     assert "payable_amount" in _SAMPLE_FIELDS
     assert _SAMPLE_FIELDS["payable_amount"].value == "280元"
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 — payable_amount priority rules
+# ---------------------------------------------------------------------------
+
+
+def test_payable_amount_first_nonzero_after_bill_code():
+    """Priority 1: first non-zero amount after the bill code."""
+    text = "UJ17628390\n983元\n0元\n0元"
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "983元"
+
+
+def test_payable_amount_skips_leading_zeros_after_code():
+    """Priority 1 skips 0元 entries immediately after the bill code."""
+    text = "UJ17628391\n0元\n0元\n567元"
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "567元"
+
+
+def test_payable_amount_falls_back_to_last_nonzero():
+    """Priority 2: no bill code present, take the last non-zero amount."""
+    text = "155元\n13元\n280元\n0元\n0元"
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "280元"
+
+
+def test_payable_amount_all_zeros_returns_zero():
+    """Fallback: all amounts are 0元."""
+    text = "UJ17628390\n0元\n0元"
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "0元"
+
+
+def test_payable_amount_zero_before_code_nonzero_after():
+    """0元 before the bill code must not interfere with post-code selection."""
+    text = "0元\n0元\nUJ17628390\n983元"
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "983元"
+
+
+def test_uj17628390_full_extraction():
+    """UJ bill code is extracted and payable_amount is the first non-zero after it."""
+    text = (
+        "115 02 01 115 02 28\n"
+        "基隆市七堵區東新街3號屋頂\n"
+        "0元\n"
+        "UJ17628390\n"
+        "983元\n"
+        "0元\n"
+        "42923195\n"
+    )
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["invoice_or_bill_code"].value == "UJ17628390"
+    assert fields["payable_amount"].value == "983元"
+    assert "983元" in fields["amount_candidates"].value
+
+
+def test_uj17628391_trailing_zeros():
+    """UJ17628391 variant: trailing zeros must not become payable_amount."""
+    text = (
+        "115 03 01 115 03 31\n"
+        "台北市大安區信義路三段153號4樓\n"
+        "UJ17628391\n"
+        "1200元\n"
+        "0元\n"
+        "0元\n"
+    )
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["invoice_or_bill_code"].value == "UJ17628391"
+    assert fields["payable_amount"].value == "1200元"
+
+
+# ---------------------------------------------------------------------------
+# payable_amount — new priority rules (duplicate > max > zero fallback)
+# ---------------------------------------------------------------------------
+
+
+def _amounts_text(nums: list) -> str:
+    """Build a plain text string of 'N元' entries for testing."""
+    return "\n".join(f"{n}元" for n in nums)
+
+
+def test_pick_payable_repeated_value_wins():
+    """280 appears twice → repeated non-zero wins."""
+    text = _amounts_text([0, 21, 155, 112, 13, 280, 0, 0, 163, 117, 280])
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "280元"
+
+
+def test_pick_payable_repeated_307():
+    """307 appears twice → repeated non-zero wins."""
+    text = _amounts_text([0, 21, 155, 137, 15, 307, 0, 0, 163, 144, 307])
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "307元"
+
+
+def test_pick_payable_no_repeat_max_wins():
+    """983 is the only non-zero amount → max (= itself) wins."""
+    text = _amounts_text([0, 983, 0, 0, 0])
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "983元"
+
+
+def test_pick_payable_all_zeros():
+    """All amounts are 0 → fallback 0元."""
+    text = _amounts_text([0, 0, 0])
+    fields = {f.name: f for f in extract_fields(text)}
+    assert fields["payable_amount"].value == "0元"
 
 
 def test_fullwidth_bill_code_via_parse_text():

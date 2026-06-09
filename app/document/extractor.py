@@ -60,6 +60,31 @@ _BUSINESS_ID = re.compile(r'^(\d{8})$', re.MULTILINE)
 _AMOUNTS = re.compile(r'(\d+)元')
 
 
+def _pick_payable_amount(amounts: List[str]) -> str:
+    """Select the best payable amount from candidates.
+
+    Priority:
+    a. Last non-zero amount that appears more than once (repeated value = likely a total).
+    b. Maximum non-zero amount (largest single value = likely the total).
+    c. Fallback: '0元'.
+    """
+    nonzero = [a for a in amounts if int(a) != 0]
+    if not nonzero:
+        return "0元"
+
+    counts: dict[str, int] = {}
+    for a in nonzero:
+        counts[a] = counts.get(a, 0) + 1
+
+    # (a) last element of nonzero that has count > 1
+    duplicates = [a for a in nonzero if counts[a] > 1]
+    if duplicates:
+        return f"{duplicates[-1]}元"
+
+    # (b) largest non-zero amount
+    return f"{max(nonzero, key=int)}元"
+
+
 def _extract_taipower_fields(text: str) -> List[DocumentField]:
     """Extract TaiPower bill-specific fields from normalized text."""
     fields: List[DocumentField] = []
@@ -92,7 +117,7 @@ def _extract_taipower_fields(text: str) -> List[DocumentField]:
     if amounts:
         candidates = "、".join(f"{a}元" for a in amounts)
         fields.append(DocumentField(name="amount_candidates", value=candidates, confidence=0.8))
-        fields.append(DocumentField(name="payable_amount", value=f"{amounts[-1]}元", confidence=0.75))
+        fields.append(DocumentField(name="payable_amount", value=_pick_payable_amount(amounts), confidence=0.75))
 
     return fields
 
