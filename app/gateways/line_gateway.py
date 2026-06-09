@@ -121,17 +121,18 @@ class LineGateway:
         for event in request.events:
             if event.type == "message" and event.message.type == "text":
                 router_result = await self.router.route(
-                    user_id=user_id or event.source.get("userId", "unknown"),
                     message=event.message.text,
+                    user_id=user_id or event.source.get("userId", "unknown"),
                     metadata={
                         "line_event_id": event.message.id,
                         "reply_token": event.replyToken,
                     },
                 )
 
+                worker_response = router_result.get("worker_response")
                 reply_payload = self.reply_text(
                     event.replyToken,
-                    f"收到，我是小雷。你剛剛說：{event.message.text}",
+                    f"小雷收到：{worker_response}",
                 )
 
                 results.append(

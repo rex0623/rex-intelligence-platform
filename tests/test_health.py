@@ -93,18 +93,28 @@ def test_line_webhook_invalid_json(client):
     assert response.status_code == 400
 
 
-def test_line_webhook_text_message_replies_fixed_text(client, monkeypatch):
-    """Test LINE webhook text message replies with fixed response."""
+@pytest.mark.parametrize(
+    "text, expected_worker, expected_reply",
+    [
+        ("請幫我看電費單", "pdf_worker", "小雷收到：我判斷這是 PDF 任務"),
+        ("請幫我整理 Downloads", "folder_worker", "小雷收到：我判斷這是資料夾整理任務"),
+        ("幫我寫 API", "claude_worker", "小雷收到：我判斷這是程式開發任務"),
+        ("幫我整理需求", "gpt_worker", "小雷收到：我判斷這是需求分析任務"),
+        ("你好", "default", "小雷收到：我還不確定你的需求，可以再說清楚一點嗎？"),
+    ],
+)
+def test_line_webhook_text_message_routing(client, monkeypatch, text, expected_worker, expected_reply):
+    """Test LINE webhook text message routing for different intents."""
     reply_called = {}
 
     def fake_verify_signature(signature, body):
         reply_called["verified"] = True
         return True
 
-    def fake_reply_text(reply_token, text):
+    def fake_reply_text(reply_token, reply_text):
         reply_called["reply_token"] = reply_token
-        reply_called["text"] = text
-        return {"status": "dry_run", "reply_token": reply_token, "message": text}
+        reply_called["text"] = reply_text
+        return {"status": "dry_run", "reply_token": reply_token, "message": reply_text}
 
     monkeypatch.setattr("app.main.line_gateway.verify_signature", fake_verify_signature)
     monkeypatch.setattr("app.main.line_gateway.reply_text", fake_reply_text)
@@ -117,7 +127,7 @@ def test_line_webhook_text_message_replies_fixed_text(client, monkeypatch):
                     "type": "message",
                     "message": {
                         "type": "text",
-                        "text": "Hello from LINE",
+                        "text": text,
                         "id": "1234567890",
                     },
                     "timestamp": 1234567890,
@@ -135,5 +145,6 @@ def test_line_webhook_text_message_replies_fixed_text(client, monkeypatch):
     assert data["status"] == "ok"
     assert reply_called["verified"] is True
     assert reply_called["reply_token"] == "test_token"
-    assert reply_called["text"] == "收到，我是小雷。你剛剛說：Hello from LINE"
+    assert reply_called["text"] == expected_reply
     assert data["details"]["results"][0]["reply"]["status"] == "dry_run"
+    assert data["details"]["results"][0]["worker_id"] == expected_worker
