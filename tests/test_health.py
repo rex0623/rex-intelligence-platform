@@ -56,7 +56,7 @@ def test_line_webhook_invalid_signature(client):
 
 
 def test_line_webhook_no_signature(client):
-    """Test LINE webhook without signature (development mode)."""
+    """Test LINE webhook without signature header."""
     response = client.post(
         "/line/webhook",
         json={
@@ -77,10 +77,9 @@ def test_line_webhook_no_signature(client):
         },
     )
 
-    # Should succeed without signature in development
-    assert response.status_code == 200
+    assert response.status_code == 400
     data = response.json()
-    assert data["status"] == "ok"
+    assert data["error"] == "Missing X-Line-Signature header"
 
 
 def test_line_webhook_invalid_json(client):

@@ -14,8 +14,8 @@ from app.schemas.messages import LineWebhookRequest
 logger = get_logger(__name__)
 
 # Global instances
-ai_router: AIRouter = None
-line_gateway: LineGateway = None
+ai_router: AIRouter = AIRouter()
+line_gateway: LineGateway = LineGateway(router=ai_router)
 
 
 @asynccontextmanager
@@ -23,11 +23,6 @@ async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
     # Startup
     logger.info("Starting RIP application")
-    global ai_router, line_gateway
-
-    ai_router = AIRouter()
-    line_gateway = LineGateway(router=ai_router)
-
     logger.info("Application startup complete")
 
     yield
@@ -75,7 +70,11 @@ async def detailed_health_check():
     """
     logger.debug("Detailed health check requested")
 
-    router_health = await ai_router.get_health()
+    if ai_router is None:
+        logger.warning("AI Router is not initialized for detailed health check")
+        router_health = {"router_status": "unavailable", "workers": {}}
+    else:
+        router_health = await ai_router.get_health()
 
     return {
         "status": "healthy",
@@ -96,14 +95,30 @@ async def line_webhook(request: Request):
     Returns:
         Response
     """
+    if line_gateway is None:
+        logger.error("LINE Gateway is not initialized")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": "Service unavailable"},
+        )
+
     # Get signature from header
-    signature = request.headers.get("X-Line-Signature", "")
+    signature = request.headers.get("X-Line-Signature")
     body = await request.body()
 
     logger.info("LINE webhook received", extra={"signature_provided": bool(signature)})
 
+    if not signature:
+        logger.warning("Missing LINE signature header")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "Missing X-Line-Signature header"},
+        )
+
+    decoded_body = body.decode("utf-8", errors="replace")
+
     # Verify signature
-    if not line_gateway.verify_signature(signature, body.decode()):
+    if not line_gateway.verify_signature(signature, decoded_body):
         logger.warning("Invalid LINE signature")
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,

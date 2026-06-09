@@ -36,9 +36,13 @@ class LineGateway:
         Returns:
             True if signature is valid
         """
+        if not signature:
+            logger.warning("Missing X-Line-Signature header")
+            return False
+
         if not self.channel_secret:
-            logger.warning("LINE_CHANNEL_SECRET not set, skipping signature verification")
-            return True
+            logger.warning("LINE_CHANNEL_SECRET not set, cannot verify signature")
+            return False
 
         expected_signature = hmac.new(
             self.channel_secret.encode(),
