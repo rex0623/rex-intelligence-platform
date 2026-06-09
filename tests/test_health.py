@@ -91,3 +91,49 @@ def test_line_webhook_invalid_json(client):
     )
 
     assert response.status_code == 400
+
+
+def test_line_webhook_text_message_replies_fixed_text(client, monkeypatch):
+    """Test LINE webhook text message replies with fixed response."""
+    reply_called = {}
+
+    def fake_verify_signature(signature, body):
+        reply_called["verified"] = True
+        return True
+
+    def fake_reply_text(reply_token, text):
+        reply_called["reply_token"] = reply_token
+        reply_called["text"] = text
+        return {"status": "dry_run", "reply_token": reply_token, "message": text}
+
+    monkeypatch.setattr("app.main.line_gateway.verify_signature", fake_verify_signature)
+    monkeypatch.setattr("app.main.line_gateway.reply_text", fake_reply_text)
+
+    response = client.post(
+        "/line/webhook",
+        json={
+            "events": [
+                {
+                    "type": "message",
+                    "message": {
+                        "type": "text",
+                        "text": "Hello from LINE",
+                        "id": "1234567890",
+                    },
+                    "timestamp": 1234567890,
+                    "mode": "active",
+                    "replyToken": "test_token",
+                    "source": {"type": "user", "userId": "test_user"},
+                }
+            ]
+        },
+        headers={"X-Line-Signature": "test_signature"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert reply_called["verified"] is True
+    assert reply_called["reply_token"] == "test_token"
+    assert reply_called["text"] == "收到，我是小雷。你剛剛說：Hello from LINE"
+    assert data["details"]["results"][0]["reply"]["status"] == "dry_run"

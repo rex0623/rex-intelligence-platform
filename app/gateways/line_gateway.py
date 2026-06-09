@@ -1,5 +1,6 @@
 """LINE Gateway for RIP."""
 
+import base64
 import hashlib
 import hmac
 from typing import Any, Optional
@@ -23,7 +24,7 @@ class LineGateway:
             router: AI Router instance
         """
         self.router = router or AIRouter()
-        self.channel_secret = settings.LINE_CHANNEL_SECRET
+        self.line_bot_api = None
 
     def verify_signature(self, signature: str, body: str) -> bool:
         """
@@ -40,21 +41,60 @@ class LineGateway:
             logger.warning("Missing X-Line-Signature header")
             return False
 
-        if not self.channel_secret:
+        channel_secret = settings.LINE_CHANNEL_SECRET
+        if not channel_secret:
             logger.warning("LINE_CHANNEL_SECRET not set, cannot verify signature")
             return False
 
         expected_signature = hmac.new(
-            self.channel_secret.encode(),
+            channel_secret.encode(),
             body.encode(),
             hashlib.sha256,
         ).digest()
 
-        import base64
-
         expected_signature_b64 = base64.b64encode(expected_signature).decode()
 
         return signature == expected_signature_b64
+
+    def reply_text(self, reply_token: str, text: str) -> dict[str, Any]:
+        """
+        Reply to a LINE text message.
+
+        Args:
+            reply_token: LINE reply token
+            text: Reply text content
+
+        Returns:
+            Result data from send or dry run
+        """
+        logger.info(
+            "Replying to LINE text message",
+            extra={"reply_token": reply_token, "text": text},
+        )
+
+        if not reply_token:
+            logger.warning("Missing reply token for LINE reply")
+            return {"status": "failed", "reason": "missing_reply_token"}
+
+        if not settings.LINE_ACCESS_TOKEN:
+            logger.info("Dry run reply: LINE_ACCESS_TOKEN not configured")
+            return {"status": "dry_run", "reply_token": reply_token, "message": text}
+
+        try:
+            from linebot import LineBotApi
+            from linebot.exceptions import LineBotApiError
+            from linebot.models import TextSendMessage
+        except ImportError:
+            logger.warning("LINE SDK not installed, using dry run reply")
+            return {"status": "dry_run", "reply_token": reply_token, "message": text}
+
+        try:
+            line_bot_api = LineBotApi(settings.LINE_ACCESS_TOKEN)
+            line_bot_api.reply_message(reply_token, TextSendMessage(text=text))
+            return {"status": "success", "reply_token": reply_token, "message": text}
+        except LineBotApiError as e:
+            logger.error("LINE API reply failed", exc_info=True)
+            return {"status": "failed", "reason": str(e)}
 
     async def handle_webhook(
         self,
@@ -80,8 +120,30 @@ class LineGateway:
 
         for event in request.events:
             if event.type == "message" and event.message.type == "text":
-                result = await self._handle_text_message(event, user_id)
-                results.append(result)
+                router_result = await self.router.route(
+                    user_id=user_id or event.source.get("userId", "unknown"),
+                    message=event.message.text,
+                    metadata={
+                        "line_event_id": event.message.id,
+                        "reply_token": event.replyToken,
+                    },
+                )
+
+                reply_payload = self.reply_text(
+                    event.replyToken,
+                    f"收到，我是小雷。你剛剛說：{event.message.text}",
+                )
+
+                results.append(
+                    {
+                        "event_type": event.type,
+                        "user_id": event.source.get("userId", "unknown"),
+                        "message": event.message.text,
+                        "intent": router_result.get("intent"),
+                        "worker_id": router_result.get("worker_id"),
+                        "reply": reply_payload,
+                    }
+                )
             else:
                 logger.debug(f"Ignoring event type: {event.type}")
 
