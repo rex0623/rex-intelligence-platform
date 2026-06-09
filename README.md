@@ -193,6 +193,33 @@ python scripts/mock_line.py "處理電費單"
 
 對應輸出會依據 AI Router intent 分流。
 
+## Phase 10 本機執行方式
+
+如果你使用 Poetry：
+
+```bash
+poetry run pytest -q
+poetry run python scripts/mock_line.py "處理電費單"
+```
+
+如果你使用本地虛擬環境 `.venv`：
+
+```bash
+source .venv/bin/activate
+python -m pytest -q
+python scripts/mock_line.py "處理電費單"
+```
+
+要測試 PDF Intelligence Engine，請把 PDF 檔案放到：
+
+```bash
+workspace/sandbox/pdf_inbox
+```
+
+這個流程目前仍屬 dry-run，不會更名或修改 PDF。PDF 分析只會掃描檔案、擷取第一頁文字、判斷類型和回傳報告。
+
+目前測試狀態：`35 tests passed`
+
 ### 安全資料夾分析
 
 `整理 Downloads` 會在安全根目錄中分析 `Downloads` 資料夾，預設安全根目錄為：
