@@ -45,13 +45,25 @@ def format_mock_response(worker_response: object) -> str:
             if classification_counts:
                 counts_text = "、".join([f"{k} {v}" for k, v in classification_counts.items()])
                 lines.append(f"- 分類結果：{counts_text}")
-            summaries = inner.get("pdf_summaries", [])
-            if summaries:
-                lines.append("- PDF 檔案摘要：")
-                for summary in summaries:
-                    lines.append(
-                        f"  * {summary.get('file_name')} ({summary.get('page_count', 0)}頁, {summary.get('classification', {}).get('type', 'unknown')})"
-                    )
+            document_objects = inner.get("document_objects", [])
+            if document_objects:
+                lines.append("- Document Summary：")
+                for doc in document_objects:
+                    doc_type = doc.get("document_type", "unknown")
+                    confidence = doc.get("confidence", 0.0)
+                    source = doc.get("source_file", "")
+                    lines.append(f"  * [{doc_type}] {source} (confidence: {confidence:.2f})")
+                    fields = doc.get("fields", [])
+                    for field in fields:
+                        lines.append(f"    - {field.get('name')}：{field.get('value')}")
+            else:
+                summaries = inner.get("pdf_summaries", [])
+                if summaries:
+                    lines.append("- PDF 檔案摘要：")
+                    for summary in summaries:
+                        lines.append(
+                            f"  * {summary.get('file_name')} ({summary.get('page_count', 0)}頁, {summary.get('classification', {}).get('type', 'unknown')})"
+                        )
             return "\n".join(lines)
         # handle nested worker response structure
         inner = {}

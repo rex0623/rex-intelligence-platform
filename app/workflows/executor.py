@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import settings
+from app.document.classifier import classify_document_type
+from app.document.extractor import extract_fields
+from app.document.parser import parse_text
+from app.document.schemas import Document
 from app.workflows.base import WorkflowPlan
 
 
@@ -38,9 +42,10 @@ class WorkflowExecutor:
                 )
                 or "none"
             )
+            doc_count = len(summary.get("document_objects", []))
             return (
                 f"dry-run completed：PDF數量 {summary['total_pdfs']}，可讀數量 {summary['readable_pdfs']}，"
-                f"分類結果 {classification_result}"
+                f"分類結果 {classification_result}，Document物件 {doc_count}"
             )
 
         if step_name in {"批次更名", "加入浮水印"}:
@@ -61,25 +66,26 @@ class WorkflowExecutor:
         pdf_files = [path for path in target.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
         readable = 0
         classification_counts: dict[str, int] = {}
-
-        def classify(text: str) -> str:
-            normalized = text.lower()
-            if "台灣電力公司" in normalized or "電費通知單" in normalized:
-                return "taipower_bill"
-            if "發票" in normalized:
-                return "invoice"
-            if "契約" in normalized:
-                return "contract"
-            return "unknown"
+        document_objects: list[dict[str, Any]] = []
 
         for path in pdf_files:
             try:
                 doc = fitz.open(path)
                 if not doc.is_encrypted and doc.page_count > 0:
-                    text = doc.load_page(0).get_text()
-                    if text:
+                    raw_text = doc.load_page(0).get_text()
+                    normalized = parse_text(raw_text)
+                    if normalized:
+                        classification = classify_document_type(normalized)
+                        document = Document(
+                            document_type=classification["document_type"],
+                            confidence=float(classification["confidence"]),
+                            fields=extract_fields(normalized),
+                            text=normalized,
+                            source_file=path.name,
+                        )
                         readable += 1
-                        pdf_type = classify(text)
+                        pdf_type = classification["document_type"].value
+                        document_objects.append(document.model_dump())
                     else:
                         pdf_type = "unknown"
                 else:
@@ -94,4 +100,5 @@ class WorkflowExecutor:
             "total_pdfs": len(pdf_files),
             "readable_pdfs": readable,
             "classification_counts": classification_counts,
+            "document_objects": document_objects,
         }

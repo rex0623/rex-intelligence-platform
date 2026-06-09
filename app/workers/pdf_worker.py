@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from app.core.logger import get_logger
+from app.document.classifier import classify_document_type
+from app.document.extractor import extract_fields
+from app.document.parser import parse_text
+from app.document.schemas import Document
 from app.schemas.messages import WorkerRequest
 from app.workers.base import BaseWorker
 
@@ -106,7 +110,15 @@ class PDFWorker(BaseWorker):
             "error": f"Unknown action: {action}",
         }
 
+    def classify_pdf(self, text: str) -> dict[str, object]:
+        """Classify a PDF from its text content."""
+        result = classify_document_type(text)
+        return {"type": result["document_type"].value, "confidence": result["confidence"]}
+
     async def analyze_pdfs(self) -> dict[str, Any]:
+        return self._analyze_pdfs_sync()
+
+    def _analyze_pdfs_sync(self) -> dict[str, Any]:
         target = self.safe_pdf_root
         try:
             home = Path.home().resolve()
@@ -128,6 +140,7 @@ class PDFWorker(BaseWorker):
 
         pdf_files = [path for path in target.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
         summaries = []
+        document_objects = []
         readable_count = 0
         classification_counts: dict[str, int] = {}
 
@@ -153,6 +166,7 @@ class PDFWorker(BaseWorker):
                 "text_length": 0,
                 "first_200_chars": "",
                 "classification": {"type": "unknown", "confidence": 0.0},
+                "document_object": None,
             }
 
             try:
@@ -164,12 +178,23 @@ class PDFWorker(BaseWorker):
                 file_info["producer"] = metadata.get("producer", "") or ""
 
                 if not doc.is_encrypted and doc.page_count > 0:
-                    text = doc.load_page(0).get_text()
+                    raw_text = doc.load_page(0).get_text()
+                    normalized_text = parse_text(raw_text)
                     file_info["readable"] = True
-                    file_info["text_length"] = len(text)
-                    file_info["first_200_chars"] = text[:200]
-                    classification = self.classify_pdf(text)
-                    file_info["classification"] = classification
+                    file_info["text_length"] = len(normalized_text)
+                    file_info["first_200_chars"] = normalized_text[:200]
+
+                    classification = classify_document_type(normalized_text)
+                    document = Document(
+                        document_type=classification["document_type"],
+                        confidence=float(classification["confidence"]),
+                        fields=extract_fields(normalized_text),
+                        text=normalized_text,
+                        source_file=path.name,
+                    )
+                    file_info["classification"] = {"type": classification["document_type"].value, "confidence": classification["confidence"]}
+                    file_info["document_object"] = document.model_dump()
+                    document_objects.append(document.model_dump())
                     readable_count += 1
                 else:
                     file_info["classification"] = {"type": "unknown", "confidence": 0.0}
@@ -194,20 +219,6 @@ class PDFWorker(BaseWorker):
                 "readable_pdfs": readable_count,
                 "classification_counts": classification_counts,
                 "pdf_summaries": summaries,
+                "document_objects": document_objects,
             },
         }
-
-    def classify_pdf(self, text: str) -> dict[str, Any]:
-        normalized = text.lower()
-        if (
-            "台灣電力公司" in normalized
-            or "電費通知單" in normalized
-            or "taiwan power company" in normalized
-            or "electric bill" in normalized
-        ):
-            return {"type": "taipower_bill", "confidence": 0.95}
-        if "發票" in normalized or "invoice" in normalized:
-            return {"type": "invoice", "confidence": 0.9}
-        if "契約" in normalized or "contract" in normalized:
-            return {"type": "contract", "confidence": 0.9}
-        return {"type": "unknown", "confidence": 0.5}
