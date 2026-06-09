@@ -7,6 +7,7 @@ from app.core.logger import get_logger
 from app.schemas.messages import WorkerRequest
 from app.workers import ClaudeWorker, FolderWorker, GPTWorker, PDFWorker
 from app.workflows.engine import WorkflowEngine
+from app.approvals.manager import approval_manager
 
 workflow_engine = WorkflowEngine()
 
@@ -93,6 +94,9 @@ class AIRouter:
             if "電費單" in message or "電費" in message:
                 plan = workflow_engine.create_workflow("pdf_bill", title="電費單處理流程")
                 payload = plan.model_dump()
+                # create an approval for this workflow plan
+                approval = approval_manager.create_approval(payload)
+                payload["approval_id"] = approval.approval_id
                 return {
                     "status": "success",
                     "user_id": user_id,

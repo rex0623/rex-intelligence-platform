@@ -5,6 +5,8 @@ import argparse
 import asyncio
 
 from app.router.ai_router import AIRouter
+from app.approvals.manager import approval_manager
+import re
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -20,6 +22,11 @@ def format_mock_response(worker_response: object) -> str:
             for i, s in enumerate(steps, start=1):
                 lines.append(f"{i}. {s.get('name')}")
             lines.append("注意：目前不會更名、不會修改 PDF")
+            approval_id = worker_response.get('approval_id')
+            if approval_id:
+                lines.append("")
+                lines.append(f"若要確認，請輸入：確認 {approval_id}")
+                lines.append(f"若要取消，請輸入：取消 {approval_id}")
             return "\n".join(lines)
         # handle PDF analysis response
         if isinstance(data, dict) and data.get("action") == "analyze_pdfs":
@@ -66,7 +73,34 @@ def format_mock_response(worker_response: object) -> str:
 
 
 def mock_line_payload(text: str) -> str:
-    """Run the AI Router against a text input and return the mock LINE reply."""
+    """Run the AI Router against a text input and return the mock LINE reply.
+
+    Support local approval commands: "確認 {id}" and "取消 {id}" which change
+    approval status in the in-memory approval manager.
+    """
+    # handle confirm / cancel commands locally first
+    text_stripped = text.strip()
+    m_confirm = re.match(r"^確認\s+([0-9a-fA-F\-]+)$", text_stripped)
+    m_cancel = re.match(r"^取消\s+([0-9a-fA-F\-]+)$", text_stripped)
+    if m_confirm:
+        approval_id = m_confirm.group(1)
+        try:
+            approval = approval_manager.approve(approval_id)
+            return "小雷收到：已確認 workflow，但目前仍為 dry-run，不會修改 PDF"
+        except KeyError:
+            return f"小雷收到：找不到 approval：{approval_id}"
+        except ValueError:
+            return f"小雷收到：無法確認 approval：{approval_id}（狀態為 {approval_manager.get(approval_id).status}）"
+    if m_cancel:
+        approval_id = m_cancel.group(1)
+        try:
+            approval = approval_manager.reject(approval_id)
+            return "小雷收到：已取消 workflow"
+        except KeyError:
+            return f"小雷收到：找不到 approval：{approval_id}"
+        except ValueError:
+            return f"小雷收到：無法取消 approval：{approval_id}（狀態為 {approval_manager.get(approval_id).status}）"
+
     router = AIRouter()
     result = asyncio.run(router.route(message=text))
     worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")

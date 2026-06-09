@@ -1,0 +1,104 @@
+"""File-backed approval manager."""
+
+import json
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict, Optional
+
+from app.approvals.schemas import Approval
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class ApprovalManager:
+    def __init__(self, store_path: Optional[Path | str] = None):
+        self.store_path = (
+            Path(store_path)
+            if store_path is not None
+            else Path(__file__).resolve().parents[2] / "runtime" / "approvals.json"
+        )
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self._store: Dict[str, Approval] = {}
+        self._load_store()
+
+    def _load_store(self) -> None:
+        if not self.store_path.exists():
+            self._store = {}
+            return
+
+        try:
+            raw = json.loads(self.store_path.read_text(encoding="utf-8"))
+            self._store = {
+                item["approval_id"]: Approval.model_validate(item) for item in raw
+            }
+        except Exception:
+            logger.warning(
+                "Failed to load approval store, starting with empty store",
+                exc_info=True,
+            )
+            self._store = {}
+
+    def _save_store(self) -> None:
+        data = [approval.model_dump(mode="json") for approval in self._store.values()]
+        self.store_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    def create_approval(self, workflow_plan: dict, ttl_minutes: int = 60) -> Approval:
+        approval_id = str(uuid.uuid4())
+        workflow_id = workflow_plan.get("workflow_id", "")
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+        approval = Approval(
+            approval_id=approval_id,
+            workflow_id=workflow_id,
+            status="pending",
+            created_at=datetime.now(timezone.utc),
+            expires_at=expires_at,
+            payload=workflow_plan,
+        )
+        self._store[approval_id] = approval
+        self._save_store()
+        logger.info("Created approval", extra={"approval_id": approval_id})
+        return approval
+
+    def get(self, approval_id: str) -> Optional[Approval]:
+        approval = self._store.get(approval_id)
+        if approval and approval.is_expired():
+            approval.status = "expired"
+            self._save_store()
+        return approval
+
+    def approve(self, approval_id: str) -> Approval:
+        approval = self._store.get(approval_id)
+        if approval is None:
+            raise KeyError("approval not found")
+        if approval.is_expired():
+            approval.status = "expired"
+            self._save_store()
+            return approval
+        if approval.status != "pending":
+            raise ValueError("approval not in pending state")
+        approval.status = "approved"
+        self._save_store()
+        logger.info("Approval approved", extra={"approval_id": approval_id})
+        return approval
+
+    def reject(self, approval_id: str) -> Approval:
+        approval = self._store.get(approval_id)
+        if approval is None:
+            raise KeyError("approval not found")
+        if approval.is_expired():
+            approval.status = "expired"
+            self._save_store()
+            return approval
+        if approval.status != "pending":
+            raise ValueError("approval not in pending state")
+        approval.status = "rejected"
+        self._save_store()
+        logger.info("Approval rejected", extra={"approval_id": approval_id})
+        return approval
+
+
+approval_manager = ApprovalManager()

@@ -211,6 +211,11 @@ class LineGateway:
                 for i, s in enumerate(steps, start=1):
                     lines.append(f"{i}. {s.get('name')}")
                 lines.append("注意：目前不會更名、不會修改 PDF")
+                approval_id = worker_response.get('approval_id')
+                if approval_id:
+                    lines.append("")
+                    lines.append(f"若要確認，請輸入：確認 {approval_id}")
+                    lines.append(f"若要取消，請輸入：取消 {approval_id}")
                 return "\n".join(lines)
 
             return f"小雷收到：{worker_response}"
