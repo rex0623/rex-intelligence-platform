@@ -1,4 +1,4 @@
-"""Tests for Phase 11 Document Intelligence Engine."""
+"""Tests for Phase 11/12 Document Intelligence Engine."""
 
 import asyncio
 from pathlib import Path
@@ -363,3 +363,132 @@ def test_analyze_pdfs_taipower_has_fields(tmp_path, monkeypatch):
     field_names = {f["name"] for f in doc["fields"]}
     assert "電號" in field_names
     assert "應繳金額" in field_names
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 — full-width normalization (parser)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_text_converts_fullwidth_digits():
+    assert parse_text("１２３456") == "123456"
+
+
+def test_parse_text_converts_fullwidth_uppercase():
+    assert parse_text("ＸＢ") == "XB"
+
+
+def test_parse_text_converts_fullwidth_lowercase():
+    assert parse_text("ａｂｃ") == "abc"
+
+
+def test_parse_text_converts_ideographic_space():
+    result = parse_text("hello　world")  # U+3000 ideographic space
+    assert result == "hello world"
+
+
+def test_parse_text_converts_nbsp():
+    result = parse_text("hello world")  # non-breaking space
+    assert result == "hello world"
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 — TaiPower bill sample (real text from problem statement)
+# ---------------------------------------------------------------------------
+
+# Raw text as it appears in a real TaiPower PDF (full-width chars intact)
+_SAMPLE_BILL_RAW = """\
+電子帳單
+115 03
+106
+台北市大安區信義路三段１５３號４樓
+得禾能源股份有限公司
+先生/女士/寶號
+115 02 01    115 02 28
+基隆區營業處核算（收費）課
+２００基隆市仁一路３０１號
+基隆市七堵區東新街３號屋頂
+0元
+115年01-02月
+XB17839034
+21元
+(02)24231156
+00423107
+42923195
+155元
+112元
+13元
+280元"""
+
+_SAMPLE_BILL = parse_text(_SAMPLE_BILL_RAW)
+_SAMPLE_FIELDS = {f.name: f for f in extract_fields(_SAMPLE_BILL)}
+
+
+def test_sample_bill_billing_start_date():
+    assert "billing_start_date" in _SAMPLE_FIELDS
+    assert _SAMPLE_FIELDS["billing_start_date"].value == "1150201"
+
+
+def test_sample_bill_billing_end_date():
+    assert "billing_end_date" in _SAMPLE_FIELDS
+    assert _SAMPLE_FIELDS["billing_end_date"].value == "1150228"
+
+
+def test_sample_bill_site_address():
+    assert "site_address" in _SAMPLE_FIELDS
+    site = _SAMPLE_FIELDS["site_address"].value
+    assert "基隆市七堵區東新街" in site
+    assert "3號" in site
+
+
+def test_sample_bill_invoice_or_bill_code():
+    assert "invoice_or_bill_code" in _SAMPLE_FIELDS
+    assert _SAMPLE_FIELDS["invoice_or_bill_code"].value == "XB17839034"
+
+
+def test_sample_bill_business_id():
+    assert "business_id" in _SAMPLE_FIELDS
+    assert _SAMPLE_FIELDS["business_id"].value == "42923195"
+
+
+def test_sample_bill_amount_candidates_contains_all():
+    assert "amount_candidates" in _SAMPLE_FIELDS
+    amounts_str = _SAMPLE_FIELDS["amount_candidates"].value
+    for expected in ["21元", "155元", "112元", "13元", "280元"]:
+        assert expected in amounts_str
+
+
+def test_sample_bill_payable_amount_is_last():
+    assert "payable_amount" in _SAMPLE_FIELDS
+    assert _SAMPLE_FIELDS["payable_amount"].value == "280元"
+
+
+def test_fullwidth_bill_code_via_parse_text():
+    """Full-width bill code becomes extractable after parse_text."""
+    raw = "ＸＢ１７８３９０３４"
+    normalized = parse_text(raw)
+    assert normalized == "XB17839034"
+    fields = extract_fields(normalized)
+    names = {f.name for f in fields}
+    assert "invoice_or_bill_code" in names
+    code = next(f for f in fields if f.name == "invoice_or_bill_code")
+    assert code.value == "XB17839034"
+
+
+def test_business_id_excludes_phone_number():
+    """Phone number like (02)24231156 must not be extracted as business_id."""
+    text = parse_text("(02)24231156\n00423107\n42923195")
+    fields = extract_fields(text)
+    bid = next((f for f in fields if f.name == "business_id"), None)
+    assert bid is not None
+    assert bid.value == "42923195"
+    assert "24231156" not in bid.value
+
+
+def test_site_address_prefers_site_over_billing_address():
+    """When billing address and site address both match, prefer the site address."""
+    fields = extract_fields(_SAMPLE_BILL)
+    site = next(f for f in fields if f.name == "site_address")
+    # Site address (七堵) should win over billing address (大安)
+    assert "七堵" in site.value
+    assert "大安" not in site.value
