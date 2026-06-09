@@ -160,7 +160,7 @@ deactivate  # 退出虛擬環境
 
 ```bash
 # 發送測試消息到 Gateway
-curl -X POST http://localhost:8000/webhook \
+curl -X POST http://localhost:8000/line/webhook \
   -H "Content-Type: application/json" \
   -H "X-Line-Signature: test" \
   -d '{
@@ -173,6 +173,25 @@ curl -X POST http://localhost:8000/webhook \
     }]
   }'
 ```
+
+### 本機 Mock LINE CLI
+
+```bash
+# 使用本機 CLI 測試 AI Router
+python scripts/mock_line.py "處理電費單"
+
+# 預期輸出
+小雷收到：我判斷這是 PDF 任務
+```
+
+支援測試句子：
+- 處理電費單
+- 整理 Downloads
+- 幫我寫 API
+- 幫我整理需求
+- 你好
+
+對應輸出會依據 AI Router intent 分流。
 
 ## � 成本管理
 
