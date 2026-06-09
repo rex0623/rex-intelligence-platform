@@ -202,6 +202,17 @@ class LineGateway:
                 lines.append(f"- 未來將執行：{', '.join(inner.get('future_actions', []))}")
                 return "\n".join(lines)
 
+            # handle workflow plan payloads
+            if worker_response.get("workflow_type") == "pdf_bill":
+                steps = worker_response.get("steps", [])
+                lines = [f"小雷收到：已建立電費單處理流程（{'dry-run' if worker_response.get('dry_run') else 'live'}）"]
+                lines.append(f"狀態：{worker_response.get('status')}")
+                lines.append("步驟：")
+                for i, s in enumerate(steps, start=1):
+                    lines.append(f"{i}. {s.get('name')}")
+                lines.append("注意：目前不會更名、不會修改 PDF")
+                return "\n".join(lines)
+
             return f"小雷收到：{worker_response}"
 
         return f"小雷收到：{worker_response}"

@@ -14,9 +14,9 @@ def test_mock_line_pdf_task(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "SAFE_PDF_ROOT", str(pdf_root))
 
     output = mock_line_payload("處理電費單")
-    assert output.startswith("小雷收到：PDF 分析完成")
-    assert "PDF 檔案總數" in output
-    assert "sample1.pdf" in output
+    assert output.startswith("小雷收到：已建立電費單處理流程（dry-run）")
+    assert "狀態：waiting_approval" in output
+    assert "步驟：" in output
 
 
 def test_mock_line_folder_task(tmp_path, monkeypatch):

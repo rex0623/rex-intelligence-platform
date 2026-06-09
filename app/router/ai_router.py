@@ -6,6 +6,9 @@ from typing import Any
 from app.core.logger import get_logger
 from app.schemas.messages import WorkerRequest
 from app.workers import ClaudeWorker, FolderWorker, GPTWorker, PDFWorker
+from app.workflows.engine import WorkflowEngine
+
+workflow_engine = WorkflowEngine()
 
 logger = get_logger(__name__)
 
@@ -86,7 +89,19 @@ class AIRouter:
                 "response": response_payload,
             }
         if worker_id == "pdf_worker":
-            # For PDF worker we analyze safe pdf root in dry-run
+            # If message explicitly about 電費單, create a pdf_bill workflow plan instead of returning PDF analysis
+            if "電費單" in message or "電費" in message:
+                plan = workflow_engine.create_workflow("pdf_bill", title="電費單處理流程")
+                payload = plan.model_dump()
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "intent": intent,
+                    "worker_id": worker_id,
+                    "worker_response": payload,
+                    "response": payload,
+                }
+            # otherwise fallback to analyzing PDFs directly
             worker_request = WorkerRequest(
                 worker_id=worker_id,
                 action="analyze_pdfs",

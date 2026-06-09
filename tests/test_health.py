@@ -162,8 +162,9 @@ def test_line_webhook_text_message_routing(client, monkeypatch, text, expected_w
         assert reply_called["text"].startswith("小雷收到：資料夾分析完成")
         assert "dry-run 模式" in reply_called["text"]
     elif expected_worker == "pdf_worker":
-        assert reply_called["text"].startswith("小雷收到：PDF 分析完成")
-        assert "PDF 檔案總數" in reply_called["text"]
+        assert reply_called["text"].startswith("小雷收到：已建立電費單處理流程（dry-run）")
+        assert "狀態：waiting_approval" in reply_called["text"]
+        assert "步驟：" in reply_called["text"]
     else:
         assert reply_called["text"] == expected_reply
     assert data["details"]["results"][0]["reply"]["status"] == "dry_run"
