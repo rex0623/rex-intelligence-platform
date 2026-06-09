@@ -163,6 +163,13 @@ class LineGateway:
             String reply text
         """
         if isinstance(worker_response, dict):
+            if worker_response.get("status") == "dry_run_completed":
+                lines = ["小雷收到：workflow 已確認，以下是 dry-run 執行報告"]
+                for step in worker_response.get("steps", []):
+                    lines.append(f"- {step.get('name')}：{step.get('result')}")
+                lines.append("注意：本次沒有修改任何 PDF")
+                return "\n".join(lines)
+
             data = worker_response.get("data", {})
             inner = {}
             if isinstance(data, dict) and data.get("action") == "analyze_folder":

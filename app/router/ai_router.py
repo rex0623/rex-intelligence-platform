@@ -1,5 +1,6 @@
 """AI Router for RIP - The Brain of the System."""
 
+import re
 import uuid
 from typing import Any
 
@@ -7,9 +8,11 @@ from app.core.logger import get_logger
 from app.schemas.messages import WorkerRequest
 from app.workers import ClaudeWorker, FolderWorker, GPTWorker, PDFWorker
 from app.workflows.engine import WorkflowEngine
+from app.workflows.executor import WorkflowExecutor
 from app.approvals.manager import approval_manager
 
 workflow_engine = WorkflowEngine()
+workflow_executor = WorkflowExecutor()
 
 logger = get_logger(__name__)
 
@@ -55,6 +58,10 @@ class AIRouter:
             f"Router received message from user",
             extra={"user_id": user_id, "message_length": len(message)},
         )
+
+        approval_command = self._handle_approval_command(message, user_id)
+        if approval_command is not None:
+            return approval_command
 
         intent = self._detect_intent(message)
         logger.info(
@@ -205,6 +212,76 @@ class AIRouter:
             return "我判斷這是需求分析任務"
 
         return "我還不確定你的需求，可以再說清楚一點嗎？"
+
+    def _handle_approval_command(self, message: str, user_id: str) -> dict[str, Any] | None:
+        text = message.strip()
+        confirm_match = re.match(r"^確認\s+([0-9a-fA-F\-]+)$", text)
+        if confirm_match:
+            approval_id = confirm_match.group(1)
+            try:
+                approval = approval_manager.approve(approval_id)
+            except KeyError:
+                return {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "intent": "approval_confirmation",
+                    "worker_id": "approval_manager",
+                    "worker_response": f"找不到 approval：{approval_id}",
+                    "response": {"message": f"找不到 approval：{approval_id}"},
+                }
+            except ValueError:
+                current_status = approval_manager.get(approval_id).status
+                return {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "intent": "approval_confirmation",
+                    "worker_id": "approval_manager",
+                    "worker_response": f"無法確認 approval：{approval_id}（狀態為 {current_status}）",
+                    "response": {"message": f"無法確認 approval：{approval_id}（狀態為 {current_status}）"},
+                }
+
+            if not approval.payload:
+                return {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "intent": "approval_confirmation",
+                    "worker_id": "approval_manager",
+                    "worker_response": "approval 尚未包含 workflow_plan，無法產生 dry-run 報告",
+                    "response": {"message": "approval 尚未包含 workflow_plan，無法產生 dry-run 報告"},
+                }
+
+            report = workflow_executor.execute_dry_run(approval.payload)
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "intent": "approval_confirmation",
+                "worker_id": "workflow_executor",
+                "worker_response": report,
+                "response": report,
+            }
+
+        cancel_match = re.match(r"^取消\s+([0-9a-fA-F\-]+)$", text)
+        if cancel_match:
+            approval_id = cancel_match.group(1)
+            try:
+                approval_manager.reject(approval_id)
+                message_text = "已取消 workflow"
+            except KeyError:
+                message_text = f"找不到 approval：{approval_id}"
+            except ValueError:
+                current_status = approval_manager.get(approval_id).status
+                message_text = f"無法取消 approval：{approval_id}（狀態為 {current_status}）"
+
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "intent": "approval_cancellation",
+                "worker_id": "approval_manager",
+                "worker_response": message_text,
+                "response": {"message": message_text},
+            }
+
+        return None
 
     def _extract_folder_name(self, message: str) -> str:
         """
