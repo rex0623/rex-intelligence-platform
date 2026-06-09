@@ -3,6 +3,7 @@
 import os
 from typing import Literal
 
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -52,12 +53,11 @@ class Settings(BaseSettings):
     ENABLE_AGENT: bool = False
     ENABLE_TASK_QUEUE: bool = False
 
-    class Config:
-        """Pydantic config."""
-
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
 
 
 settings = Settings()

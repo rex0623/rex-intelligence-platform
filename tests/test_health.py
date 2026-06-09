@@ -86,7 +86,7 @@ def test_line_webhook_invalid_json(client):
     """Test LINE webhook with invalid JSON."""
     response = client.post(
         "/line/webhook",
-        data="invalid json",
+        content="invalid json",
         headers={"Content-Type": "application/json"},
     )
 
