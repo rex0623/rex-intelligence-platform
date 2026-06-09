@@ -3469,5 +3469,539 @@
       "status": "waiting_approval",
       "dry_run": true
     }
+  },
+  {
+    "approval_id": "363884ab-394e-425e-9544-8e46d58744cf",
+    "workflow_id": "4c271dbd-0bc0-48c5-bc61-ead910f0e553",
+    "status": "pending",
+    "created_at": "2026-06-09T16:18:33.620881Z",
+    "expires_at": "2026-06-09T17:18:33.620878Z",
+    "payload": {
+      "workflow_id": "4c271dbd-0bc0-48c5-bc61-ead910f0e553",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "74786c33-b080-4e81-8c59-b3c1bc9418cf",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "f7416a0d-8a78-4da4-b115-da4115d973a6",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "7ee94e6d-6393-4af4-bbdf-4018841839d3",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "bbe3984c-ee76-4c8a-b34a-5a3dfe6d576d",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "efe8bb64-15ea-4517-ba10-7daf5e4faf98",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "8b0f4815-21cc-4040-8d85-f84ac4deb94f",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "db9c3a5c-134f-4bf6-bbf7-6ec95cafdce9",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "c467b03e-7079-4000-88cd-4e435c583c68",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "a57b8c62-6a0e-4e49-a47e-c9cb33ce3f6b",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
+  },
+  {
+    "approval_id": "eff68643-877d-4b59-a0a9-cc2d495e012c",
+    "workflow_id": "e00e0ccb-ef75-4a25-84cb-0b3c714a8567",
+    "status": "pending",
+    "created_at": "2026-06-09T16:18:33.635387Z",
+    "expires_at": "2026-06-09T17:18:33.635384Z",
+    "payload": {
+      "workflow_id": "e00e0ccb-ef75-4a25-84cb-0b3c714a8567",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "6a7151ab-ea5d-4628-8f95-71b0770c74a4",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "ec06a87b-9c4e-4479-b503-596460582076",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "a564832a-bdd3-45be-a756-7be8b4018c4c",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "fac3a050-37a4-440d-95d2-90c93a0cde36",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "3bdbdb1f-e00c-4179-927d-2ae52b409647",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "ec9d9596-afe0-428a-a4bb-660d57a749f1",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "cf06158e-5ed7-46e8-a82f-0396d9aae58b",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "b4a22b02-8dc0-4742-aaeb-d9921f1015ae",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "fb03a8f2-3ad6-46a8-af73-000ae2de56fd",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
+  },
+  {
+    "approval_id": "a1b3d7e6-7761-41bd-a1c0-d5d8c5c25af9",
+    "workflow_id": "d0935cb0-7ab3-4c6b-a624-6759bc2df59f",
+    "status": "pending",
+    "created_at": "2026-06-09T16:22:31.972084Z",
+    "expires_at": "2026-06-09T17:22:31.972081Z",
+    "payload": {
+      "workflow_id": "d0935cb0-7ab3-4c6b-a624-6759bc2df59f",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "3d5c3c23-54c0-445d-b47a-7ce9db03ef7d",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "fe588029-1459-4792-b09d-ef62fd48e527",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "f4479c30-0183-4dfb-919e-99f69e5f9a72",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "28b121da-d3b8-415b-8d26-e2121870dd92",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "cecfc0ef-0955-4d4d-9f99-41b89df4306f",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "b8735e07-f016-44d8-b92a-13ea482fa640",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "4e27defa-b35d-451b-87e8-6ab54279e1a3",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "6690282a-f276-4563-abaf-57516bc4d28b",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "39293f19-ece7-4853-898c-d4d7621fc13e",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
+  },
+  {
+    "approval_id": "f9e75f50-7d0a-45d4-9b45-00fbf8548785",
+    "workflow_id": "f87a95bc-6c9f-4ef9-bc83-af5e510ddb10",
+    "status": "pending",
+    "created_at": "2026-06-09T16:22:31.984198Z",
+    "expires_at": "2026-06-09T17:22:31.984196Z",
+    "payload": {
+      "workflow_id": "f87a95bc-6c9f-4ef9-bc83-af5e510ddb10",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "d078dbb4-555e-47b0-8a2d-d37d84268279",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "301226ad-e24c-472e-aee3-db3b6991bdf9",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "0e17c122-7443-4454-ad9d-89eb2bca6a8d",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "411810c2-5bfb-41b9-b1d4-b6a825cd4858",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "eb68edf8-38b5-4dd2-9287-b1aa6b3789a5",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "d38c8387-0691-43c3-8910-c54c7899216a",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "b0e70338-ba11-4446-9636-ca41f35dd95c",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "874beb29-eb6f-46f7-b6f6-2754486883a6",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "ad47ab87-7007-4a3c-a440-d07679ae61bc",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
+  },
+  {
+    "approval_id": "75ac361c-7aa0-4152-9e6f-cbdf83552b25",
+    "workflow_id": "250b989f-b47e-43d0-9200-ef8b72447700",
+    "status": "pending",
+    "created_at": "2026-06-09T16:25:02.583082Z",
+    "expires_at": "2026-06-09T17:25:02.583078Z",
+    "payload": {
+      "workflow_id": "250b989f-b47e-43d0-9200-ef8b72447700",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "610a129e-bc8a-4506-a781-3e254b3f886f",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "b576ce2c-5759-4472-a68d-f12d877ed212",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "aeda932d-0745-480a-a1ff-6237b6e975a7",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "63b2e6b2-a5cf-47f0-ae62-85a1d110dd3e",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "076d3837-5e3a-47ab-8dbb-a834cbb27f76",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "9e51f7ce-5ffa-4c1a-9300-759e97d21ecc",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "137bd4dc-597d-4237-b2ef-15acb122f3c0",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "feecbb11-a01a-4024-90a7-b6658c37b2e5",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "acc43479-77ca-40a5-9f33-0f99d0ac8d5f",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
+  },
+  {
+    "approval_id": "01b4ea15-bcf4-4ad1-beb7-cdb033ade8bd",
+    "workflow_id": "906859a0-c0e3-42d2-b94f-e22a1657f090",
+    "status": "pending",
+    "created_at": "2026-06-09T16:25:02.598535Z",
+    "expires_at": "2026-06-09T17:25:02.598531Z",
+    "payload": {
+      "workflow_id": "906859a0-c0e3-42d2-b94f-e22a1657f090",
+      "workflow_type": "pdf_bill",
+      "title": "電費單處理流程",
+      "summary": "",
+      "steps": [
+        {
+          "step_id": "fb243950-0983-4018-959d-d72b0aa78354",
+          "name": "掃描 PDF",
+          "description": "掃描 SAFE_PDF_ROOT 下的 PDF 檔案",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "0adc2922-956f-4de1-940c-227824d933cb",
+          "name": "讀取電號",
+          "description": "從 PDF 中擷取電號",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "a5a4b0c0-7054-45aa-869b-dd8534c94fbc",
+          "name": "讀取計費期間",
+          "description": "從 PDF 中擷取計費期間",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "b5c6e443-f51b-4c8e-b56c-de495f58f0d9",
+          "name": "對照案場名稱",
+          "description": "比對案場名稱 mapping",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "857c6199-1821-4aab-a8a4-6ac09f0129e1",
+          "name": "建議新檔名",
+          "description": "根據資訊建議新的檔名",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "b1d5e415-1bae-4fc5-9773-e38ede530be2",
+          "name": "等待使用者確認",
+          "description": "等待使用者核准建議的檔名",
+          "worker": null,
+          "status": "pending",
+          "requires_approval": true
+        },
+        {
+          "step_id": "9e0e6edc-160d-4635-9b15-3593ee5cf80a",
+          "name": "批次更名",
+          "description": "批次更名 PDF 並備份",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "a1a0729a-f4b0-455e-91c1-d1c0807a6a29",
+          "name": "加入浮水印",
+          "description": "在 PDF 加入浮水印",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        },
+        {
+          "step_id": "f15d212f-ec93-4df8-a8f9-86238ad62306",
+          "name": "輸出結果",
+          "description": "匯出處理報告與歸檔",
+          "worker": "pdf_worker",
+          "status": "pending",
+          "requires_approval": false
+        }
+      ],
+      "status": "waiting_approval",
+      "dry_run": true
+    }
   }
 ]

@@ -39,8 +39,8 @@ def _format_document_summary(inner: dict) -> str:
     return "\n".join(lines)
 
 
-def _analyze_pdfs_direct() -> str:
-    """Directly call PDFWorker.analyze_pdfs, bypassing the router."""
+def _run_analyze_pdfs() -> dict:
+    """Call PDFWorker.analyze_pdfs and return the inner payload dict."""
     worker = PDFWorker()
     request = WorkerRequest(
         worker_id="pdf_worker",
@@ -51,8 +51,48 @@ def _analyze_pdfs_direct() -> str:
     )
     response = asyncio.run(worker.execute(request))
     data = response.model_dump()
-    inner = data.get("data", {}).get("data", {})
-    return _format_document_summary(inner)
+    return data.get("data", {}).get("data", {})
+
+
+def _analyze_pdfs_direct() -> str:
+    """Directly call PDFWorker.analyze_pdfs, bypassing the router."""
+    return _format_document_summary(_run_analyze_pdfs())
+
+
+def _format_document_detail(inner: dict) -> str:
+    """Format analyze_pdfs payload into a verbose per-PDF detail view."""
+    lines = ["小雷收到：PDF 詳細分析完成"]
+    if inner.get("mode") == "dry-run":
+        lines.append("- 模式：dry-run，不會修改 PDF (dry-run 模式)")
+    total = inner.get("total_pdfs", 0)
+    lines.append(f"- PDF 檔案總數：{total}")
+    lines.append(f"- 可讀數量：{inner.get('readable_pdfs', 0)}")
+    summaries = inner.get("pdf_summaries", [])
+    for i, summary in enumerate(summaries, start=1):
+        lines.append("")
+        lines.append(f"[{i}/{total}] {summary.get('file_name', '')}")
+        doc = summary.get("document_object") or {}
+        doc_type_raw = doc.get("document_type", "unknown")
+        doc_type = doc_type_raw.value if hasattr(doc_type_raw, "value") else str(doc_type_raw)
+        lines.append(f"  - document_type：{doc_type}")
+        confidence = doc.get("confidence", 0.0)
+        lines.append(f"  - confidence：{confidence:.2f}")
+        lines.append(f"  - text_length：{summary.get('text_length', 0)}")
+        first_200 = summary.get("first_200_chars", "")
+        lines.append(f"  - first_200_chars：{first_200}")
+        fields = doc.get("fields", [])
+        if fields:
+            lines.append("  - extracted_fields：")
+            for field in fields:
+                lines.append(f"    * {field.get('name')}：{field.get('value')}")
+        else:
+            lines.append("  - extracted_fields：（無）")
+    return "\n".join(lines)
+
+
+def _analyze_pdfs_detail() -> str:
+    """Directly call PDFWorker.analyze_pdfs and return the verbose detail view."""
+    return _format_document_detail(_run_analyze_pdfs())
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -117,6 +157,8 @@ def format_mock_response(worker_response: object) -> str:
 
 def mock_line_payload(text: str) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    if "分析 PDF 詳細" in text or "分析pdf詳細" in text.lower():
+        return _analyze_pdfs_detail()
     if "分析 PDF" in text or "分析pdf" in text.lower():
         return _analyze_pdfs_direct()
 
