@@ -58,6 +58,10 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[2] / "workspace" / "sandbox" / "inbox"
     )
 
+    SAFE_PDF_ROOT: str = str(
+        Path(__file__).resolve().parents[2] / "workspace" / "sandbox" / "pdf_inbox"
+    )
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

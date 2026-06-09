@@ -85,6 +85,26 @@ class AIRouter:
                 "worker_response": response_payload,
                 "response": response_payload,
             }
+        if worker_id == "pdf_worker":
+            # For PDF worker we analyze safe pdf root in dry-run
+            worker_request = WorkerRequest(
+                worker_id=worker_id,
+                action="analyze_pdfs",
+                payload={},
+                user_id=user_id,
+                request_id=str(uuid.uuid4()),
+            )
+            worker = self.workers[worker_id]
+            worker_response = await worker.execute(worker_request)
+            response_payload = worker_response.model_dump()
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "intent": intent,
+                "worker_id": worker_id,
+                "worker_response": response_payload,
+                "response": response_payload,
+            }
 
         worker_response = self._generate_fake_response(worker_id)
 

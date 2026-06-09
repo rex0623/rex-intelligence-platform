@@ -6,8 +6,17 @@ from app.core.config import settings
 from scripts.mock_line import mock_line_payload
 
 
-def test_mock_line_pdf_task():
-    assert mock_line_payload("處理電費單") == "小雷收到：我判斷這是 PDF 任務"
+def test_mock_line_pdf_task(tmp_path, monkeypatch):
+    pdf_root = tmp_path / "pdf_inbox"
+    pdf_root.mkdir(parents=True)
+    (pdf_root / "sample1.pdf").write_text("x")
+
+    monkeypatch.setattr(settings, "SAFE_PDF_ROOT", str(pdf_root))
+
+    output = mock_line_payload("處理電費單")
+    assert output.startswith("小雷收到：PDF 分析完成")
+    assert "PDF 檔案總數" in output
+    assert "sample1.pdf" in output
 
 
 def test_mock_line_folder_task(tmp_path, monkeypatch):

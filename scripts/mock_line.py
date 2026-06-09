@@ -11,6 +11,20 @@ def format_mock_response(worker_response: object) -> str:
     """Format the router worker response for mock LINE CLI output."""
     if isinstance(worker_response, dict):
         data = worker_response.get("data", {})
+        # handle PDF analysis response
+        if isinstance(data, dict) and data.get("action") == "analyze_pdfs":
+            inner = data.get("data", {})
+            lines = ["小雷收到：PDF 分析完成"]
+            if inner.get("mode") == "dry-run":
+                lines.append("- 模式：dry-run，不會更名或修改 PDF (dry-run 模式)")
+            lines.append(f"- PDF 檔案總數：{inner.get('total_pdfs', 0)}")
+            pdf_list = inner.get("pdf_files", [])
+            if pdf_list:
+                lines.append(f"- PDF 檔名清單：{', '.join(pdf_list)}")
+            else:
+                lines.append("- 無 PDF 檔案可供分析")
+            lines.append(f"- 未來將執行：{', '.join(inner.get('future_actions', []))}")
+            return "\n".join(lines)
         # handle nested worker response structure
         inner = {}
         if isinstance(data, dict) and data.get("action") == "analyze_folder":

@@ -15,6 +15,10 @@ class PDFWorker(BaseWorker):
     def __init__(self):
         """Initialize PDF worker."""
         super().__init__(worker_id="pdf_worker", name="PDF Worker")
+        from pathlib import Path
+        from app.core.config import settings
+
+        self.safe_pdf_root = Path(settings.SAFE_PDF_ROOT).expanduser().resolve()
 
     async def validate(self, request: WorkerRequest) -> bool:
         """
@@ -26,7 +30,12 @@ class PDFWorker(BaseWorker):
         Returns:
             True if valid
         """
-        if request.action not in ["extract_text", "extract_images", "extract_tables"]:
+        if request.action not in [
+            "extract_text",
+            "extract_images",
+            "extract_tables",
+            "analyze_pdfs",
+        ]:
             return False
 
         return True
@@ -47,6 +56,51 @@ class PDFWorker(BaseWorker):
         logger.info(f"PDF Worker processing: {action}")
 
         # Return mock data for Phase 1
+        if action == "analyze_pdfs":
+            # Dry-run analysis of PDFs in the safe pdf root
+            from pathlib import Path
+
+            target = self.safe_pdf_root
+            # safety: do not allow scanning root or home
+            try:
+                home = Path.home().resolve()
+                if target == Path("/") or target == home or str(target).rstrip(":\\") in ["C:"]:
+                    return {
+                        "status": "error",
+                        "action": action,
+                        "error": "目錄不允許掃描。",
+                    }
+            except Exception:
+                pass
+
+            if not target.exists():
+                return {
+                    "status": "error",
+                    "action": action,
+                    "error": f"PDF 目錄不存在：{target}",
+                }
+
+            pdfs = [p.name for p in target.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"]
+            total = len(pdfs)
+
+            return {
+                "status": "success",
+                "action": action,
+                "data": {
+                    "mode": "dry-run",
+                    "message": "dry-run，不會更名或修改 PDF",
+                    "total_pdfs": total,
+                    "pdf_files": pdfs,
+                    "future_actions": [
+                        "讀取電號",
+                        "讀取計費期間",
+                        "對照案場名稱",
+                        "重新命名",
+                        "加入浮水印",
+                    ],
+                },
+            }
+
         if action == "extract_text":
             return {
                 "status": "success",
