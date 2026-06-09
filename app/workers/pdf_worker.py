@@ -1,5 +1,6 @@
 """PDF Worker for RIP."""
 
+from pathlib import Path
 from typing import Any
 
 from app.core.logger import get_logger
@@ -15,7 +16,6 @@ class PDFWorker(BaseWorker):
     def __init__(self):
         """Initialize PDF worker."""
         super().__init__(worker_id="pdf_worker", name="PDF Worker")
-        from pathlib import Path
         from app.core.config import settings
 
         self.safe_pdf_root = Path(settings.SAFE_PDF_ROOT).expanduser().resolve()
@@ -51,55 +51,11 @@ class PDFWorker(BaseWorker):
             Processing result
         """
         action = request.action
-        payload = request.payload
 
         logger.info(f"PDF Worker processing: {action}")
 
-        # Return mock data for Phase 1
         if action == "analyze_pdfs":
-            # Dry-run analysis of PDFs in the safe pdf root
-            from pathlib import Path
-
-            target = self.safe_pdf_root
-            # safety: do not allow scanning root or home
-            try:
-                home = Path.home().resolve()
-                if target == Path("/") or target == home or str(target).rstrip(":\\") in ["C:"]:
-                    return {
-                        "status": "error",
-                        "action": action,
-                        "error": "目錄不允許掃描。",
-                    }
-            except Exception:
-                pass
-
-            if not target.exists():
-                return {
-                    "status": "error",
-                    "action": action,
-                    "error": f"PDF 目錄不存在：{target}",
-                }
-
-            pdfs = [p.name for p in target.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"]
-            total = len(pdfs)
-
-            return {
-                "status": "success",
-                "action": action,
-                "data": {
-                    "mode": "dry-run",
-                    "message": "dry-run，不會更名或修改 PDF",
-                    "total_pdfs": total,
-                    "pdf_files": pdfs,
-                    "future_actions": [
-                        "讀取電號",
-                        "讀取計費期間",
-                        "對照案場名稱",
-                        "重新命名",
-                        "加入浮水印",
-                    ],
-                },
-            }
+            return await self.analyze_pdfs()
 
         if action == "extract_text":
             return {
@@ -110,7 +66,7 @@ class PDFWorker(BaseWorker):
                     "PDF 文件已成功處理。\n"
                     "此為 Phase 1 的演示數據。",
                     "pages": 5,
-                    "file_name": payload.get("file_name", "document.pdf"),
+                    "file_name": request.payload.get("file_name", "document.pdf"),
                 },
             }
 
@@ -123,7 +79,7 @@ class PDFWorker(BaseWorker):
                         {"id": 1, "page": 1, "size": "100KB"},
                         {"id": 2, "page": 3, "size": "150KB"},
                     ],
-                    "file_name": payload.get("file_name", "document.pdf"),
+                    "file_name": request.payload.get("file_name", "document.pdf"),
                 },
             }
 
@@ -141,7 +97,7 @@ class PDFWorker(BaseWorker):
                             "preview": "Table 1 data preview...",
                         }
                     ],
-                    "file_name": payload.get("file_name", "document.pdf"),
+                    "file_name": request.payload.get("file_name", "document.pdf"),
                 },
             }
 
@@ -149,3 +105,109 @@ class PDFWorker(BaseWorker):
             "status": "error",
             "error": f"Unknown action: {action}",
         }
+
+    async def analyze_pdfs(self) -> dict[str, Any]:
+        target = self.safe_pdf_root
+        try:
+            home = Path.home().resolve()
+            if target == Path("/") or target == home or str(target).rstrip(":\\") in ["C:"]:
+                return {
+                    "status": "error",
+                    "action": "analyze_pdfs",
+                    "error": "目錄不允許掃描。",
+                }
+        except Exception:
+            pass
+
+        if not target.exists():
+            return {
+                "status": "error",
+                "action": "analyze_pdfs",
+                "error": f"PDF 目錄不存在：{target}",
+            }
+
+        pdf_files = [path for path in target.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
+        summaries = []
+        readable_count = 0
+        classification_counts: dict[str, int] = {}
+
+        try:
+            import fitz
+        except ImportError:
+            return {
+                "status": "error",
+                "action": "analyze_pdfs",
+                "error": "PyMuPDF 未安裝，無法分析 PDF。",
+            }
+
+        for path in pdf_files:
+            file_size = path.stat().st_size
+            file_info = {
+                "file_name": path.name,
+                "file_size": file_size,
+                "page_count": 0,
+                "creator": "",
+                "producer": "",
+                "encrypted": False,
+                "readable": False,
+                "text_length": 0,
+                "first_200_chars": "",
+                "classification": {"type": "unknown", "confidence": 0.0},
+            }
+
+            try:
+                doc = fitz.open(path)
+                file_info["encrypted"] = doc.is_encrypted
+                file_info["page_count"] = doc.page_count
+                metadata = doc.metadata or {}
+                file_info["creator"] = metadata.get("creator", "") or ""
+                file_info["producer"] = metadata.get("producer", "") or ""
+
+                if not doc.is_encrypted and doc.page_count > 0:
+                    text = doc.load_page(0).get_text()
+                    file_info["readable"] = True
+                    file_info["text_length"] = len(text)
+                    file_info["first_200_chars"] = text[:200]
+                    classification = self.classify_pdf(text)
+                    file_info["classification"] = classification
+                    readable_count += 1
+                else:
+                    file_info["classification"] = {"type": "unknown", "confidence": 0.0}
+
+                doc.close()
+            except Exception:
+                file_info["readable"] = False
+                file_info["classification"] = {"type": "unknown", "confidence": 0.0}
+
+            classification_counts[file_info["classification"]["type"]] = (
+                classification_counts.get(file_info["classification"]["type"], 0) + 1
+            )
+            summaries.append(file_info)
+
+        return {
+            "status": "success",
+            "action": "analyze_pdfs",
+            "data": {
+                "mode": "dry-run",
+                "message": "dry-run，不會修改任何 PDF",
+                "total_pdfs": len(pdf_files),
+                "readable_pdfs": readable_count,
+                "classification_counts": classification_counts,
+                "pdf_summaries": summaries,
+            },
+        }
+
+    def classify_pdf(self, text: str) -> dict[str, Any]:
+        normalized = text.lower()
+        if (
+            "台灣電力公司" in normalized
+            or "電費通知單" in normalized
+            or "taiwan power company" in normalized
+            or "electric bill" in normalized
+        ):
+            return {"type": "taipower_bill", "confidence": 0.95}
+        if "發票" in normalized or "invoice" in normalized:
+            return {"type": "invoice", "confidence": 0.9}
+        if "契約" in normalized or "contract" in normalized:
+            return {"type": "contract", "confidence": 0.9}
+        return {"type": "unknown", "confidence": 0.5}

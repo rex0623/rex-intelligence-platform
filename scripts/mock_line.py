@@ -36,16 +36,22 @@ def format_mock_response(worker_response: object) -> str:
         # handle PDF analysis response
         if isinstance(data, dict) and data.get("action") == "analyze_pdfs":
             inner = data.get("data", {})
-            lines = ["小雷收到：PDF 分析完成"]
+            lines = ["小雷收到：PDF 智慧分析完成"]
             if inner.get("mode") == "dry-run":
-                lines.append("- 模式：dry-run，不會更名或修改 PDF (dry-run 模式)")
+                lines.append("- 模式：dry-run，不會修改 PDF (dry-run 模式)")
             lines.append(f"- PDF 檔案總數：{inner.get('total_pdfs', 0)}")
-            pdf_list = inner.get("pdf_files", [])
-            if pdf_list:
-                lines.append(f"- PDF 檔名清單：{', '.join(pdf_list)}")
-            else:
-                lines.append("- 無 PDF 檔案可供分析")
-            lines.append(f"- 未來將執行：{', '.join(inner.get('future_actions', []))}")
+            lines.append(f"- 可讀數量：{inner.get('readable_pdfs', 0)}")
+            classification_counts = inner.get("classification_counts", {})
+            if classification_counts:
+                counts_text = "、".join([f"{k} {v}" for k, v in classification_counts.items()])
+                lines.append(f"- 分類結果：{counts_text}")
+            summaries = inner.get("pdf_summaries", [])
+            if summaries:
+                lines.append("- PDF 檔案摘要：")
+                for summary in summaries:
+                    lines.append(
+                        f"  * {summary.get('file_name')} ({summary.get('page_count', 0)}頁, {summary.get('classification', {}).get('type', 'unknown')})"
+                    )
             return "\n".join(lines)
         # handle nested worker response structure
         inner = {}

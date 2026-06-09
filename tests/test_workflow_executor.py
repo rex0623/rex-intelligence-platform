@@ -19,7 +19,7 @@ def test_execute_dry_run_report_can_be_generated():
     assert report["status"] == "dry_run_completed"
     assert isinstance(report["steps"], list)
     assert report["steps"][0]["name"] == "掃描 PDF"
-    assert report["steps"][0]["result"] == "dry-run completed"
+    assert "dry-run completed" in report["steps"][0]["result"]
     assert report["note"] == "本次沒有修改任何 PDF"
 
 
@@ -46,7 +46,7 @@ def test_execute_dry_run_does_not_modify_files(tmp_path: Path):
 
     after = sorted([p.name for p in tmp_path.iterdir()])
     assert before == after
-    assert report["steps"][0]["result"] == "dry-run completed"
+    assert "dry-run completed" in report["steps"][0]["result"]
     assert report["steps"][1]["result"] == "dry-run blocked，需要正式 approval，Phase 9 不執行"
 
 
