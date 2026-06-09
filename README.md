@@ -71,11 +71,11 @@ RIP 採用四層架構設計：
 
 ### 前置要求
 
-- Docker & Docker Compose
-- Python 3.11+
+- Docker & Docker Compose（推薦）
+- 或 Python 3.11+ + PostgreSQL + Redis（本地開發）
 - Git
 
-### 開發環境設置
+### 方式 1: 使用 Docker Compose（推薦）
 
 ```bash
 # 1. 克隆項目
@@ -85,7 +85,7 @@ cd rex-intelligence-platform
 # 2. 複製環境配置
 cp .env.example .env
 
-# 3. 編輯 .env，添加你的 API Key
+# 3. 編輯 .env，添加你的 API Key（可選，Phase 1 使用模擬數據）
 # 需要配置:
 #   - LINE_CHANNEL_ID
 #   - LINE_CHANNEL_SECRET
@@ -96,7 +96,7 @@ cp .env.example .env
 #   - GITHUB_TOKEN
 #   - AWS_* (可選)
 
-# 4. 啟動服務
+# 4. 啟動所有服務
 docker-compose up -d
 
 # 5. 驗證服務
@@ -104,7 +104,56 @@ docker-compose ps
 curl http://localhost:8000/health
 
 # 6. 查看日誌
-docker-compose logs -f rip-router
+docker-compose logs -f rip-api
+
+# 7. 停止服務
+docker-compose down
+```
+
+### 方式 2: 本地開發（使用 Python 虛擬環境）
+
+```bash
+# 1. 克隆項目
+git clone https://github.com/xxx/rex-intelligence-platform.git
+cd rex-intelligence-platform
+
+# 2. 創建 Python 虛擬環境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或
+venv\Scripts\activate  # Windows
+
+# 3. 複製環境配置
+cp .env.example .env
+
+# 4. 編輯 .env
+# 確保以下設置指向本地服務：
+#   - DATABASE_URL=postgresql://postgres:password@localhost:5432/rip_dev
+#   - REDIS_URL=redis://localhost:6379/0
+
+# 5. 啟動 PostgreSQL 和 Redis（需在另外兩個終端機運行）
+# 終端 1: Docker 啟動 PostgreSQL 和 Redis
+docker run --name rip-postgres -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=rip_dev -p 5432:5432 -d postgres:15-alpine
+docker run --name rip-redis -p 6379:6379 -d redis:7-alpine
+
+# 6. 安裝依賴
+pip install -e ".[dev]"
+
+# 7. 啟動開發服務器
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 8. 驗證服務
+curl http://localhost:8000/health
+
+# 9. 運行測試
+pytest tests/ -v
+
+# 10. 停止服務
+# Ctrl+C 停止 uvicorn
+docker stop rip-postgres rip-redis
+docker rm rip-postgres rip-redis
+deactivate  # 退出虛擬環境
 ```
 
 ### 測試 Gateway
@@ -125,7 +174,103 @@ curl -X POST http://localhost:8000/webhook \
   }'
 ```
 
-## 📖 使用示例
+## � 成本管理
+
+RIP 提供完整的成本追蹤：
+
+```
+每個 API 調用都被記錄：
+├─ API 提供商 (OpenAI, Anthropic, Google)
+├─ 模型名稱 (GPT-4, Claude 3, Gemini)
+├─ Token 數量 (input, output)
+├─ 成本估算
+
+用戶可以查詢:
+└─ /cost/user/<user_id>           # 個人成本
+   /cost/provider/<provider>      # 按服務商成本
+   /cost/day/<date>               # 按日期成本
+```
+
+## 🧪 API 測試
+
+### 健康檢查
+
+```bash
+# 基本健康檢查
+curl http://localhost:8000/health
+
+# 詳細健康檢查（包含 Worker 狀態）
+curl http://localhost:8000/health/detailed
+```
+
+### LINE Webhook 測試
+
+```bash
+# 發送測試消息 - PDF 處理
+curl -X POST http://localhost:8000/line/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [{
+      "type": "message",
+      "message": {
+        "type": "text",
+        "text": "請幫我分析電費單",
+        "id": "100001"
+      },
+      "timestamp": 1262304000000,
+      "mode": "active",
+      "replyToken": "nHuyWiB7yP5Zw52FIkcQT",
+      "source": {
+        "type": "user",
+        "userId": "U1234567890abcdef1234567890abcdef"
+      }
+    }]
+  }'
+
+# 發送測試消息 - 文件夾操作
+curl -X POST http://localhost:8000/line/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [{
+      "type": "message",
+      "message": {
+        "type": "text",
+        "text": "幫我整理資料夾",
+        "id": "100002"
+      },
+      "timestamp": 1262304000000,
+      "mode": "active",
+      "replyToken": "nHuyWiB7yP5Zw52FIkcQT",
+      "source": {
+        "type": "user",
+        "userId": "U1234567890abcdef1234567890abcdef"
+      }
+    }]
+  }'
+
+# 發送測試消息 - 代碼生成
+curl -X POST http://localhost:8000/line/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [{
+      "type": "message",
+      "message": {
+        "type": "text",
+        "text": "幫我寫 Python 函數計算費波那契數列",
+        "id": "100003"
+      },
+      "timestamp": 1262304000000,
+      "mode": "active",
+      "replyToken": "nHuyWiB7yP5Zw52FIkcQT",
+      "source": {
+        "type": "user",
+        "userId": "U1234567890abcdef1234567890abcdef"
+      }
+    }]
+  }'
+```
+
+## �📖 使用示例
 
 ### 示例 1: 簡單文本生成
 

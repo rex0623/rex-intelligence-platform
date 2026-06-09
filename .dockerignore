@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.Python
+*.egg-info
+dist
+build
+venv
+.venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs
+README.md
+CONTRIBUTING.md
+DESIGN_SUMMARY.md
+
+# Config
+.env
+.env.local
+.env.*.local
+
+# Development
+.dockerignore
+Dockerfile
+docker-compose.yml
+pytest.ini
+pyproject.toml
+poetry.lock
