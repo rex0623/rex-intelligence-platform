@@ -39,6 +39,7 @@ class PDFWorker(BaseWorker):
             "extract_images",
             "extract_tables",
             "analyze_pdfs",
+            "generate_rename_plan",
         ]:
             return False
 
@@ -60,6 +61,9 @@ class PDFWorker(BaseWorker):
 
         if action == "analyze_pdfs":
             return await self.analyze_pdfs()
+
+        if action == "generate_rename_plan":
+            return await self.generate_rename_plan()
 
         if action == "extract_text":
             return {
@@ -117,6 +121,26 @@ class PDFWorker(BaseWorker):
 
     async def analyze_pdfs(self) -> dict[str, Any]:
         return self._analyze_pdfs_sync()
+
+    async def generate_rename_plan(self) -> dict[str, Any]:
+        from app.filename.planner import build_rename_plan
+        from app.filename.validator import validate_rename_plan
+
+        analysis = self._analyze_pdfs_sync()
+        if analysis.get("status") == "error":
+            return analysis
+        summaries = analysis.get("data", {}).get("pdf_summaries", [])
+        plan = build_rename_plan(summaries)
+        plan.validation_report = validate_rename_plan(plan)
+        return {
+            "status": "success",
+            "action": "generate_rename_plan",
+            "data": {
+                "mode": "dry-run",
+                "message": "dry-run，不會實際更名",
+                "rename_plan": plan.model_dump(),
+            },
+        }
 
     def _analyze_pdfs_sync(self) -> dict[str, Any]:
         target = self.safe_pdf_root

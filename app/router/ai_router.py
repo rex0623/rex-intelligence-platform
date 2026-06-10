@@ -97,6 +97,44 @@ class AIRouter:
                 "response": response_payload,
             }
         if worker_id == "pdf_worker":
+            # Rename planning: generate a RenamePlan and submit for approval
+            if intent == "rename_planning":
+                worker_request = WorkerRequest(
+                    worker_id=worker_id,
+                    action="generate_rename_plan",
+                    payload={},
+                    user_id=user_id,
+                    request_id=str(uuid.uuid4()),
+                )
+                worker = self.workers[worker_id]
+                worker_response = await worker.execute(worker_request)
+                response_data = worker_response.model_dump()
+                outer_data = response_data.get("data", {})
+                if outer_data.get("status") == "error":
+                    return {
+                        "status": "failed",
+                        "user_id": user_id,
+                        "intent": intent,
+                        "worker_id": worker_id,
+                        "worker_response": outer_data.get("error", "generate_rename_plan failed"),
+                        "response": {"message": outer_data.get("error", "")},
+                    }
+                plan_dict = outer_data.get("data", {}).get("rename_plan", {})
+                approval = approval_manager.create_approval(plan_dict)
+                worker_resp = {
+                    "action": "generate_rename_plan",
+                    "rename_plan": plan_dict,
+                    "approval_id": approval.approval_id,
+                }
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "intent": intent,
+                    "worker_id": worker_id,
+                    "worker_response": worker_resp,
+                    "response": worker_resp,
+                }
+
             # If message explicitly about 電費單, create a pdf_bill workflow plan instead of returning PDF analysis
             if "電費單" in message or "電費" in message:
                 plan = workflow_engine.create_workflow("pdf_bill", title="電費單處理流程")
@@ -155,6 +193,13 @@ class AIRouter:
         """
         message_lower = message.lower()
 
+        # Rename planning (check before PDF/file_management to handle "整理檔名")
+        if any(
+            kw in message
+            for kw in ["產生改名計畫", "整理檔名", "分析 PDF 並產生改名計畫"]
+        ):
+            return "rename_planning"
+
         # PDF intent
         if any(word in message_lower for word in ["電費單", "pdf", "PDF"]):
             return "pdf_processing"
@@ -182,6 +227,7 @@ class AIRouter:
         """
         intent_map = {
             "pdf_processing": "pdf_worker",
+            "rename_planning": "pdf_worker",
             "file_management": "folder_worker",
             "code_generation": "claude_worker",
             "requirements_analysis": "gpt_worker",
