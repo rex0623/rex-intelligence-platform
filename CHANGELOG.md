@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.4-alpha] — Phase 14D-3B Explicit Mock LINE Rollback Execution Command
+
+### Added
+- `scripts/mock_line.py` — 明確 rollback 執行指令「回滾改名 {transaction_id}」。
+  - regex 完全比對（`^回滾改名\s+(\S+)$`）；「回滾」「回滾改名」（無 id）、「請回滾改名 {id}」「回滾改名 {id} 謝謝」「回滾改名{id}」均不觸發。
+  - 一律透過 `rollback_transaction_by_id(transaction_id, transaction_log)` 執行；Mock LINE 不直接呼叫 `Path.rename`（AST 驗證）。
+  - 成功回滾的 action 在 transaction log 中更新為 `rolled_back`；失敗的維持 `success`。
+  - 回覆內容：transaction_id、成功/失敗/跳過/blocked 統計、每筆檔案結果與原因。
+  - 失敗回覆：找不到 transaction、`rollback_source_not_found`、`rollback_target_already_exists`、沒有可回滾項目。
+  - 預設 transaction log 路徑沿用 `runtime/rename_transactions.json`。
+- `tests/test_rollback_execution.py` — 16 個新測試（含 parametrize 展開；執行回滾與檔案復原、log 狀態更新、找不到 transaction、來源不存在、目標被佔用、沒有可回滾項目、模糊文字/不完全格式不觸發、preview 仍不 rollback、AST 驗證、monkeypatch 驗證委派 `rollback_transaction_by_id()`、混合 action 與重複回滾）。
+
+### Changed
+- `tests/test_rollback_preview.py` — 兩處配合 14D-3B 設計更新：
+  - 「回滾改名 {id} 不執行」測試改為驗證格式不完全符合的變體不觸發（完全比對的執行行為移至新測試檔）。
+  - preview 隔離測試加入對 `mock_line.rollback_transaction_by_id` 的 monkeypatch 防護，原始碼檢查改限定 transaction_log 模組。
+
+### Safety guarantees
+- 「預覽回滾改名 {transaction_id}」仍只預覽：不改檔案、不寫 log、不呼叫 `rollback_transaction_by_id()`（monkeypatch + byte-level 驗證）。
+- 「確認改名 {approval_id}」維持 14D-2 行為不變；一般 rename planning 指令仍不觸發任何真實檔案異動。
+- Rollback 不覆寫檔案：目標被佔用即回報失敗。
+- 所有檔案異動測試使用 `pytest tmp_path`，transaction log 一律注入隔離路徑。
+
+### Recommended next phase
+- **Phase 14E — Rename Execution Hardening / Once-only Guard**。
+
+---
+
 ## [v0.5.3-alpha] — Phase 14D-3A Mock LINE Rollback Preview Command
 
 ### Added

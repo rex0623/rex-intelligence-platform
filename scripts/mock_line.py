@@ -13,6 +13,7 @@ import uuid
 
 from app.approvals.manager import approval_manager
 from app.filename.approval_bridge import execute_approved_rename_plan
+from app.filename.executor import rollback_transaction_by_id
 from app.filename.schemas import RenamePlan
 from app.filename.transaction_log import (
     RenameTransactionLog,
@@ -173,9 +174,12 @@ _CONFIRM_RENAME_PATTERN = re.compile(r"^確認改名\s+(\S+)$")
 
 # Rollback 預覽指令格式（Phase 14D-3A）：「預覽回滾改名 {transaction_id}」。
 # 純讀取，不會 rollback、不會修改任何檔案或 transaction log。
-# 「回滾」「回滾改名」「預覽回滾」等都不會匹配，本階段也沒有任何
-# 真實 rollback 指令。
 _PREVIEW_ROLLBACK_PATTERN = re.compile(r"^預覽回滾改名\s+(\S+)$")
+
+# Rollback 執行指令格式（Phase 14D-3B）：「回滾改名 {transaction_id}」。
+# 唯一可觸發真實 rollback 的指令；完全比對才生效。
+# 「回滾」「回滾改名」「確認」「好」「OK」「執行」或附加多餘文字均不匹配。
+_ROLLBACK_RENAME_PATTERN = re.compile(r"^回滾改名\s+(\S+)$")
 
 _DEFAULT_TRANSACTION_LOG_PATH = (
     Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
@@ -388,6 +392,46 @@ def preview_rollback(
     return "\n".join(lines)
 
 
+def rollback_rename(
+    transaction_id: str,
+    transaction_log: RenameTransactionLog | None = None,
+) -> str:
+    """Handle the explicit 「回滾改名 {transaction_id}」 command.
+
+    The only Mock LINE path that can trigger a real rollback.  All execution
+    goes through rollback_transaction_by_id(), which reverses successful
+    actions via the safe executor and marks them "rolled_back" in the log;
+    this module never renames files itself.
+    """
+    if transaction_log is None:
+        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+
+    result = rollback_transaction_by_id(transaction_id, transaction_log)
+
+    if not result.executed:
+        reasons = {r.reason for r in result.results}
+        if "transaction_not_found" in reasons:
+            return f"小雷收到：找不到 transaction：{transaction_id}"
+        return f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+
+    lines = ["小雷收到：已執行回滾改名"]
+    lines.append(f"- transaction_id：{transaction_id}")
+    lines.append(
+        f"- 成功：{result.success_count} 筆"
+        f" | 失敗：{result.failed_count} 筆"
+        f" | 跳過：{result.skipped_count} 筆"
+        f" | blocked：{result.blocked_count} 筆"
+    )
+    if result.results:
+        lines.append("檔案結果：")
+        for i, r in enumerate(result.results, 1):
+            entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
+            if r.reason:
+                entry += f"（{r.reason}）"
+            lines.append(entry)
+    return "\n".join(lines)
+
+
 def mock_line_payload(
     text: str,
     transaction_log: RenameTransactionLog | None = None,
@@ -398,6 +442,14 @@ def mock_line_payload(
     if preview_rollback_match:
         return preview_rollback(
             preview_rollback_match.group(1),
+            transaction_log=transaction_log,
+        )
+
+    # Rollback execution (Phase 14D-3B): exact「回滾改名 {transaction_id}」only
+    rollback_rename_match = _ROLLBACK_RENAME_PATTERN.match(text.strip())
+    if rollback_rename_match:
+        return rollback_rename(
+            rollback_rename_match.group(1),
             transaction_log=transaction_log,
         )
 

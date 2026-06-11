@@ -113,24 +113,30 @@ def test_preview_rollback_without_space_does_not_trigger(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 測試 4：「回滾改名 {transaction_id}」不會真的 rollback
+# 測試 4：格式不完全符合的「回滾改名」不會真的 rollback
+# （Phase 14D-3B 起「回滾改名 {id}」為真實 rollback 指令；
+#   完全比對與執行行為由 tests/test_rollback_execution.py 覆蓋。）
 # ---------------------------------------------------------------------------
 
 
-def test_rollback_command_does_not_actually_rollback(tmp_path):
+def test_malformed_rollback_command_does_not_actually_rollback(tmp_path):
     # 建立一個真實已更名的檔案情境
     renamed = tmp_path / "new_0.pdf"
     renamed.write_text("content")
     log, tx = _make_log_with_tx(tmp_path, ["success"])
 
-    output = mock_line_payload(f"回滾改名 {tx.transaction_id}", transaction_log=log)
-
-    assert "回滾預覽" not in output
-    assert renamed.exists(), "「回滾改名」不應移動任何檔案"
-    assert not (tmp_path / "orig_0.pdf").exists(), "不應出現回滾後的檔案"
-    # log 中 action 狀態不變
-    reloaded = log.load_transaction(tx.transaction_id)
-    assert reloaded.actions[0].status == "success"
+    for text in [
+        f"請回滾改名 {tx.transaction_id}",
+        f"回滾改名 {tx.transaction_id} 謝謝",
+        f"回滾改名{tx.transaction_id}",
+    ]:
+        output = mock_line_payload(text, transaction_log=log)
+        assert "已執行回滾改名" not in output, f"「{text}」不應觸發 rollback"
+        assert renamed.exists(), f"「{text}」不應移動任何檔案"
+        assert not (tmp_path / "orig_0.pdf").exists(), "不應出現回滾後的檔案"
+        # log 中 action 狀態不變
+        reloaded = log.load_transaction(tx.transaction_id)
+        assert reloaded.actions[0].status == "success"
 
 
 # ---------------------------------------------------------------------------
@@ -161,17 +167,19 @@ def test_preview_does_not_call_rollback_by_id(tmp_path, monkeypatch):
 
     monkeypatch.setattr(executor_module, "rollback_transaction_by_id", explode)
     monkeypatch.setattr(executor_module, "rollback_rename_transaction", explode)
+    # Phase 14D-3B 起 mock_line 為「回滾改名」指令引用 rollback_transaction_by_id，
+    # preview 路徑仍不可呼叫它
+    monkeypatch.setattr(mock_line_module, "rollback_transaction_by_id", explode)
 
     log, tx = _make_log_with_tx(tmp_path, ["success"])
     output = mock_line_payload(f"預覽回滾改名 {tx.transaction_id}", transaction_log=log)
 
     assert "回滾預覽" in output
 
-    # 原始碼層級驗證：mock_line 與 transaction_log 都不引用 rollback 執行函式
-    for module in (mock_line_module, __import__("app.filename.transaction_log", fromlist=[""])):
-        source = inspect.getsource(module)
-        assert "rollback_transaction_by_id" not in source
-        assert "rollback_rename_transaction" not in source
+    # 原始碼層級驗證：transaction_log（preview helper 所在模組）不引用 rollback 執行函式
+    source = inspect.getsource(__import__("app.filename.transaction_log", fromlist=[""]))
+    assert "rollback_transaction_by_id" not in source
+    assert "rollback_rename_transaction" not in source
 
 
 # ---------------------------------------------------------------------------
