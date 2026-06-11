@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.1-alpha] — Phase 14D-1 Approval-to-Execution Bridge
+
+### Added
+- `app/filename/approval_bridge.py` — 受控 application-layer bridge。
+  - `execute_approved_rename_plan(plan, transaction_log=None)` — 接收已核准、已驗證的 RenamePlan，透過既有 Safe Rename Executor 安全執行。
+    - Gate 1：`plan.status != "approved"` → `executed=False`、`dry_run=False`、reason `"plan_not_approved"`，不呼叫 executor。
+    - Gate 2：`validation_report` 缺失 → reason `"missing_validation_report"`，不呼叫 executor。
+    - Gate 3：`validation_report.blocked_count > 0` → reason `"validation_has_blocked_candidates"`，不呼叫 executor。
+    - 通過後委派 `execute_rename_plan(plan, transaction_log=...)`，保留 preflight 與所有 per-candidate 安全規則。
+  - `execute_approved_rename_by_plan_id(plan_id, plan_loader, transaction_log=None)` — 以注入式 `plan_loader` 載入 plan；找不到 → reason `"plan_not_found"`，找到則委派 `execute_approved_rename_plan()`。
+- `tests/test_approval_bridge.py` — 15 個新測試（gate 拒絕、低/中風險執行、高風險跳過、transaction log 整合、AST 驗證 bridge 不直接 rename、Mock LINE 隔離、plan_id helper）。
+
+### Safety guarantees
+- Mock LINE 仍**不會**觸發真實更名 — bridge 未接到任何 Mock LINE 指令（Phase 14D-2 才加入明確確認指令）。
+- Rollback 指令仍未對使用者開放。
+- Bridge 不直接呼叫 `Path.rename` / `os.rename` / `shutil.move`，真實更名僅透過 `execute_rename_plan()`。
+- 所有檔案系統測試使用 `pytest tmp_path`。
+
+### Recommended next phase
+- **Phase 14D-2 — Explicit Mock LINE Confirm Rename Command**。
+
+---
+
 ## [v0.5.0-alpha] — Phase 14C Persistent Transaction Log & Rollback Audit Trail
 
 ### Added
