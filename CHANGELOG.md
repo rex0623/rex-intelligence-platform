@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.1-alpha] — Phase 15B MovePlan Approval + Dry-run Workflow Integration
+
+### Added
+- `app/router/ai_router.py` — `move_planning` intent（關鍵字：「整理資料夾」「產生搬移計畫」「分析 PDF 並產生搬移計畫」「產生資料夾歸檔計畫」），route 至 pdf_worker `generate_move_plan`，建立 approval 並在 payload 標記 `plan_type="move_plan"`。
+- `app/workers/pdf_worker.py` — `generate_move_plan` action：分析 PDF → 沿用 filename intelligence 建議檔名 → `build_move_plan()` → `validate_move_plan()` → 掛 validation_report → 回傳 dry-run move_plan。
+- `app/workflows/executor.py` — `_execute_move_dry_run()`：「確認 {approval_id}」核准 move plan 後顯示 dry-run 報告（建議搬移目標、風險摘要、「本次沒有實際搬移任何檔案」），依 `plan_type` 與 RenamePlan payload 分流。
+- `scripts/mock_line.py` — move planning 關鍵字 + `_format_move_plan_response()`（整合 `format_move_plan_for_cli()`，輸出標題、風險摘要、每筆建議、approval_id、「尚未實際搬移」提示）。
+- `tests/test_move_plan_workflow.py` — 15 個新測試。
+
+### Safety
+- `_payload_to_rename_plan()` 防護：`plan_type=="move_plan"` 的 approval 不可被「確認改名」當成 RenamePlan 執行（有測試）。
+- **仍無任何真實搬移**：沒有 move executor、沒有「確認搬移」指令（輸出與原始碼均有測試驗證）；核准 move plan 只產生 dry-run 報告。
+- 既有 rename_planning intent、「整理檔名」「整理 Downloads」行為不變（有測試）；整合模組經 AST 驗證無 rename/move/replace 呼叫。
+
+### Recommended next phase
+- **Phase 15C — MovePlan Quality Gate / Preflight Design**。
+
+---
+
 ## [v0.6.0-alpha] — Phase 15A Folder Intelligence / Move Plan Design
 
 ### Added

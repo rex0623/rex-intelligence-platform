@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.6.0-alpha |
-| **Test Count** | 317 passing |
+| **Current Version** | v0.6.1-alpha |
+| **Test Count** | 332 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -28,6 +28,7 @@
 | 14E | Rename Execution Hardening / Once-only Guard | ✅ Complete |
 | 14F | Rename Transaction Log Rotation / Cleanup | ✅ Complete |
 | 15A | Folder Intelligence / Move Plan Design | ✅ Complete |
+| 15B | MovePlan Approval + Dry-run Workflow Integration | ✅ Complete |
 
 ---
 
@@ -51,7 +52,7 @@
 | Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A）與 `prune_transactions()` 維運清理 API（14F） |
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
 | Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）指令 |
-| Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning only，無 executor（15A） |
+| Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning only，無 executor（15A）；已接 router/worker/approval/dry-run（15B） |
 
 ---
 
@@ -111,6 +112,9 @@ WorkerRequest                                                               │
 25. **Log prune 僅為維運 API（14F）** — 未接任何 Mock LINE 指令，rename / rollback 指令行為完全不變。
 26. **MovePlan 僅為計畫（15A）** — `dry_run=True`、`requires_approval=True` by default；沒有 move executor、沒有任何 Mock LINE 搬移指令；planner / validator / formatter 不碰真實 filesystem（AST 驗證不得出現 rename/move/replace/mkdir 呼叫）。
 27. **Folder segment 防護（15A）** — `sanitize_folder_segment()` 排除 `/`、`\`、`:` 等非法字元與相對路徑點號；business_id / billing_period 缺失時使用 `unknown-business` / `unknown-period` fallback（validator 標為 high）；unknown 文件對應 `未分類/unknown-document/`（validator 標為 blocked）。
+28. **Move planning 指令僅產生計畫（15B）** — 「整理資料夾」「產生搬移計畫」等指令只產生 MovePlan + approval + dry-run summary；「確認 {approval_id}」核准後也只顯示 move dry-run 報告，不搬移檔案。
+29. **MovePlan payload 標記 `plan_type="move_plan"`（15B）** — dry-run executor 據此分流；「確認改名」對 move plan approval 一律拒絕（不可被當成 RenamePlan 執行）。
+30. **沒有「確認搬移」指令（15B）** — Mock LINE 無任何真實搬移入口；無 move executor。
 
 ---
 
@@ -127,13 +131,14 @@ WorkerRequest                                                               │
 - Log prune 為手動維運 API，無自動排程；何時呼叫由維運方決定。
 - Prune 條件以 transaction 為單位（created_at / 筆數），不支援以 plan_id 或 action 層級篩選。
 - MovePlan 僅支援 Taipower bill folder template；其他 document type 一律進「未分類」。
-- MovePlan 尚未接 approval workflow、Mock LINE 與任何 executor（Phase 15B+ 範疇）；planning 不檢查真實 filesystem（目標資料夾是否存在、collision 等留待 executor preflight）。
+- MovePlan 已接 approval workflow 與 Mock LINE planning 指令（15B），但無任何 executor；planning 不檢查真實 filesystem（目標資料夾是否存在、collision 等留待未來 preflight）。
+- MovePlan approval 沒有 once-only guard（因為沒有執行路徑，核准只產生 dry-run 報告）。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 15B — MovePlan Approval + Dry-run Workflow Integration**
+**Phase 15C — MovePlan Quality Gate / Preflight Design**
 
-- 將 MovePlan 接上既有 Approval Engine（建立 approval、核准、dry-run 報告），沿用 rename pipeline 的流程設計。
-- Mock LINE 可加入 dry-run planning 指令（如「產生搬移計畫」），但仍不可有真實搬移指令。
+- 仿照 Phase 14A 設計 move preflight：approved plan、validation_report、blocked gate、目標資料夾/collision 檢查（read-only）。
+- 為未來 safe move executor（15D+）鋪路；本階段仍不實際搬移。

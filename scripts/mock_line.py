@@ -19,6 +19,8 @@ from app.filename.transaction_log import (
     RenameTransactionLog,
     preview_rollback_transaction,
 )
+from app.folder_intelligence.formatter import format_move_plan_for_cli
+from app.folder_intelligence.schemas import MovePlan
 from app.router.ai_router import AIRouter
 from app.schemas.messages import WorkerRequest
 from app.workers.pdf_worker import PDFWorker
@@ -164,6 +166,29 @@ def _format_rename_plan(response: dict) -> str:
 
 _RENAME_PLAN_KEYWORDS = ["產生改名計畫", "整理檔名", "分析 PDF 並產生改名計畫"]
 
+# Move planning 關鍵字（Phase 15B）：只產生 MovePlan + approval + dry-run 顯示，
+# 不會搬移任何檔案；本階段沒有任何真實搬移指令。
+_MOVE_PLAN_KEYWORDS = [
+    "產生搬移計畫",
+    "整理資料夾",
+    "分析 PDF 並產生搬移計畫",
+    "產生資料夾歸檔計畫",
+]
+
+
+def _format_move_plan_response(response: dict) -> str:
+    """Format a generate_move_plan response for mock LINE CLI output."""
+    plan = MovePlan.model_validate(response.get("move_plan", {}))
+    lines = [format_move_plan_for_cli(plan)]
+
+    approval_id = response.get("approval_id", "")
+    if approval_id:
+        lines.append("")
+        lines.append(f"- approval_id：{approval_id}")
+        lines.append(f"若要核准此搬移計畫（僅 dry-run 報告），請輸入：確認 {approval_id}")
+        lines.append(f"若要取消，請輸入：取消 {approval_id}")
+    return "\n".join(lines)
+
 # ---------------------------------------------------------------------------
 # Phase 14D-2 — Explicit confirm rename command
 # ---------------------------------------------------------------------------
@@ -200,6 +225,9 @@ def _payload_to_rename_plan(payload: object) -> RenamePlan | None:
     workflow plan or empty payload).
     """
     if not isinstance(payload, dict):
+        return None
+    # MovePlan payload 也有 plan_id / candidates，不可被當成 RenamePlan 執行
+    if payload.get("plan_type") == "move_plan":
         return None
     if "plan_id" not in payload or "candidates" not in payload:
         return None
@@ -300,7 +328,28 @@ def format_mock_response(worker_response: object) -> str:
         if worker_response.get("action") == "generate_rename_plan":
             return _format_rename_plan(worker_response)
 
+        if worker_response.get("action") == "generate_move_plan":
+            return _format_move_plan_response(worker_response)
+
         if worker_response.get("status") == "dry_run_completed":
+            if worker_response.get("action") == "move_plan":
+                lines = ["小雷收到：搬移計畫已確認（dry-run）"]
+                risk_summary = worker_response.get("risk_summary", {})
+                if risk_summary:
+                    lines.append(
+                        f"風險摘要："
+                        f"低風險 {risk_summary.get('low', 0)} 份"
+                        f" | 中風險 {risk_summary.get('medium', 0)} 份"
+                        f" | 高風險 {risk_summary.get('high', 0)} 份"
+                        f" | 封鎖 {risk_summary.get('blocked', 0)} 份"
+                    )
+                for step in worker_response.get("steps", []):
+                    lines.append(f"- {step.get('name')}：{step.get('result')}")
+                lines.append(
+                    f"注意：{worker_response.get('note', '本次沒有實際搬移任何檔案')}"
+                )
+                return "\n".join(lines)
+
             if worker_response.get("action") == "rename_plan":
                 lines = ["小雷收到：改名計畫已確認（dry-run）"]
                 risk_summary = worker_response.get("risk_summary", {})
@@ -498,8 +547,11 @@ def mock_line_payload(
             transaction_log=transaction_log,
         )
 
-    # Rename planning: must be checked before 分析 PDF to handle 分析 PDF 並產生改名計畫
-    if any(kw in text for kw in _RENAME_PLAN_KEYWORDS):
+    # Move/Rename planning: must be checked before 分析 PDF to handle
+    # 分析 PDF 並產生搬移計畫 / 分析 PDF 並產生改名計畫
+    if any(kw in text for kw in _MOVE_PLAN_KEYWORDS) or any(
+        kw in text for kw in _RENAME_PLAN_KEYWORDS
+    ):
         router = AIRouter()
         result = asyncio.run(router.route(message=text))
         worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")

@@ -97,6 +97,48 @@ class AIRouter:
                 "response": response_payload,
             }
         if worker_id == "pdf_worker":
+            # Move planning (Phase 15B): generate a dry-run MovePlan and
+            # submit for approval.  Planning only — never moves files.
+            if intent == "move_planning":
+                worker_request = WorkerRequest(
+                    worker_id=worker_id,
+                    action="generate_move_plan",
+                    payload={},
+                    user_id=user_id,
+                    request_id=str(uuid.uuid4()),
+                )
+                worker = self.workers[worker_id]
+                worker_response = await worker.execute(worker_request)
+                response_data = worker_response.model_dump()
+                outer_data = response_data.get("data", {})
+                if outer_data.get("status") == "error":
+                    return {
+                        "status": "failed",
+                        "user_id": user_id,
+                        "intent": intent,
+                        "worker_id": worker_id,
+                        "worker_response": outer_data.get("error", "generate_move_plan failed"),
+                        "response": {"message": outer_data.get("error", "")},
+                    }
+                plan_dict = outer_data.get("data", {}).get("move_plan", {})
+                # 標記 payload 類型，讓 dry-run executor 與 rename 確認流程
+                # 能與 RenamePlan payload 區分
+                plan_dict["plan_type"] = "move_plan"
+                approval = approval_manager.create_approval(plan_dict)
+                worker_resp = {
+                    "action": "generate_move_plan",
+                    "move_plan": plan_dict,
+                    "approval_id": approval.approval_id,
+                }
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "intent": intent,
+                    "worker_id": worker_id,
+                    "worker_response": worker_resp,
+                    "response": worker_resp,
+                }
+
             # Rename planning: generate a RenamePlan and submit for approval
             if intent == "rename_planning":
                 worker_request = WorkerRequest(
@@ -193,6 +235,19 @@ class AIRouter:
         """
         message_lower = message.lower()
 
+        # Move planning (check before rename/PDF/file_management to handle
+        # "整理資料夾" / "分析 PDF 並產生搬移計畫")
+        if any(
+            kw in message
+            for kw in [
+                "產生搬移計畫",
+                "整理資料夾",
+                "分析 PDF 並產生搬移計畫",
+                "產生資料夾歸檔計畫",
+            ]
+        ):
+            return "move_planning"
+
         # Rename planning (check before PDF/file_management to handle "整理檔名")
         if any(
             kw in message
@@ -228,6 +283,7 @@ class AIRouter:
         intent_map = {
             "pdf_processing": "pdf_worker",
             "rename_planning": "pdf_worker",
+            "move_planning": "pdf_worker",
             "file_management": "folder_worker",
             "code_generation": "claude_worker",
             "requirements_analysis": "gpt_worker",

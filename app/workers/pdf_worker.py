@@ -40,6 +40,7 @@ class PDFWorker(BaseWorker):
             "extract_tables",
             "analyze_pdfs",
             "generate_rename_plan",
+            "generate_move_plan",
         ]:
             return False
 
@@ -64,6 +65,9 @@ class PDFWorker(BaseWorker):
 
         if action == "generate_rename_plan":
             return await self.generate_rename_plan()
+
+        if action == "generate_move_plan":
+            return await self.generate_move_plan()
 
         if action == "extract_text":
             return {
@@ -139,6 +143,57 @@ class PDFWorker(BaseWorker):
                 "mode": "dry-run",
                 "message": "dry-run，不會實際更名",
                 "rename_plan": plan.model_dump(),
+            },
+        }
+
+    async def generate_move_plan(self) -> dict[str, Any]:
+        """Generate a dry-run MovePlan (Phase 15B).
+
+        Planning only: never creates folders, never moves files.
+        """
+        from app.filename.planner import build_rename_plan
+        from app.folder_intelligence.planner import build_move_plan
+        from app.folder_intelligence.validator import validate_move_plan
+
+        analysis = self._analyze_pdfs_sync()
+        if analysis.get("status") == "error":
+            return analysis
+        summaries = analysis.get("data", {}).get("pdf_summaries", [])
+
+        # 沿用 filename intelligence 的建議檔名（若有），讓搬移目標使用
+        # 正規化後的檔名；planner 僅產生字串，不更名任何檔案。
+        rename_plan = build_rename_plan(summaries)
+        proposed_by_file = {
+            c.original_filename: c.proposed_filename
+            for c in rename_plan.candidates
+            if c.proposed_filename
+        }
+
+        documents = []
+        for summary in summaries:
+            file_name = summary.get("file_name", "")
+            doc_obj = summary.get("document_object") or {}
+            doc_type = doc_obj.get(
+                "document_type",
+                summary.get("classification", {}).get("type", "unknown"),
+            )
+            documents.append({
+                "path": str(self.safe_pdf_root / file_name) if file_name else "",
+                "filename": file_name,
+                "document_type": doc_type,
+                "document_object": doc_obj,
+                "proposed_filename": proposed_by_file.get(file_name),
+            })
+
+        plan = build_move_plan(documents)
+        plan.validation_report = validate_move_plan(plan)
+        return {
+            "status": "success",
+            "action": "generate_move_plan",
+            "data": {
+                "mode": "dry-run",
+                "message": "dry-run，不會實際搬移",
+                "move_plan": plan.model_dump(),
             },
         }
 

@@ -15,6 +15,10 @@ class WorkflowExecutor:
     """Executor for workflow dry-run simulation."""
 
     def execute_dry_run(self, workflow_plan: dict[str, Any] | WorkflowPlan) -> dict[str, Any]:
+        # Detect MovePlan payload (Phase 15B; tagged by router with plan_type)
+        if isinstance(workflow_plan, dict) and workflow_plan.get("plan_type") == "move_plan":
+            return self._execute_move_dry_run(workflow_plan)
+
         # Detect RenamePlan payload (has plan_id, not workflow_id)
         if isinstance(workflow_plan, dict) and "plan_id" in workflow_plan:
             return self._execute_rename_dry_run(workflow_plan)
@@ -85,6 +89,60 @@ class WorkflowExecutor:
             "steps": steps_report,
             "risk_summary": risk_summary,
             "note": "本次沒有實際更名任何 PDF",
+        }
+
+    def _execute_move_dry_run(self, plan_dict: dict[str, Any]) -> dict[str, Any]:
+        """Dry-run report for a MovePlan payload (Phase 15B).
+
+        Display only — never creates folders, never moves files.
+        """
+        validation = plan_dict.get("validation_report") or {}
+        val_by_file = {
+            v["original_filename"]: v
+            for v in validation.get("candidates", [])
+        }
+
+        steps_report = []
+        for c in plan_dict.get("candidates", []):
+            original = c.get("original_filename", "")
+            folder = c.get("proposed_folder", "")
+            confidence = c.get("confidence", 0.0)
+            warnings = c.get("warnings", [])
+            val = val_by_file.get(original, {})
+            risk = val.get("risk_level", "unknown")
+            issues = val.get("issues", [])
+
+            if folder and risk not in ("blocked",):
+                steps_report.append({
+                    "name": original,
+                    "result": (
+                        f"dry-run：建議搬移至 {folder}"
+                        f"（信心度 {confidence:.2f}，風險 {risk}）"
+                    ),
+                })
+            else:
+                reason = "；".join(issues) if issues else (
+                    "；".join(warnings) if warnings else "無法產生歸檔建議"
+                )
+                steps_report.append({
+                    "name": original,
+                    "result": f"dry-run blocked：{reason}",
+                })
+
+        risk_summary = {
+            "low": validation.get("low_count", 0),
+            "medium": validation.get("medium_count", 0),
+            "high": validation.get("high_count", 0),
+            "blocked": validation.get("blocked_count", 0),
+        }
+
+        return {
+            "plan_id": plan_dict.get("plan_id", ""),
+            "status": "dry_run_completed",
+            "action": "move_plan",
+            "steps": steps_report,
+            "risk_summary": risk_summary,
+            "note": "本次沒有實際搬移任何檔案",
         }
 
     def _dry_run_result_for_step(self, step_name: str) -> str:
