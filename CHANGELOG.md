@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.5-alpha] — Phase 14E Rename Execution Hardening / Once-only Guard
+
+### Added
+- **Approval once-only guard** — 同一 approval_id 不會重複執行真實 rename。
+  - `app/approvals/manager.py` — 新增 `mark_executed(approval_id, transaction_id)`：在既有 payload dict 記錄 `execution_status="executed"` / `executed_at` / `execution_transaction_id` 並持久化（backward compatible：舊 approval 無 `execution_status` 視為尚未執行）。
+  - `scripts/mock_line.py` — 「確認改名」執行前檢查 `execution_status`；已執行過則回覆「此改名計畫已執行過」+ transaction_id +「預覽回滾改名 / 回滾改名」復原提示，不呼叫 `execute_approved_rename_plan()`、不動檔案、不新增 transaction。
+  - 標記條件：至少一筆 rename 成功；全數失敗（檔案未動）不標記，允許重試。
+- **Rollback once-only guard** — 已無可回滾 action 時不進入 rollback 執行路徑。
+  - `scripts/mock_line.py` — 「回滾改名」先以 read-only `preview_rollback_transaction()` 判斷；無可回滾 action 時不呼叫 `rollback_transaction_by_id()`、不動檔案、不寫 log。全部已回滾 → 「此交易已回滾完成（已回滾 N 筆）」；其餘 → 「沒有可回滾項目」。部分 rolled_back 仍可回滾剩餘 success action。
+- `app/filename/schemas.py` — `RollbackPreview` 新增 `has_rollbackable_actions` / `is_fully_rolled_back` properties（重用 preview，未新增重複邏輯）。
+- 「預覽回滾改名」回覆強化：無可回滾項目時提示「目前沒有可回滾項目」，全部回滾完成時顯示「此交易已全部回滾」。
+- `tests/test_once_only_guard.py` — 16 個新測試（含 parametrize 展開；首次執行、重複確認擋下（monkeypatch 驗證不呼叫 bridge）、execution_status 持久化、全敗可重試、重複回滾擋下（log byte-level 不變）、部分回滾、預覽 fully rolled_back、狀態 properties、模糊文字不觸發）。
+
+### Changed
+- `tests/test_mock_line_confirm_rename.py` — 重複確認測試改驗證 once-only guard（原 14D-2 行為：第二次回報 original_file_not_found；14E 起：直接回覆已執行過且不新增 transaction）。
+
+### Safety guarantees
+- 明確指令格式不變：「確認改名 {approval_id}」「預覽回滾改名 {transaction_id}」「回滾改名 {transaction_id}」。
+- 模糊文字仍不觸發任何真實 rename / rollback。
+- Dry-run 行為不變；Mock LINE 仍不直接呼叫 `Path.rename`。
+- 所有檔案異動測試使用 `pytest tmp_path`；approval store 與 transaction log 均隔離。
+
+### Recommended next phase
+- **Phase 15A — Folder Intelligence / Move Plan Design**（或 Phase 14F — Rename Transaction Log Rotation / Cleanup）。
+
+---
+
 ## [v0.5.4-alpha] — Phase 14D-3B Explicit Mock LINE Rollback Execution Command
 
 ### Added

@@ -116,3 +116,11 @@ class RollbackPreview(BaseModel):
     pending_count: int = 0
     rollbackable_count: int = 0
     actions: List[RollbackPreviewAction] = Field(default_factory=list)
+
+    @property
+    def has_rollbackable_actions(self) -> bool:
+        return self.rollbackable_count > 0
+
+    @property
+    def is_fully_rolled_back(self) -> bool:
+        return self.total_actions > 0 and self.rolled_back_count == self.total_actions

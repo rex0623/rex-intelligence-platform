@@ -229,6 +229,19 @@ def confirm_rename(
             f"請先輸入：確認 {approval_id}"
         )
 
+    # Once-only guard (Phase 14E)：同一 approval 成功執行過即不可重複執行。
+    # 舊 approval payload 沒有 execution_status 時視為尚未執行（backward compatible）。
+    payload = approval.payload or {}
+    if payload.get("execution_status") == "executed":
+        executed_tx = payload.get("execution_transaction_id")
+        lines = ["小雷收到：此改名計畫已執行過，不會重複執行"]
+        lines.append(f"- approval_id：{approval_id}")
+        if executed_tx:
+            lines.append(f"- transaction_id：{executed_tx}")
+            lines.append(f"如需復原，請輸入：預覽回滾改名 {executed_tx}")
+            lines.append(f"或輸入：回滾改名 {executed_tx}")
+        return "\n".join(lines)
+
     plan = _payload_to_rename_plan(approval.payload)
     if plan is None:
         return f"小雷收到：approval {approval_id} 的內容不是改名計畫，不支援「確認改名」"
@@ -255,6 +268,11 @@ def confirm_rename(
     for tx in transaction_log.list_transactions():
         if tx.plan_id == plan.plan_id:
             transaction_id = tx.transaction_id
+
+    # Once-only guard (Phase 14E)：至少一筆真實更名成功才標記已執行；
+    # 全數失敗（檔案未動）時允許重試。
+    if result.success_count > 0:
+        approval_manager.mark_executed(approval_id, transaction_id)
 
     lines = ["小雷收到：已執行改名"]
     lines.append(f"- approval_id：{approval_id}")
@@ -388,6 +406,11 @@ def preview_rollback(
                 f"      狀態：{action.status}"
                 f" | 可回滾：{'是' if action.rollbackable else '否'}"
             )
+    if not preview.has_rollbackable_actions:
+        if preview.is_fully_rolled_back:
+            lines.append("此交易已全部回滾，目前沒有可回滾項目。")
+        else:
+            lines.append("目前沒有可回滾項目。")
     lines.append("目前僅預覽，尚未執行回滾。")
     return "\n".join(lines)
 
@@ -406,9 +429,23 @@ def rollback_rename(
     if transaction_log is None:
         transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
 
+    # Once-only guard (Phase 14E)：先以 read-only preview 判斷狀態，
+    # 沒有可回滾 action 時完全不進入 rollback 執行路徑（不動檔案、不寫 log）。
+    preview = preview_rollback_transaction(transaction_id, transaction_log)
+    if preview is None:
+        return f"小雷收到：找不到 transaction：{transaction_id}"
+    if not preview.has_rollbackable_actions:
+        if preview.is_fully_rolled_back:
+            return (
+                f"小雷收到：此交易已回滾完成"
+                f"（已回滾 {preview.rolled_back_count} 筆），沒有可回滾項目"
+            )
+        return f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+
     result = rollback_transaction_by_id(transaction_id, transaction_log)
 
     if not result.executed:
+        # 理論上 preview guard 已擋掉；保留原行為作為防護
         reasons = {r.reason for r in result.results}
         if "transaction_not_found" in reasons:
             return f"小雷收到：找不到 transaction：{transaction_id}"

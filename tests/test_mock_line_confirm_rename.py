@@ -394,7 +394,7 @@ def test_confirm_rename_reports_target_exists_failure(tmp_path, isolated_approva
 
 
 # ---------------------------------------------------------------------------
-# 測試 15：已核准後重複執行第二次（原始檔已消失）不會覆寫
+# 測試 15：已核准後重複執行第二次，once-only guard 擋下（Phase 14E）
 # ---------------------------------------------------------------------------
 
 
@@ -409,6 +409,7 @@ def test_confirm_rename_second_run_does_not_overwrite(tmp_path, isolated_approva
     assert "成功：1 筆" in first
 
     second = mock_line_payload(f"確認改名 {approval_id}", transaction_log=log)
-    assert "成功：0 筆" in second
-    assert "original_file_not_found" in second
+    assert "已執行過" in second, "第二次確認應被 once-only guard 擋下"
+    assert "已執行改名" not in second
     assert (tmp_path / "renamed.pdf").read_text() == "content", "已更名檔案不可被覆寫"
+    assert len(log.list_transactions()) == 1, "第二次確認不應新增 transaction"

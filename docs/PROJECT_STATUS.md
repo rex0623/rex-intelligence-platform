@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.5.4-alpha |
-| **Test Count** | 268 passing |
+| **Current Version** | v0.5.5-alpha |
+| **Test Count** | 284 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -25,6 +25,7 @@
 | 14D-2 | Explicit Mock LINE Confirm Rename Command | ✅ Complete |
 | 14D-3A | Mock LINE Rollback Preview Command | ✅ Complete |
 | 14D-3B | Explicit Mock LINE Rollback Execution Command | ✅ Complete |
+| 14E | Rename Execution Hardening / Once-only Guard | ✅ Complete |
 
 ---
 
@@ -34,7 +35,7 @@
 |--------|------|-------------|
 | AI Router | `app/router/ai_router.py` | Routes LINE messages to workers |
 | Workflow Engine | `app/workflows/engine.py` | Manages multi-step workflows |
-| Approval Engine | `app/approvals/manager.py` | Approval request lifecycle |
+| Approval Engine | `app/approvals/manager.py` | Approval request lifecycle；含 `mark_executed()` 執行狀態標記（14E） |
 | Dry-run Executor | `app/workflows/executor.py` | Executes workflows in dry-run mode |
 | PDF Intelligence | `app/workers/pdf_worker.py` | Reads and classifies PDF files |
 | Document Intelligence | `app/document/` | Classifies and extracts document fields |
@@ -100,6 +101,9 @@ WorkerRequest                                                               │
 18. **Rollbackable 判斷** — 只有 action status == "success" 可回滾；rolled_back / failed / pending 不會被動到。
 19. **Rollback 一律透過 `rollback_transaction_by_id()`** — Mock LINE 不直接呼叫 `Path.rename` / `os.rename` / `shutil.move`（AST 驗證）；成功回滾的 action 在 log 中更新為 `rolled_back`，失敗的維持 `success`。
 20. **Rollback 安全檢查** — 來源不存在 → `rollback_source_not_found`；目標已被佔用 → `rollback_target_already_exists`，不覆寫任何檔案。
+21. **Approval once-only guard（14E）** — 同一 approval_id 成功執行（至少一筆 rename 成功）後，payload 記錄 `execution_status` / `executed_at` / `execution_transaction_id`；重複「確認改名」直接回覆「已執行過」+ transaction_id + 復原提示，不呼叫 bridge、不動檔案、不新增 transaction。全數失敗（檔案未動）時不標記，允許重試。舊 approval 無 `execution_status` 視為尚未執行（backward compatible）。
+22. **Rollback once-only guard（14E）** — 「回滾改名」先以 read-only preview 判斷；無可回滾 action 時完全不進入執行路徑（不動檔案、不寫 log）。全部已回滾 → 回覆「此交易已回滾完成」；部分 rolled_back 仍可回滾剩餘 success action。
+23. **預覽提示可回滾狀態（14E）** — 「預覽回滾改名」在無可回滾項目時明確提示，全部回滾完成時顯示「此交易已全部回滾」。
 
 ---
 
@@ -111,15 +115,15 @@ WorkerRequest                                                               │
 - No multi-user / tenant isolation.
 - RenamePlan 透過 approval payload（JSON）持久化，無獨立 plan 儲存系統。
 - Rollback 預覽不檢查實際檔案是否存在；可回滾與否僅依 log 中 action status 判斷，實際可行性由執行時的 safety check 把關（來源/目標檢查）。
-- 「確認改名」「回滾改名」可重複輸入同一 id；重複執行不會覆寫檔案（分別回報 original_file_not_found / 沒有可回滾項目），但尚未做 once-only 執行鎖（Phase 14E 範疇）。
+- Once-only guard 以「至少一筆 rename 成功」為標記條件；部分成功（如 2 成功 1 失敗）即標記 executed，失敗的候選項無法透過同一 approval 重試。
+- Approval 執行狀態存於 payload dict（非 schema 欄位），仰賴 JSON store 持久化；無跨 process 鎖，極端並發下仍可能 race（單人 CLI 情境可接受）。
 - Transaction log 無 rotation/壓縮。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 14E — Rename Execution Hardening / Once-only Guard**
+**Phase 15A — Folder Intelligence / Move Plan Design**
 
-- 「確認改名 {approval_id}」加入 once-only 執行鎖：已執行過的 approval 不可重複觸發。
-- 考慮 approval 執行後標記 executed 狀態（approval lifecycle 延伸）。
-- Transaction log rotation / 大小控管。
+- Rename pipeline（plan → validate → approve → execute → rollback）已完整且 hardened，可作為 folder move 的設計範本。
+- 替代選項：**Phase 14F — Rename Transaction Log Rotation / Cleanup**（log 大小控管、TTL），若希望先完成 hardening 收尾。

@@ -85,6 +85,28 @@ class ApprovalManager:
         logger.info("Approval approved", extra={"approval_id": approval_id})
         return approval
 
+    def mark_executed(
+        self, approval_id: str, transaction_id: Optional[str] = None
+    ) -> Optional[Approval]:
+        """Record execution state on an approval (Phase 14E once-only guard).
+
+        Stores execution metadata inside the existing payload dict, so the
+        record stays backward compatible: old approvals without
+        "execution_status" are treated as not yet executed.
+        """
+        approval = self._store.get(approval_id)
+        if approval is None:
+            return None
+        if approval.payload is None:
+            approval.payload = {}
+        approval.payload["execution_status"] = "executed"
+        approval.payload["executed_at"] = datetime.now(timezone.utc).isoformat()
+        if transaction_id:
+            approval.payload["execution_transaction_id"] = transaction_id
+        self._save_store()
+        logger.info("Approval marked executed", extra={"approval_id": approval_id})
+        return approval
+
     def reject(self, approval_id: str) -> Approval:
         approval = self._store.get(approval_id)
         if approval is None:
