@@ -291,11 +291,11 @@ def test_bridge_does_not_affect_generic_mock_line_behavior(tmp_path, monkeypatch
     from app.core.config import settings
     from scripts.mock_line import mock_line_payload
 
-    # Mock LINE 模組不應 import approval bridge
+    # Phase 14D-2 起 Mock LINE 接入 approval bridge，但僅限明確
+    # 「確認改名 {approval_id}」指令；通用改名指令仍不可觸發真實更名。
     import scripts.mock_line as mock_line_module
-    mock_line_source = inspect.getsource(mock_line_module)
-    assert "approval_bridge" not in mock_line_source, (
-        "Mock LINE 不應接到 approval bridge（Phase 14D-2 才會加入明確確認指令）"
+    assert hasattr(mock_line_module, "_CONFIRM_RENAME_PATTERN"), (
+        "真實更名必須限定於明確確認指令格式"
     )
 
     pdf_root = tmp_path / "pdf_inbox"

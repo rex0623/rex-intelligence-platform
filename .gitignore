@@ -169,6 +169,9 @@ coverage_html_report/
 *.sqlite3
 *.dump
 
+# Runtime artifacts (generated at run time, never commit)
+runtime/rename_transactions.json
+
 # Credentials (never commit these!)
 *.pem
 *.key

@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.2-alpha] — Phase 14D-2 Explicit Mock LINE Confirm Rename Command
+
+### Added
+- `scripts/mock_line.py` — 明確確認改名指令「確認改名 {approval_id}」。
+  - 唯一可觸發真實更名的 Mock LINE 指令；regex 完全比對（`^確認改名\s+(\S+)$`），附加任何多餘文字均不觸發。
+  - 流程：查詢 approval → 驗證已核准 → payload 轉回 `RenamePlan`（最小 adapter）→ `execute_approved_rename_plan()` → 寫入 `RenameTransactionLog` → 回覆執行摘要。
+  - 回覆內容：成功/失敗/跳過/blocked 統計、transaction_id、每筆檔案結果與原因。
+  - 失敗回覆：找不到 approval、approval 尚未核准（提示先輸入「確認 {approval_id}」）、payload 不是改名計畫、缺 validation_report、含 blocked candidate。
+  - 改名計畫輸出新增提示行：「核准後若要實際執行改名，請輸入：確認改名 {approval_id}」。
+- Transaction log 預設路徑：`runtime/rename_transactions.json`（目錄不存在自動建立）。
+- `.gitignore` 排除 `runtime/rename_transactions.json`。
+- `tests/test_mock_line_confirm_rename.py` — 18 個新測試（含 parametrize 展開；模糊文字不觸發、未核准/非 rename plan/blocked/缺 validation_report 拒絕、低風險執行、高風險跳過、目標已存在失敗、重複執行不覆寫、預設 log 路徑、AST 驗證不直接 rename，approval store 隔離至 tmp_path）。
+
+### Changed
+- `tests/test_approval_bridge.py` — Mock LINE 隔離測試改為驗證「真實更名僅限明確確認指令格式」（14D-1 時 bridge 尚未接入 Mock LINE，14D-2 起刻意接入）。
+
+### Safety guarantees
+- 「整理檔名」「產生改名計畫」「分析 PDF 並產生改名計畫」等通用指令仍**不會**觸發真實更名。
+- 「確認」「確認改名」（無 id）、「好」「OK」「執行」等模糊文字**不會**觸發真實更名。
+- 「確認 {approval_id}」維持原行為：核准 + dry-run 報告，不觸發真實更名。
+- Rollback 指令仍未開放（Phase 14D-3 範疇）。
+- Mock LINE 不直接呼叫 `Path.rename`；真實更名僅透過 approval bridge → safe rename executor。
+- 所有真實更名測試使用 `pytest tmp_path`，approval store 與 transaction log 均隔離。
+
+### Recommended next phase
+- **Phase 14D-3 — Explicit Mock LINE Rollback Command**。
+
+---
+
 ## [v0.5.1-alpha] — Phase 14D-1 Approval-to-Execution Bridge
 
 ### Added

@@ -8,8 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import asyncio
+import re
 import uuid
 
+from app.approvals.manager import approval_manager
+from app.filename.approval_bridge import execute_approved_rename_plan
+from app.filename.schemas import RenamePlan
+from app.filename.transaction_log import RenameTransactionLog
 from app.router.ai_router import AIRouter
 from app.schemas.messages import WorkerRequest
 from app.workers.pdf_worker import PDFWorker
@@ -148,11 +153,114 @@ def _format_rename_plan(response: dict) -> str:
         lines.append("")
         lines.append(f"若要確認，請輸入：確認 {approval_id}")
         lines.append(f"若要取消，請輸入：取消 {approval_id}")
+        lines.append(f"核准後若要實際執行改名，請輸入：確認改名 {approval_id}")
 
     return "\n".join(lines)
 
 
 _RENAME_PLAN_KEYWORDS = ["產生改名計畫", "整理檔名", "分析 PDF 並產生改名計畫"]
+
+# ---------------------------------------------------------------------------
+# Phase 14D-2 — Explicit confirm rename command
+# ---------------------------------------------------------------------------
+
+# 唯一可觸發真實更名的指令格式：「確認改名 {approval_id}」（完全符合才生效）。
+# 「確認」「確認改名」「好」「OK」「執行」等都不會匹配。
+_CONFIRM_RENAME_PATTERN = re.compile(r"^確認改名\s+(\S+)$")
+
+_DEFAULT_TRANSACTION_LOG_PATH = (
+    Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
+)
+
+# Approval bridge 的 plan-level gate 拒絕理由 → 使用者訊息
+_BRIDGE_REJECT_MESSAGES = {
+    "plan_not_approved": "改名計畫尚未核准，無法執行",
+    "missing_validation_report": "改名計畫缺少 validation_report，無法執行",
+    "validation_has_blocked_candidates": "改名計畫包含 blocked candidate，無法執行",
+}
+
+
+def _payload_to_rename_plan(payload: object) -> RenamePlan | None:
+    """Minimal adapter: convert an approval payload dict back to RenamePlan.
+
+    Returns None if the payload is not a rename plan (e.g. a pdf_bill
+    workflow plan or empty payload).
+    """
+    if not isinstance(payload, dict):
+        return None
+    if "plan_id" not in payload or "candidates" not in payload:
+        return None
+    try:
+        return RenamePlan.model_validate(payload)
+    except Exception:
+        return None
+
+
+def confirm_rename(
+    approval_id: str,
+    transaction_log: RenameTransactionLog | None = None,
+) -> str:
+    """Handle the explicit 「確認改名 {approval_id}」 command.
+
+    The only Mock LINE path that can trigger a real rename.  All execution
+    goes through execute_approved_rename_plan() (approval bridge), which
+    delegates to the safe rename executor; this module never renames files.
+    """
+    approval = approval_manager.get(approval_id)
+    if approval is None:
+        return f"小雷收到：找不到 approval：{approval_id}"
+
+    if approval.status != "approved":
+        return (
+            f"小雷收到：approval {approval_id} 尚未核准（狀態：{approval.status}），"
+            f"請先輸入：確認 {approval_id}"
+        )
+
+    plan = _payload_to_rename_plan(approval.payload)
+    if plan is None:
+        return f"小雷收到：approval {approval_id} 的內容不是改名計畫，不支援「確認改名」"
+
+    # Approval Engine 已核准此 approval，將核准狀態同步到 plan 物件，
+    # 由 approval bridge 重新驗證所有 gate（validation_report、blocked_count）。
+    plan.status = "approved"
+
+    if transaction_log is None:
+        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+
+    result = execute_approved_rename_plan(plan, transaction_log=transaction_log)
+
+    # Bridge plan-level gate 拒絕：回覆統一原因
+    if not result.executed and result.results:
+        reasons = {r.reason for r in result.results}
+        if len(reasons) == 1:
+            reason = next(iter(reasons))
+            if reason in _BRIDGE_REJECT_MESSAGES:
+                return f"小雷收到：{_BRIDGE_REJECT_MESSAGES[reason]}"
+
+    # 從 log 取回本次 plan 對應的 transaction_id（executor 內部建立）
+    transaction_id = None
+    for tx in transaction_log.list_transactions():
+        if tx.plan_id == plan.plan_id:
+            transaction_id = tx.transaction_id
+
+    lines = ["小雷收到：已執行改名"]
+    lines.append(f"- approval_id：{approval_id}")
+    lines.append(
+        f"- 成功：{result.success_count} 筆"
+        f" | 失敗：{result.failed_count} 筆"
+        f" | 跳過：{result.skipped_count} 筆"
+        f" | blocked：{result.blocked_count} 筆"
+    )
+    if transaction_id:
+        lines.append(f"- transaction_id：{transaction_id}")
+    if result.results:
+        lines.append("檔案結果：")
+        for i, r in enumerate(result.results, 1):
+            entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
+            if r.reason:
+                entry += f"（{r.reason}）"
+            lines.append(entry)
+    return "\n".join(lines)
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -233,8 +341,19 @@ def format_mock_response(worker_response: object) -> str:
     return f"小雷收到：{worker_response}"
 
 
-def mock_line_payload(text: str) -> str:
+def mock_line_payload(
+    text: str,
+    transaction_log: RenameTransactionLog | None = None,
+) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    # Explicit confirm rename (Phase 14D-2): exact「確認改名 {approval_id}」only
+    confirm_rename_match = _CONFIRM_RENAME_PATTERN.match(text.strip())
+    if confirm_rename_match:
+        return confirm_rename(
+            confirm_rename_match.group(1),
+            transaction_log=transaction_log,
+        )
+
     # Rename planning: must be checked before 分析 PDF to handle 分析 PDF 並產生改名計畫
     if any(kw in text for kw in _RENAME_PLAN_KEYWORDS):
         router = AIRouter()
