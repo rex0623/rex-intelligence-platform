@@ -1,0 +1,62 @@
+"""Data models for folder intelligence / move plan (Phase 15A).
+
+Planning-only schemas: MovePlan is dry_run=True and requires approval by
+default.  No executor consumes these models yet.
+"""
+
+import uuid
+from datetime import datetime, timezone
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+class MoveCandidate(BaseModel):
+    original_path: str
+    original_filename: str
+    proposed_folder: str
+    proposed_path: str
+    document_type: str = "unknown"
+    confidence: float = 0.0
+    reason: str = ""
+    extracted_fields: dict = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+    requires_approval: bool = True
+
+
+class MoveCandidateValidation(BaseModel):
+    original_filename: str
+    proposed_folder: str
+    proposed_path: str
+    risk_level: Literal["low", "medium", "high", "blocked"] = "low"
+    issues: List[str] = Field(default_factory=list)
+
+
+class MoveValidationReport(BaseModel):
+    total_files: int = 0
+    low_count: int = 0
+    medium_count: int = 0
+    high_count: int = 0
+    blocked_count: int = 0
+    approval_required: bool = True
+    plan_issues: List[str] = Field(default_factory=list)
+    candidates: List[MoveCandidateValidation] = Field(default_factory=list)
+    validated_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
+
+class MovePlan(BaseModel):
+    plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    dry_run: bool = True
+    status: str = "pending_approval"
+    requires_approval: bool = True
+    candidates: List[MoveCandidate] = Field(default_factory=list)
+    total_files: int = 0
+    warnings: List[str] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+    validation_report: Optional[MoveValidationReport] = None
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )

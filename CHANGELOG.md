@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.0-alpha] — Phase 15A Folder Intelligence / Move Plan Design
+
+### Added
+- `app/folder_intelligence/` — 新的 domain module（planning only，獨立於 `app/workers/folder_worker.py`，未推翻既有 worker）。
+  - `schemas.py` — `MoveCandidate` / `MovePlan` / `MoveCandidateValidation` / `MoveValidationReport`。
+    - MovePlan `dry_run=True`、`status="pending_approval"`、`requires_approval=True` by default。
+  - `template.py` — deterministic folder template 規則。
+    - Taipower bill → `電費單/{business_id}/{billing_period}/`（例：`電費單/24581234/2026-05/`）。
+    - `sanitize_folder_segment()` 排除 `/`、`\`、`:` 等非法字元與相對路徑點號。
+    - business_id / billing_period 缺失 → `unknown-business` / `unknown-period`。
+    - unknown 文件 → `未分類/unknown-document/`。
+  - `planner.py` — `build_move_plan(documents)`：支援 `extracted_fields` dict 與 rename pipeline 的 `document_object.fields` 結構；`proposed_filename` 優先於 original filename；不檢查真實 filesystem、不建立資料夾、不搬移檔案。
+  - `validator.py` — `validate_move_plan(plan)` 風險分級：blocked（空計畫項目/缺路徑/缺資料夾/unknown 類型）、high（confidence < 0.7、fallback segment、同計畫 proposed_path 重複）、medium（confidence 0.7–0.9、目標與原路徑相同）、low（confidence ≥ 0.9 且無問題）。
+  - `formatter.py` — `format_move_plan_for_cli(plan)` dry-run 輸出（原始檔、建議資料夾、目標路徑、confidence、risk、issues、「尚未實際搬移」提醒）。
+- `tests/test_folder_intelligence_plan.py` — 20 個新測試。
+
+### Safety guarantees
+- **本階段只產生 MovePlan，無任何真實 move / rename**：沒有 move executor、沒有 Mock LINE 搬移指令（planning 指令整合留待 15B）。
+- folder_intelligence 模組經 AST 驗證不得出現 `.rename()` / `.move()` / `.replace()` / `.mkdir()` 呼叫、不得 import os / shutil。
+- 既有 rename / rollback pipeline 完全未改動，297 個既有測試原樣通過。
+
+### Recommended next phase
+- **Phase 15B — MovePlan Approval + Dry-run Workflow Integration**。
+
+---
+
 ## [v0.5.6-alpha] — Phase 14F Rename Transaction Log Rotation / Cleanup
 
 ### Added
