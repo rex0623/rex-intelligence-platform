@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.6.2-alpha |
-| **Test Count** | 347 passing |
+| **Current Version** | v0.6.3-alpha |
+| **Test Count** | 369 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -30,6 +30,7 @@
 | 15A | Folder Intelligence / Move Plan Design | ✅ Complete |
 | 15B | MovePlan Approval + Dry-run Workflow Integration | ✅ Complete |
 | 15C | MovePlan Quality Gate / Preflight Design | ✅ Complete |
+| 15D | Safe Move Executor Design | ✅ Complete |
 
 ---
 
@@ -53,7 +54,8 @@
 | Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A）與 `prune_transactions()` 維運清理 API（14F） |
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
 | Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）指令 |
-| Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning only，無 executor（15A）；已接 router/worker/approval/dry-run（15B）；read-only preflight 與 execution schemas（15C） |
+| Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning 不碰 filesystem（15A）；已接 router/worker/approval/dry-run（15B）；read-only preflight 與 execution schemas（15C） |
+| Safe Move Executor | `app/folder_intelligence/executor.py` | `execute_move_plan()` — 唯一可真實搬移檔案的入口；preflight gate → 執行期檢查 → mkdir + move → rollback_from/rollback_to（15D）；未接 Mock LINE |
 
 ---
 
@@ -118,6 +120,9 @@ WorkerRequest                                                               │
 30. **沒有「確認搬移」指令（15B）** — Mock LINE 無任何真實搬移入口；無 move executor。
 31. **Move preflight 純資料驗證（15C）** — `preflight_move_plan()` 永遠回傳 `executed=False`、`dry_run=True`、`success_count=0`、`rollback_available=False`；不搬移、不建資料夾、不檢查真實 filesystem（AST 驗證不得 import os/shutil/pathlib、不得呼叫 rename/move/replace/mkdir/makedirs）。
 32. **Move preflight 三重 plan gate（15C）** — `plan_not_approved` / `missing_validation_report` / `validation_has_blocked_candidates`；candidate-level 依序檢查 missing paths（failed）、blocked（blocked）、same_path（skipped）、high risk（skipped）、low/medium（skipped，`preflight_passed_no_execution_in_phase_15c`）。
+33. **真實 move 唯一入口：`execute_move_plan()`（15D）** — 僅限 `app/folder_intelligence/executor.py`（AST 驗證 app/ 與 scripts/ 其他模組無 rename/move 呼叫、無 shutil import）；只接受 approved + validation_report + `blocked_count == 0` 的 MovePlan；blocked 永不搬移、high risk 預設跳過、low/medium 才執行；執行期檢查來源存在與目標 collision（`original_file_not_found` / `target_file_already_exists`），成功前先 `mkdir(parents=True)` 建立目標資料夾。
+34. **Move 成功結果含 rollback 資訊（15D）** — 每筆成功搬移回傳 `rollback_from`（新位置）/ `rollback_to`（原位置），`rollback_available=True`；但 Move rollback 執行與 Move Transaction Log 留待 15E。
+35. **Mock LINE 仍無真實搬移（15D）** — 沒有「確認搬移」指令、Mock LINE 原始碼不含 `execute_move_plan`（測試驗證）；executor 為底層 API，只能在程式中明確呼叫。
 
 ---
 
@@ -134,16 +139,18 @@ WorkerRequest                                                               │
 - Log prune 為手動維運 API，無自動排程；何時呼叫由維運方決定。
 - Prune 條件以 transaction 為單位（created_at / 筆數），不支援以 plan_id 或 action 層級篩選。
 - MovePlan 僅支援 Taipower bill folder template；其他 document type 一律進「未分類」。
-- MovePlan 已接 approval workflow 與 Mock LINE planning 指令（15B），但無任何 executor。
-- Move preflight（15C）刻意不檢查真實 filesystem（來源存在、目標 collision、資料夾存在與否留待 15D safe executor 的執行期檢查，模式同 rename 的 14A→14B）。
-- Move dry-run 顯示尚未掛 preflight summary：approval payload 的 plan status 不會隨核准同步（核准狀態在 Approval Engine），需待 15D execution bridge 處理狀態同步後再整合。
-- MovePlan approval 沒有 once-only guard（因為沒有執行路徑，核准只產生 dry-run 報告）。
+- MovePlan 已接 approval workflow 與 Mock LINE planning 指令（15B），但 Mock LINE 沒有任何真實搬移入口；`execute_move_plan()`（15D）僅為底層 API，須在程式中明確呼叫。
+- Move preflight（15C）刻意不檢查真實 filesystem；執行期檢查（來源存在、目標 collision、資料夾建立）由 15D executor 負責。
+- **尚未實作 Move Transaction Log** — `execute_move_plan()` 不持久化任何交易紀錄（rollback_from/rollback_to 僅存在於回傳結果）。
+- **尚未實作 Move rollback** — 沒有 move rollback function、沒有 rollback 指令。
+- Move dry-run 顯示尚未掛 preflight summary：approval payload 的 plan status 不會隨核准同步（核准狀態在 Approval Engine），需待 move execution bridge 處理狀態同步後再整合。
+- MovePlan approval 沒有 once-only guard（核准只產生 dry-run 報告，沒有接執行路徑）。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 15D — Safe Move Executor Design**
+**Phase 15E — Move Transaction Log / Rollback Foundation**
 
-- 仿照 Phase 14B 設計 safe move executor：preflight gate → 執行期檢查（來源存在、目標 collision、資料夾建立）→ 真實搬移 → rollback 資訊。
-- 仿照 14D-1 設計 approval-to-execution bridge（含 plan status 同步），執行入口仍須明確指令。
+- 仿照 14C 設計 Move Transaction Log：持久化成功搬移的 rollback_from / rollback_to。
+- 仿照 14B/14C 設計 move rollback foundation（function-level，先不接指令）。

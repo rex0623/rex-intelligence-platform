@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.3-alpha] — Phase 15D Safe Move Executor Design
+
+### Added
+- `app/folder_intelligence/executor.py` — `execute_move_plan(plan) -> MoveExecutionResult`，唯一可真實搬移檔案的模組（底層 API，未接 Mock LINE）。
+  - Plan-level gates（先呼叫 `preflight_move_plan()`）：`plan_not_approved`、`missing_validation_report`、`validation_has_blocked_candidates` → `executed=False`，不搬移。
+  - Candidate-level：blocked → blocked（`blocked_by_validation`，永不搬移）；high → skipped（`high_risk_requires_manual_review`）；same_path → skipped；missing paths → failed；來源不存在 → failed（`original_file_not_found`）；目標已存在 → failed（`target_file_already_exists`，不覆蓋）。
+  - low / medium 通過檢查後：`mkdir(parents=True)` 建立目標資料夾 → `Path.rename()` 搬移。
+  - 成功結果含 `rollback_from`（新位置）/ `rollback_to`（原位置）；`rollback_available=True` if 至少一筆成功；`dry_run=False`、`executed=True` if 至少一筆進入 filesystem 檢查。
+- `app/folder_intelligence/__init__.py` — 匯出 `execute_move_plan`，docstring 標明 executor 為唯一搬移入口。
+- `tests/test_safe_move_executor.py` — 22 個新測試（plan gates ×3、high/blocked 永不搬移、same_path、missing paths、來源不存在、目標 collision 不覆蓋、low/medium tmp_path 真實搬移、自動建立目標資料夾、source 移除、rollback_from/rollback_to、混合計數、Mock LINE 無「確認搬移」且不含 `execute_move_plan`、move planning 指令不觸發真實搬移、AST 驗證 app//scripts/ 真實 rename/move 只存在於兩個 executor module、preflight/workflow/rename 模組回歸）。
+
+### Changed
+- `tests/test_move_plan_workflow.py` — `test_no_real_move_executor_exists`（15B 時代不變式「executor.py 不可存在」）更新為 `test_move_executor_not_wired_to_mock_line`：executor.py 已存在（15D），但 Mock LINE 不可有「確認搬移」、不可引用 `execute_move_plan`。
+
+### Safety guarantees
+- 真實 move 只存在於 `app/folder_intelligence/executor.py`（AST 測試掃描 app/ 與 scripts/ 全部 .py）。
+- Mock LINE 仍不支援真實搬移；沒有「確認搬移」指令。
+- 所有真實搬移測試使用 pytest tmp_path，不碰真實 project files。
+
+### Not yet implemented
+- Move Transaction Log（成功搬移不持久化交易紀錄）。
+- Move rollback（無 rollback function、無 rollback 指令）。
+
+### Recommended next phase
+- **Phase 15E — Move Transaction Log / Rollback Foundation**。
+
+---
+
 ## [v0.6.2-alpha] — Phase 15C MovePlan Quality Gate / Preflight Design
 
 ### Added

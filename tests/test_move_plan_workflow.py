@@ -175,15 +175,13 @@ def test_move_planning_does_not_move_files(taipower_inbox, isolated_approvals, t
 # ---------------------------------------------------------------------------
 
 
-def test_no_real_move_executor_exists():
-    folder_module_dir = (
-        Path(__file__).resolve().parent.parent / "app" / "folder_intelligence"
-    )
-    assert not (folder_module_dir / "executor.py").exists(), (
-        "本階段不可有 move executor"
-    )
+def test_move_executor_not_wired_to_mock_line():
+    """Phase 15D 起 executor.py 存在，但 Mock LINE 不可接觸真實搬移。"""
     source = inspect.getsource(mock_line_module)
     assert "確認搬移" not in source, "Mock LINE 不可有「確認搬移」指令"
+    assert "execute_move_plan" not in source, (
+        "Mock LINE 不可呼叫 move executor"
+    )
 
 
 def test_confirm_move_command_does_not_trigger_anything(

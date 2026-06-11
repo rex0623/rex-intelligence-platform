@@ -1,9 +1,13 @@
-"""Folder Intelligence — move plan generation (Phase 15A).
+"""Folder Intelligence — move plan generation and safe execution.
 
-Planning only: this package never touches the real filesystem.
-There is no move executor; MovePlan is dry-run and requires approval.
+Planning (Phase 15A–15C) never touches the real filesystem; MovePlan is
+dry-run and requires approval.  Phase 15D adds execute_move_plan(), the
+ONLY entry point that actually moves files — it is a low-level API that
+must be called explicitly with an approved, validated MovePlan, and is
+NOT wired to Mock LINE or any fuzzy command.
 """
 
+from app.folder_intelligence.executor import execute_move_plan
 from app.folder_intelligence.formatter import format_move_plan_for_cli
 from app.folder_intelligence.planner import build_move_plan
 from app.folder_intelligence.preflight import preflight_move_plan
@@ -25,6 +29,7 @@ __all__ = [
     "MovePlan",
     "MoveValidationReport",
     "build_move_plan",
+    "execute_move_plan",
     "validate_move_plan",
     "format_move_plan_for_cli",
     "preflight_move_plan",
