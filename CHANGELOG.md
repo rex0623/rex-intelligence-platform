@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.0-alpha] — Phase 14C Persistent Transaction Log & Rollback Audit Trail
+
+### Added
+- `app/filename/transaction_log.py` — `RenameTransactionLog` 類別。
+  - `save_transaction(tx)` — 新增或 upsert transaction（依 transaction_id）。
+  - `load_transaction(id)` — 依 id 讀取；找不到回傳 None。
+  - `list_transactions()` — 回傳所有 transaction；log 不存在或損壞時回傳空 list。
+  - `update_transaction(tx)` — 取代既有 transaction 或新增。
+  - `mark_transaction_actions(id, updates)` — 以 original_path 或 new_path 為 key 更新 action status。
+- `execute_rename_plan(plan, transaction_log=None)` — 新增可選 `transaction_log` 參數。
+  - 若提供，執行前建立 transaction 並寫入 log，執行後更新 action 狀態（success/failed）。
+  - 不提供時行為與 Phase 14B 完全相同（零破壞）。
+- `rollback_transaction_by_id(transaction_id, transaction_log)` — 從 log 載入並 rollback。
+  - 找不到 id → 回傳 `reason="transaction_not_found"`。
+  - 成功 rollback → 將 action 狀態更新為 `"rolled_back"`。
+  - rollback 失敗 → action 狀態維持 `"success"`（檔案仍在更名位置）。
+
+### Storage
+- JSON 格式，`{"transactions": [...]}` 結構。
+- datetime 以 ISO 8601 字串存入，Pydantic `model_validate()` 自動反序列化。
+- 損壞的 JSON 被安全忽略（回傳空 list / None），不拋出例外。
+- 父目錄不存在時自動建立。
+
+### Safety guarantees
+- Mock LINE 通用改名指令及確認流程仍走 dry-run，不觸發 `execute_rename_plan()` 或 `rollback_transaction_by_id()`。
+- 所有檔案系統測試使用 `pytest tmp_path`。
+
+---
+
 ## [v0.4.0-alpha] — Phase 14B Safe Rename Executor
 
 ### Added
@@ -122,8 +151,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Upcoming
 
-### Phase 14C — Persistent Transaction Log & Rollback Audit Trail
+### Phase 14D — Controlled User Confirmation Path for Safe Rename
 
-- 將 `RenameTransaction` 持久化至 JSON 或 SQLite。
-- 每次 execute / rollback 均寫入 audit log。
-- 支援重啟後查詢歷史交易並 rollback。
+- 將 `execute_rename_plan()` 整合進 Mock LINE 確認流程。
+- 使用者輸入「確認 {approval_id}」後觸發真實更名並寫入 transaction log。
+- 提供「回滾 {transaction_id}」指令讓使用者撤銷更名。
+- 更新 Mock LINE 輸出顯示執行結果（success / failed / skipped counts）。

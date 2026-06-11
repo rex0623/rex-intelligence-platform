@@ -1,9 +1,15 @@
-"""Phase 14B — Safe rename executor.
+"""Phase 14B/14C — Safe rename executor.
 
 Provides:
-  execute_rename_plan(plan)          — actually renames files, only after preflight passes.
-  build_rename_transaction(plan)     — builds an in-memory transaction for low/medium candidates.
-  rollback_rename_transaction(tx)    — reverses successful actions in a transaction.
+  execute_rename_plan(plan, transaction_log=None)
+      — actually renames files, only after preflight passes.
+      — if transaction_log provided, persists & updates the transaction.
+  build_rename_transaction(plan)
+      — builds an in-memory transaction for low/medium candidates.
+  rollback_rename_transaction(tx)
+      — reverses successful actions in a transaction.
+  rollback_transaction_by_id(transaction_id, transaction_log)
+      — loads from log and rolls back, updating log action statuses.
 
 Safety rules:
   - execute_rename_plan requires plan.status == "approved".
@@ -27,6 +33,7 @@ from app.filename.schemas import (
     RenameTransaction,
     RenameTransactionAction,
 )
+from app.filename.transaction_log import RenameTransactionLog
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +56,10 @@ def _risk_for(plan: RenamePlan, original_filename: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def execute_rename_plan(plan: RenamePlan) -> RenameExecutionResult:
+def execute_rename_plan(
+    plan: RenamePlan,
+    transaction_log: RenameTransactionLog | None = None,
+) -> RenameExecutionResult:
     """Execute an approved, validated RenamePlan by actually renaming files.
 
     Calls preflight_rename_plan() first.  Returns early (executed=False) if
@@ -62,6 +72,11 @@ def execute_rename_plan(plan: RenamePlan) -> RenameExecutionResult:
       5. original not found    → failed
       6. target already exists → failed
       7. Path.rename()         → success / failed
+
+    If transaction_log is provided:
+      - Builds a RenameTransaction and saves it before execution.
+      - Updates action statuses (success/failed) in the log after execution.
+      - Execution without transaction_log behaves identically to Phase 14B.
     """
     # ── Plan-level gate (mirrors preflight) ─────────────────────────────────
     preflight = preflight_rename_plan(plan)
@@ -71,6 +86,12 @@ def execute_rename_plan(plan: RenamePlan) -> RenameExecutionResult:
         return preflight
     if plan.validation_report.blocked_count > 0:
         return preflight
+
+    # ── Persist transaction before execution ────────────────────────────────
+    tx: RenameTransaction | None = None
+    if transaction_log is not None:
+        tx = build_rename_transaction(plan)
+        transaction_log.save_transaction(tx)
 
     # ── Per-candidate execution ──────────────────────────────────────────────
     results: list[RenameFileResult] = []
@@ -194,7 +215,7 @@ def execute_rename_plan(plan: RenamePlan) -> RenameExecutionResult:
             ))
             failed_count += 1
 
-    return RenameExecutionResult(
+    execution_result = RenameExecutionResult(
         plan_id=plan.plan_id,
         executed=any_attempted,
         dry_run=False,
@@ -206,6 +227,19 @@ def execute_rename_plan(plan: RenamePlan) -> RenameExecutionResult:
         results=results,
         rollback_available=(success_count > 0),
     )
+
+    # ── Update persisted transaction statuses ────────────────────────────────
+    if transaction_log is not None and tx is not None:
+        result_by_orig: dict[str, str] = {r.original_path: r.status for r in results}
+        updates: dict[str, str] = {}
+        for action in tx.actions:
+            file_status = result_by_orig.get(action.original_path)
+            if file_status in ("success", "failed"):
+                updates[action.original_path] = file_status
+        if updates:
+            transaction_log.mark_transaction_actions(tx.transaction_id, updates)
+
+    return execution_result
 
 
 def build_rename_transaction(plan: RenamePlan) -> RenameTransaction:
@@ -310,3 +344,59 @@ def rollback_rename_transaction(transaction: RenameTransaction) -> RenameExecuti
         results=results,
         rollback_available=False,
     )
+
+
+def rollback_transaction_by_id(
+    transaction_id: str,
+    transaction_log: RenameTransactionLog,
+) -> RenameExecutionResult:
+    """Load a persisted transaction and rollback all successful actions.
+
+    - If the transaction_id is not found in the log, returns a result with
+      executed=False and reason "transaction_not_found".
+    - On success, updates the action status to "rolled_back" in the log.
+    - If rollback of an individual action fails, the action status is NOT
+      changed (it remains "success", indicating the file is still renamed).
+    """
+    tx = transaction_log.load_transaction(transaction_id)
+
+    if tx is None:
+        return RenameExecutionResult(
+            plan_id="",
+            executed=False,
+            dry_run=False,
+            total=0,
+            success_count=0,
+            failed_count=1,
+            skipped_count=0,
+            blocked_count=0,
+            results=[RenameFileResult(
+                original_path="",
+                proposed_path="",
+                status="failed",
+                reason="transaction_not_found",
+            )],
+            rollback_available=False,
+        )
+
+    rollback_result = rollback_rename_transaction(tx)
+
+    # ── Sync log: mark rolled-back actions ───────────────────────────────────
+    if rollback_result.executed:
+        # result.original_path == action.rollback_from == action.new_path
+        rollback_by_new_path: dict[str, str] = {
+            r.original_path: r.status for r in rollback_result.results
+        }
+        updates: dict[str, str] = {}
+        for action in tx.actions:
+            if action.status == "success":
+                rb_status = rollback_by_new_path.get(action.new_path)
+                if rb_status == "success":
+                    # Rollback succeeded → mark action as rolled_back
+                    updates[action.original_path] = "rolled_back"
+                # If rb_status == "failed", keep action.status as "success"
+                # (file is still in the renamed location)
+        if updates:
+            transaction_log.mark_transaction_actions(transaction_id, updates)
+
+    return rollback_result
