@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.2-alpha] — Phase 15C MovePlan Quality Gate / Preflight Design
+
+### Added
+- `app/folder_intelligence/schemas.py` — `MoveFileResult` / `MoveExecutionResult` execution schemas（目前僅供 read-only preflight 使用）。
+- `app/folder_intelligence/preflight.py` — `preflight_move_plan(plan) -> MoveExecutionResult`。
+  - 永遠回傳 `executed=False`、`dry_run=True`、`success_count=0`、`rollback_available=False`。
+  - Plan-level gates：`plan_not_approved`、`missing_validation_report`、`validation_has_blocked_candidates`。
+  - Candidate-level：missing original_path / proposed_folder / proposed_path → failed；blocked → blocked（`blocked_by_validation`）；same_path → skipped；high risk → skipped（`high_risk_requires_manual_review`）；low/medium → skipped（`preflight_passed_no_execution_in_phase_15c`）。
+  - 不搬移檔案、不建立資料夾、不檢查真實 filesystem。
+- `tests/test_move_preflight.py` — 15 個新測試（plan gates、各 candidate 狀態、混合計數、空計畫、tmp_path 驗證不建資料夾不搬移、AST 驗證無 os/shutil/pathlib import 與 rename/move/replace/mkdir 呼叫、executed/dry_run/success/rollback 不變式）。
+
+### Safety guarantees
+- **本階段沒有任何真實 move / rename / mkdir**：仍無 move executor、無「確認搬移」指令。
+- Phase 15C 不可能出現 `success_count > 0`（每個測試都驗證不變式）。
+- 既有 rename / rollback / MovePlan workflow 行為完全不變。
+
+### Notes
+- Task 4（dry-run 顯示掛 preflight summary）刻意略過：approval payload 的 plan status 不隨核准同步，直接掛 preflight 會永遠回 `plan_not_approved`；狀態同步屬 15D execution bridge 範疇（模式同 14D-1）。
+
+### Recommended next phase
+- **Phase 15D — Safe Move Executor Design**。
+
+---
+
 ## [v0.6.1-alpha] — Phase 15B MovePlan Approval + Dry-run Workflow Integration
 
 ### Added

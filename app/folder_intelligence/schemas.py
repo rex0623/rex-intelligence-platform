@@ -47,6 +47,36 @@ class MoveValidationReport(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 15C — Move execution schemas（目前僅供 read-only preflight 使用；
+# 本階段沒有 move executor，executed 永遠 False、success_count 永遠 0）
+# ---------------------------------------------------------------------------
+
+
+class MoveFileResult(BaseModel):
+    original_path: str
+    proposed_path: str
+    proposed_folder: str = ""
+    status: Literal["success", "failed", "skipped", "blocked"]
+    reason: Optional[str] = None
+    risk_level: Optional[str] = None
+    rollback_from: Optional[str] = None
+    rollback_to: Optional[str] = None
+
+
+class MoveExecutionResult(BaseModel):
+    plan_id: str
+    executed: bool
+    dry_run: bool
+    total: int
+    success_count: int
+    failed_count: int
+    skipped_count: int
+    blocked_count: int
+    results: List[MoveFileResult]
+    rollback_available: bool = False
+
+
 class MovePlan(BaseModel):
     plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     dry_run: bool = True
