@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.3-alpha] — Phase 14D-3A Mock LINE Rollback Preview Command
+
+### Added
+- `scripts/mock_line.py` — 明確預覽指令「預覽回滾改名 {transaction_id}」。
+  - regex 完全比對（`^預覽回滾改名\s+(\S+)$`）；無空白、附加多餘文字均不觸發。
+  - 純讀取：查詢 transaction log → 回覆交易摘要，不 rollback、不更名、不寫 log。
+  - 回覆內容：交易 ID、Plan ID、可回滾/已回滾/失敗/pending 統計、每筆 action 路徑與狀態、「目前僅預覽，尚未執行回滾」提醒。
+  - transaction_id 不存在 → 回覆「找不到 transaction：{id}」。
+- `app/filename/transaction_log.py` — `preview_rollback_transaction(transaction_id, transaction_log)` read-only helper。
+  - 找不到 transaction 回傳 None。
+  - rollbackable 判斷：status == "success" 才可回滾；rolled_back / failed / pending 不可。
+- `app/filename/schemas.py` — `RollbackPreview` / `RollbackPreviewAction` schemas。
+- `tests/test_rollback_preview.py` — 20 個新測試（含 parametrize 展開；查詢、找不到、模糊文字/不完全格式不觸發、「回滾改名 {id}」不真實 rollback、log byte-level 不變、不呼叫 rollback 函式（monkeypatch + 原始碼驗證）、不動檔案、AST 驗證無 rename 呼叫、各狀態 rollbackable 判斷、混合統計）。
+
+### Safety guarantees
+- 本階段**沒有任何指令會真實 rollback** — 「回滾」「回滾改名 {id}」「預覽回滾」「預覽回滾改名」（無 id）均不觸發任何 rollback 或 preview 以外的行為。
+- Preview 不呼叫 `rollback_transaction_by_id()` / `rollback_rename_transaction()` / `Path.rename`。
+- Preview 不更新 transaction log（測試驗證檔案 bytes 不變）。
+- 「確認改名 {approval_id}」維持 Phase 14D-2 行為，仍是唯一可觸發真實更名的指令。
+
+### Recommended next phase
+- **Phase 14D-3B — Explicit Mock LINE Rollback Execution Command**。
+
+---
+
 ## [v0.5.2-alpha] — Phase 14D-2 Explicit Mock LINE Confirm Rename Command
 
 ### Added

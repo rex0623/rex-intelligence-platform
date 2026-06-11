@@ -13,7 +13,12 @@ model_dump(mode="json") and deserialized via model_validate().
 import json
 from pathlib import Path
 
-from app.filename.schemas import RenameTransaction, RenameTransactionAction
+from app.filename.schemas import (
+    RenameTransaction,
+    RenameTransactionAction,
+    RollbackPreview,
+    RollbackPreviewAction,
+)
 
 
 class RenameTransactionLog:
@@ -126,3 +131,58 @@ class RenameTransactionLog:
         tx.actions = new_actions
         self._upsert(tx)
         return tx
+
+
+# ---------------------------------------------------------------------------
+# Phase 14D-3A — Read-only rollback preview
+# ---------------------------------------------------------------------------
+
+
+def preview_rollback_transaction(
+    transaction_id: str,
+    transaction_log: RenameTransactionLog,
+) -> RollbackPreview | None:
+    """Build a read-only rollback preview for a persisted transaction.
+
+    Returns None if transaction_id is not found.
+
+    Strictly read-only: never touches the filesystem, never writes to the
+    transaction log, never calls any rollback/rename function.  An action is
+    rollbackable only when its status is "success"; rolled_back / failed /
+    pending actions are not.
+    """
+    tx = transaction_log.load_transaction(transaction_id)
+    if tx is None:
+        return None
+
+    actions: list[RollbackPreviewAction] = []
+    success = rolled_back = failed = pending = 0
+
+    for action in tx.actions:
+        if action.status == "success":
+            success += 1
+        elif action.status == "rolled_back":
+            rolled_back += 1
+        elif action.status == "failed":
+            failed += 1
+        elif action.status == "pending":
+            pending += 1
+
+        actions.append(RollbackPreviewAction(
+            original_path=action.original_path,
+            new_path=action.new_path,
+            status=action.status,
+            rollbackable=(action.status == "success"),
+        ))
+
+    return RollbackPreview(
+        transaction_id=tx.transaction_id,
+        plan_id=tx.plan_id,
+        total_actions=len(tx.actions),
+        success_count=success,
+        rolled_back_count=rolled_back,
+        failed_count=failed,
+        pending_count=pending,
+        rollbackable_count=success,
+        actions=actions,
+    )

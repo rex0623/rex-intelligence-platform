@@ -92,3 +92,27 @@ class RenameTransaction(BaseModel):
     plan_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     actions: List[RenameTransactionAction] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Phase 14D-3A — Rollback preview schemas (read-only, no execution)
+# ---------------------------------------------------------------------------
+
+
+class RollbackPreviewAction(BaseModel):
+    original_path: str
+    new_path: str
+    status: str
+    rollbackable: bool
+
+
+class RollbackPreview(BaseModel):
+    transaction_id: str
+    plan_id: str
+    total_actions: int = 0
+    success_count: int = 0
+    rolled_back_count: int = 0
+    failed_count: int = 0
+    pending_count: int = 0
+    rollbackable_count: int = 0
+    actions: List[RollbackPreviewAction] = Field(default_factory=list)

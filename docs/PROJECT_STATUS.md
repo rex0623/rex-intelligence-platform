@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.5.2-alpha |
-| **Test Count** | 232 passing |
+| **Current Version** | v0.5.3-alpha |
+| **Test Count** | 252 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -23,6 +23,7 @@
 | 14C | Persistent Transaction Log & Rollback Audit Trail | ✅ Complete |
 | 14D-1 | Approval-to-Execution Bridge | ✅ Complete |
 | 14D-2 | Explicit Mock LINE Confirm Rename Command | ✅ Complete |
+| 14D-3A | Mock LINE Rollback Preview Command | ✅ Complete |
 
 ---
 
@@ -43,9 +44,9 @@
 | Preflight Validator | `app/filename/preflight.py` | Pre-execution safety checks (Phase 14A) |
 | Execution Schemas | `app/filename/schemas.py` | RenameFileResult, RenameExecutionResult, RenameTransaction |
 | Safe Rename Executor | `app/filename/executor.py` | 真實更名執行、交易建立、rollback、rollback_by_id（14B/14C） |
-| Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark |
+| Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A） |
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
-| Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」指令（14D-2） |
+| Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）與「預覽回滾改名 {transaction_id}」（14D-3A）指令 |
 
 ---
 
@@ -93,6 +94,9 @@ WorkerRequest                                                               │
 13. **非 rename plan 的 approval 不支援確認改名** — payload 缺少 plan_id/candidates 即拒絕。
 14. **真實更名一律寫入 RenameTransactionLog** — 預設路徑 `runtime/rename_transactions.json`（已加入 .gitignore，目錄不存在時自動建立）。
 15. **Mock LINE 不直接呼叫 Path.rename** — 測試以 AST 驗證；執行僅透過 approval bridge → safe executor。
+16. **「預覽回滾改名 {transaction_id}」純讀取** — 只查詢 transaction log 並回覆摘要，不 rollback、不更名檔案、不寫 log（測試驗證 log 檔 byte-level 不變）。
+17. **沒有任何指令可真實 rollback** — 「回滾」「回滾改名 {id}」「預覽回滾」均不觸發 rollback；`rollback_transaction_by_id()` 仍只是 API（Phase 14D-3B 範疇）。
+18. **Rollbackable 判斷** — 只有 action status == "success" 可回滾；rolled_back / failed / pending 標示不可回滾。
 
 ---
 
@@ -103,7 +107,8 @@ WorkerRequest                                                               │
 - Only Taipower electricity bills are fully supported for rename.
 - No multi-user / tenant isolation.
 - RenamePlan 透過 approval payload（JSON）持久化，無獨立 plan 儲存系統。
-- Rollback 指令尚未對使用者開放（僅有 `rollback_transaction_by_id()` API），Phase 14D-3 範疇。
+- Rollback 執行指令尚未對使用者開放（僅有 `rollback_transaction_by_id()` API 與 read-only 預覽指令），真實執行屬 Phase 14D-3B 範疇。
+- Rollback 預覽不檢查實際檔案是否存在；可回滾與否僅依 log 中 action status 判斷，實際可行性由未來執行階段的 safety check 把關。
 - 「確認改名」可重複輸入同一 approval_id；第二次執行會因原始檔不存在而回報 failed（不會覆寫檔案），尚未做 once-only 執行鎖。
 - Transaction log 無 rotation/壓縮。
 
@@ -111,8 +116,8 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 14D-3 — Explicit Mock LINE Rollback Command**
+**Phase 14D-3B — Explicit Mock LINE Rollback Execution Command**
 
-- 新增明確的 rollback 指令（例如「回滾改名 {transaction_id}」），透過 `rollback_transaction_by_id()` 執行。
+- 新增明確的 rollback 執行指令（例如「回滾改名 {transaction_id}」），透過 `rollback_transaction_by_id()` 執行。
 - 同樣採完全比對格式，模糊文字不可觸發。
-- 回覆 rollback 結果統計與每筆檔案狀態。
+- 回覆 rollback 結果統計與每筆檔案狀態，並更新 transaction log action 狀態。

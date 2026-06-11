@@ -14,7 +14,10 @@ import uuid
 from app.approvals.manager import approval_manager
 from app.filename.approval_bridge import execute_approved_rename_plan
 from app.filename.schemas import RenamePlan
-from app.filename.transaction_log import RenameTransactionLog
+from app.filename.transaction_log import (
+    RenameTransactionLog,
+    preview_rollback_transaction,
+)
 from app.router.ai_router import AIRouter
 from app.schemas.messages import WorkerRequest
 from app.workers.pdf_worker import PDFWorker
@@ -167,6 +170,12 @@ _RENAME_PLAN_KEYWORDS = ["產生改名計畫", "整理檔名", "分析 PDF 並�
 # 唯一可觸發真實更名的指令格式：「確認改名 {approval_id}」（完全符合才生效）。
 # 「確認」「確認改名」「好」「OK」「執行」等都不會匹配。
 _CONFIRM_RENAME_PATTERN = re.compile(r"^確認改名\s+(\S+)$")
+
+# Rollback 預覽指令格式（Phase 14D-3A）：「預覽回滾改名 {transaction_id}」。
+# 純讀取，不會 rollback、不會修改任何檔案或 transaction log。
+# 「回滾」「回滾改名」「預覽回滾」等都不會匹配，本階段也沒有任何
+# 真實 rollback 指令。
+_PREVIEW_ROLLBACK_PATTERN = re.compile(r"^預覽回滾改名\s+(\S+)$")
 
 _DEFAULT_TRANSACTION_LOG_PATH = (
     Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
@@ -341,11 +350,57 @@ def format_mock_response(worker_response: object) -> str:
     return f"小雷收到：{worker_response}"
 
 
+def preview_rollback(
+    transaction_id: str,
+    transaction_log: RenameTransactionLog | None = None,
+) -> str:
+    """Handle the explicit 「預覽回滾改名 {transaction_id}」 command (read-only).
+
+    Only queries the transaction log and formats a preview.  Never rolls
+    back, never renames files, never writes to the transaction log.
+    """
+    if transaction_log is None:
+        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+
+    preview = preview_rollback_transaction(transaction_id, transaction_log)
+    if preview is None:
+        return f"小雷收到：找不到 transaction：{transaction_id}"
+
+    lines = ["小雷收到：回滾預覽"]
+    lines.append(f"- 交易 ID：{preview.transaction_id}")
+    lines.append(f"- Plan ID：{preview.plan_id}")
+    lines.append(
+        f"- 可回滾：{preview.rollbackable_count} 筆"
+        f" | 已回滾：{preview.rolled_back_count} 筆"
+        f" | 失敗：{preview.failed_count} 筆"
+        f" | pending：{preview.pending_count} 筆"
+        f"（共 {preview.total_actions} 筆）"
+    )
+    if preview.actions:
+        lines.append("Action 摘要：")
+        for i, action in enumerate(preview.actions, 1):
+            lines.append(f"  [{i}] {action.new_path} → {action.original_path}")
+            lines.append(
+                f"      狀態：{action.status}"
+                f" | 可回滾：{'是' if action.rollbackable else '否'}"
+            )
+    lines.append("目前僅預覽，尚未執行回滾。")
+    return "\n".join(lines)
+
+
 def mock_line_payload(
     text: str,
     transaction_log: RenameTransactionLog | None = None,
 ) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    # Rollback preview (Phase 14D-3A): exact「預覽回滾改名 {transaction_id}」only
+    preview_rollback_match = _PREVIEW_ROLLBACK_PATTERN.match(text.strip())
+    if preview_rollback_match:
+        return preview_rollback(
+            preview_rollback_match.group(1),
+            transaction_log=transaction_log,
+        )
+
     # Explicit confirm rename (Phase 14D-2): exact「確認改名 {approval_id}」only
     confirm_rename_match = _CONFIRM_RENAME_PATTERN.match(text.strip())
     if confirm_rename_match:
