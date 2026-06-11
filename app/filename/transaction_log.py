@@ -11,6 +11,7 @@ model_dump(mode="json") and deserialized via model_validate().
 """
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.filename.schemas import (
@@ -18,6 +19,7 @@ from app.filename.schemas import (
     RenameTransactionAction,
     RollbackPreview,
     RollbackPreviewAction,
+    TransactionLogPruneResult,
 )
 
 
@@ -131,6 +133,96 @@ class RenameTransactionLog:
         tx.actions = new_actions
         self._upsert(tx)
         return tx
+
+    # ── Phase 14F — Rotation / cleanup ───────────────────────────────────────
+
+    def prune_transactions(
+        self,
+        max_transactions: int | None = None,
+        max_age_days: int | None = None,
+        now: datetime | None = None,
+    ) -> TransactionLogPruneResult:
+        """Prune old transactions from the log (maintenance API, Phase 14F).
+
+        Criteria (both optional; with neither given this is a no-op):
+          - max_age_days: transactions created more than N days ago become
+            prune candidates.
+          - max_transactions: keep at most N most-recent transactions; older
+            ones beyond the limit become prune candidates.
+
+        Safety rules:
+          - A transaction with any action in status "success" is still
+            rollbackable and is NEVER pruned, even if it matches the
+            criteria (counted in kept_rollbackable_count).
+          - Entries that fail validation are never pruned.
+          - Only the log file is touched; renamed files are never affected.
+          - The file is rewritten only when something was actually pruned.
+        """
+        data = self._read()
+        raw_entries = data["transactions"]
+        total_before = len(raw_entries)
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        def _aware(dt: datetime) -> datetime:
+            # naive datetime 視為 UTC；不用 dt.replace() 以符合本模組
+            # 「不得出現 rename/move/replace 呼叫」的 AST 安全防護
+            if dt.tzinfo is not None:
+                return dt
+            return datetime(
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second, dt.microsecond,
+                tzinfo=timezone.utc,
+            )
+
+        parsed: list[tuple[int, RenameTransaction]] = []
+        for i, entry in enumerate(raw_entries):
+            try:
+                parsed.append((i, RenameTransaction.model_validate(entry)))
+            except Exception:
+                continue  # 無法解析的 entry 永不刪除
+
+        candidate_indexes: set[int] = set()
+
+        if max_age_days is not None:
+            cutoff = now - timedelta(days=max_age_days)
+            for i, tx in parsed:
+                if _aware(tx.created_at) < cutoff:
+                    candidate_indexes.add(i)
+
+        if max_transactions is not None and len(parsed) > max_transactions:
+            oldest_first = sorted(parsed, key=lambda p: _aware(p[1].created_at))
+            excess = len(parsed) - max_transactions
+            for i, _tx in oldest_first[:excess]:
+                candidate_indexes.add(i)
+
+        tx_by_index = dict(parsed)
+        prune_indexes: set[int] = set()
+        pruned_ids: list[str] = []
+        kept_rollbackable = 0
+
+        for i in sorted(candidate_indexes):
+            tx = tx_by_index[i]
+            if any(action.status == "success" for action in tx.actions):
+                kept_rollbackable += 1
+                continue
+            prune_indexes.add(i)
+            pruned_ids.append(tx.transaction_id)
+
+        if prune_indexes:
+            data["transactions"] = [
+                entry for i, entry in enumerate(raw_entries) if i not in prune_indexes
+            ]
+            self._write(data)
+
+        return TransactionLogPruneResult(
+            total_before=total_before,
+            total_after=len(data["transactions"]),
+            pruned_count=len(pruned_ids),
+            kept_rollbackable_count=kept_rollbackable,
+            pruned_transaction_ids=pruned_ids,
+        )
 
 
 # ---------------------------------------------------------------------------

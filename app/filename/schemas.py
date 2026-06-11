@@ -124,3 +124,16 @@ class RollbackPreview(BaseModel):
     @property
     def is_fully_rolled_back(self) -> bool:
         return self.total_actions > 0 and self.rolled_back_count == self.total_actions
+
+
+# ---------------------------------------------------------------------------
+# Phase 14F — Transaction log rotation / cleanup schemas
+# ---------------------------------------------------------------------------
+
+
+class TransactionLogPruneResult(BaseModel):
+    total_before: int = 0
+    total_after: int = 0
+    pruned_count: int = 0
+    kept_rollbackable_count: int = 0
+    pruned_transaction_ids: List[str] = Field(default_factory=list)

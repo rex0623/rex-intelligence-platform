@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.5.5-alpha |
-| **Test Count** | 284 passing |
+| **Current Version** | v0.5.6-alpha |
+| **Test Count** | 297 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -26,6 +26,7 @@
 | 14D-3A | Mock LINE Rollback Preview Command | ✅ Complete |
 | 14D-3B | Explicit Mock LINE Rollback Execution Command | ✅ Complete |
 | 14E | Rename Execution Hardening / Once-only Guard | ✅ Complete |
+| 14F | Rename Transaction Log Rotation / Cleanup | ✅ Complete |
 
 ---
 
@@ -46,7 +47,7 @@
 | Preflight Validator | `app/filename/preflight.py` | Pre-execution safety checks (Phase 14A) |
 | Execution Schemas | `app/filename/schemas.py` | RenameFileResult, RenameExecutionResult, RenameTransaction |
 | Safe Rename Executor | `app/filename/executor.py` | 真實更名執行、交易建立、rollback、rollback_by_id（14B/14C） |
-| Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A） |
+| Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A）與 `prune_transactions()` 維運清理 API（14F） |
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
 | Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）指令 |
 
@@ -104,6 +105,8 @@ WorkerRequest                                                               │
 21. **Approval once-only guard（14E）** — 同一 approval_id 成功執行（至少一筆 rename 成功）後，payload 記錄 `execution_status` / `executed_at` / `execution_transaction_id`；重複「確認改名」直接回覆「已執行過」+ transaction_id + 復原提示，不呼叫 bridge、不動檔案、不新增 transaction。全數失敗（檔案未動）時不標記，允許重試。舊 approval 無 `execution_status` 視為尚未執行（backward compatible）。
 22. **Rollback once-only guard（14E）** — 「回滾改名」先以 read-only preview 判斷；無可回滾 action 時完全不進入執行路徑（不動檔案、不寫 log）。全部已回滾 → 回覆「此交易已回滾完成」；部分 rolled_back 仍可回滾剩餘 success action。
 23. **預覽提示可回滾狀態（14E）** — 「預覽回滾改名」在無可回滾項目時明確提示，全部回滾完成時顯示「此交易已全部回滾」。
+24. **Log prune 永不刪除可回滾交易（14F）** — `prune_transactions()` 對含 success action 的交易一律保留（即使符合刪除條件）；無法解析的 entry 永不刪除；只動 log 檔、不動實體檔案；無變更時不重寫檔案。
+25. **Log prune 僅為維運 API（14F）** — 未接任何 Mock LINE 指令，rename / rollback 指令行為完全不變。
 
 ---
 
@@ -117,7 +120,8 @@ WorkerRequest                                                               │
 - Rollback 預覽不檢查實際檔案是否存在；可回滾與否僅依 log 中 action status 判斷，實際可行性由執行時的 safety check 把關（來源/目標檢查）。
 - Once-only guard 以「至少一筆 rename 成功」為標記條件；部分成功（如 2 成功 1 失敗）即標記 executed，失敗的候選項無法透過同一 approval 重試。
 - Approval 執行狀態存於 payload dict（非 schema 欄位），仰賴 JSON store 持久化；無跨 process 鎖，極端並發下仍可能 race（單人 CLI 情境可接受）。
-- Transaction log 無 rotation/壓縮。
+- Log prune 為手動維運 API，無自動排程；何時呼叫由維運方決定。
+- Prune 條件以 transaction 為單位（created_at / 筆數），不支援以 plan_id 或 action 層級篩選。
 
 ---
 
@@ -125,5 +129,4 @@ WorkerRequest                                                               │
 
 **Phase 15A — Folder Intelligence / Move Plan Design**
 
-- Rename pipeline（plan → validate → approve → execute → rollback）已完整且 hardened，可作為 folder move 的設計範本。
-- 替代選項：**Phase 14F — Rename Transaction Log Rotation / Cleanup**（log 大小控管、TTL），若希望先完成 hardening 收尾。
+- Rename pipeline（plan → validate → approve → execute → rollback → log 維運）已完整且 hardened，可作為 folder move 的設計範本。

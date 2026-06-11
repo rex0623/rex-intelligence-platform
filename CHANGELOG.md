@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.5.6-alpha] — Phase 14F Rename Transaction Log Rotation / Cleanup
+
+### Added
+- `app/filename/transaction_log.py` — `RenameTransactionLog.prune_transactions(max_transactions=None, max_age_days=None, now=None)` 維運清理 API。
+  - `max_age_days`：刪除建立超過 N 天的交易。
+  - `max_transactions`：保留最新 N 筆，超額的舊交易刪除。
+  - 兩條件可併用；皆未指定時為 no-op。
+  - `now` 可注入（測試用），預設 UTC 現在時間。
+- `app/filename/schemas.py` — `TransactionLogPruneResult` schema（total_before / total_after / pruned_count / kept_rollbackable_count / pruned_transaction_ids）。
+- `tests/test_transaction_log_rotation.py` — 13 個新測試（依天數/筆數清理、可回滾交易保留、混合狀態保留、條件併用、no-op 不重寫檔案、損壞 entry 保留、不動實體檔案、prune 後 rollback 照常、rolled_back 後變為可清理的完整生命週期、空/不存在 log 安全處理）。
+
+### Safety guarantees
+- **永不刪除仍可回滾的交易** — 含任何 `success` action 的交易即使符合刪除條件也保留（計入 `kept_rollbackable_count`），rollback audit trail 不會遺失。
+- 無法解析的 log entry 永不刪除。
+- 只動 log 檔，不動任何實體檔案；無變更時不重寫檔案。
+- **未新增任何 Mock LINE 指令** — prune 僅為維運 API；「確認改名」「預覽回滾改名」「回滾改名」與所有 rename / rollback 行為完全不變。
+
+### Recommended next phase
+- **Phase 15A — Folder Intelligence / Move Plan Design**。
+
+---
+
 ## [v0.5.5-alpha] — Phase 14E Rename Execution Hardening / Once-only Guard
 
 ### Added
