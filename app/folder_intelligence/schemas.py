@@ -77,6 +77,27 @@ class MoveExecutionResult(BaseModel):
     rollback_available: bool = False
 
 
+# ---------------------------------------------------------------------------
+# Phase 15E — Move transaction schemas（持久化每次真實搬移的 rollback 資訊；
+# rollback_from = 搬移後的新位置、rollback_to = 搬移前的原位置）
+# ---------------------------------------------------------------------------
+
+
+class MoveTransactionAction(BaseModel):
+    original_path: str
+    new_path: str
+    status: Literal["pending", "success", "failed", "rolled_back"]
+    rollback_from: Optional[str] = None
+    rollback_to: Optional[str] = None
+
+
+class MoveTransaction(BaseModel):
+    transaction_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    plan_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    actions: List[MoveTransactionAction] = Field(default_factory=list)
+
+
 class MovePlan(BaseModel):
     plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     dry_run: bool = True

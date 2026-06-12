@@ -7,7 +7,12 @@ must be called explicitly with an approved, validated MovePlan, and is
 NOT wired to Mock LINE or any fuzzy command.
 """
 
-from app.folder_intelligence.executor import execute_move_plan
+from app.folder_intelligence.executor import (
+    build_move_transaction,
+    execute_move_plan,
+    rollback_move_transaction,
+    rollback_move_transaction_by_id,
+)
 from app.folder_intelligence.formatter import format_move_plan_for_cli
 from app.folder_intelligence.planner import build_move_plan
 from app.folder_intelligence.preflight import preflight_move_plan
@@ -17,8 +22,11 @@ from app.folder_intelligence.schemas import (
     MoveExecutionResult,
     MoveFileResult,
     MovePlan,
+    MoveTransaction,
+    MoveTransactionAction,
     MoveValidationReport,
 )
+from app.folder_intelligence.transaction_log import MoveTransactionLog
 from app.folder_intelligence.validator import validate_move_plan
 
 __all__ = [
@@ -27,9 +35,15 @@ __all__ = [
     "MoveExecutionResult",
     "MoveFileResult",
     "MovePlan",
+    "MoveTransaction",
+    "MoveTransactionAction",
+    "MoveTransactionLog",
     "MoveValidationReport",
     "build_move_plan",
+    "build_move_transaction",
     "execute_move_plan",
+    "rollback_move_transaction",
+    "rollback_move_transaction_by_id",
     "validate_move_plan",
     "format_move_plan_for_cli",
     "preflight_move_plan",

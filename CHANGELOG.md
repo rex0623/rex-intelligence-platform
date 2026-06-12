@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.4-alpha] — Phase 15E Move Transaction Log / Rollback Foundation
+
+### Added
+- `app/folder_intelligence/schemas.py` — `MoveTransactionAction`（original_path / new_path / status / rollback_from / rollback_to）與 `MoveTransaction`（transaction_id / plan_id / created_at / actions）；語意與 MoveFileResult 一致：`rollback_from` = 搬移後新位置、`rollback_to` = 原位置。
+- `app/folder_intelligence/transaction_log.py` — `MoveTransactionLog`：JSON 持久化（鏡像 14C rename log），支援 `save_transaction`（upsert、自動建 parent dir）、`load_transaction`、`list_transactions`（log 缺失/壞損回 `[]`）、`update_transaction`、`mark_transaction_actions`（依 original_path 或 new_path 比對）；datetime 以 ISO 8601 序列化；無資料庫依賴。
+- `app/folder_intelligence/executor.py` —
+  - `execute_move_plan(plan, transaction_log=None)`：未提供 log 時行為與 15D 完全相同；提供 log 時執行前 save pending transaction、執行後標記 action success/failed。
+  - `build_move_transaction(plan)`：只收 low/medium 可執行候選（排除 high/blocked/same_path/missing paths），action status="pending"。
+  - `rollback_move_transaction(tx)`：只回滾 success action；`rollback_source_not_found` / `rollback_target_already_exists`（不覆蓋）；需要時自動重建原資料夾。
+  - `rollback_move_transaction_by_id(transaction_id, transaction_log)`：找不到 → `transaction_not_found`；成功回滾標記 `rolled_back`；失敗保持 `success`、不破壞 log。
+- `tests/test_move_transaction_log.py` — 28 個新測試（log CRUD、upsert 不覆蓋其他 transaction、datetime roundtrip、invalid JSON、mark by original/new path、build_move_transaction 過濾、execute 整合與 status 更新、無 log 行為不變、rollback 成功/來源缺失/目標佔用/重建資料夾/忽略非 success、by_id 全流程、failed rollback 不破壞 log、Mock LINE 無 move rollback 接線、「回滾改名」只作用 rename log、AST 驗證、plan gate 失敗不建 log、rename/move log 互不干擾）。
+- `.gitignore` — 排除 `runtime/move_transactions.json`（建議的未來預設路徑；本階段未實際產生）。
+
+### Safety guarantees
+- 真實 move / rollback 只存在於 `app/folder_intelligence/executor.py`（AST 測試掃描 app/ 與 scripts/）。
+- Mock LINE 不可觸發真實搬移或 move rollback：沒有「確認搬移」、沒有 move rollback 指令，原始碼不含 `execute_move_plan` / `rollback_move_transaction` / `MoveTransactionLog`（測試驗證）。
+- 所有真實 move / rollback 測試使用 pytest tmp_path。
+
+### Recommended next phase
+- **Phase 15F — Move Approval-to-Execution Bridge**。
+
+---
+
 ## [v0.6.3-alpha] — Phase 15D Safe Move Executor Design
 
 ### Added

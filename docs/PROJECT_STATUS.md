@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.6.3-alpha |
-| **Test Count** | 369 passing |
+| **Current Version** | v0.6.4-alpha |
+| **Test Count** | 397 passing |
 | **Last Updated** | 2026-06-11 |
 
 ---
@@ -31,6 +31,7 @@
 | 15B | MovePlan Approval + Dry-run Workflow Integration | ✅ Complete |
 | 15C | MovePlan Quality Gate / Preflight Design | ✅ Complete |
 | 15D | Safe Move Executor Design | ✅ Complete |
+| 15E | Move Transaction Log / Rollback Foundation | ✅ Complete |
 
 ---
 
@@ -55,7 +56,8 @@
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
 | Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）指令 |
 | Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning 不碰 filesystem（15A）；已接 router/worker/approval/dry-run（15B）；read-only preflight 與 execution schemas（15C） |
-| Safe Move Executor | `app/folder_intelligence/executor.py` | `execute_move_plan()` — 唯一可真實搬移檔案的入口；preflight gate → 執行期檢查 → mkdir + move → rollback_from/rollback_to（15D）；未接 Mock LINE |
+| Safe Move Executor | `app/folder_intelligence/executor.py` | `execute_move_plan(plan, transaction_log=None)` — 唯一可真實搬移檔案的入口；preflight gate → 執行期檢查 → mkdir + move → rollback_from/rollback_to（15D）；可選持久化 transaction、`build_move_transaction()`、`rollback_move_transaction()`、`rollback_move_transaction_by_id()`（15E）；未接 Mock LINE |
+| Move Transaction Log | `app/folder_intelligence/transaction_log.py` | JSON 持久化 MoveTransaction，支援 save/load/list/update/mark（15E）；建議路徑 `runtime/move_transactions.json`（已列入 .gitignore），未接 Mock LINE |
 
 ---
 
@@ -123,6 +125,10 @@ WorkerRequest                                                               │
 33. **真實 move 唯一入口：`execute_move_plan()`（15D）** — 僅限 `app/folder_intelligence/executor.py`（AST 驗證 app/ 與 scripts/ 其他模組無 rename/move 呼叫、無 shutil import）；只接受 approved + validation_report + `blocked_count == 0` 的 MovePlan；blocked 永不搬移、high risk 預設跳過、low/medium 才執行；執行期檢查來源存在與目標 collision（`original_file_not_found` / `target_file_already_exists`），成功前先 `mkdir(parents=True)` 建立目標資料夾。
 34. **Move 成功結果含 rollback 資訊（15D）** — 每筆成功搬移回傳 `rollback_from`（新位置）/ `rollback_to`（原位置），`rollback_available=True`；但 Move rollback 執行與 Move Transaction Log 留待 15E。
 35. **Mock LINE 仍無真實搬移（15D）** — 沒有「確認搬移」指令、Mock LINE 原始碼不含 `execute_move_plan`（測試驗證）；executor 為底層 API，只能在程式中明確呼叫。
+36. **Move transaction log 為可選且不影響執行行為（15E）** — `execute_move_plan(plan, transaction_log=None)` 未提供 log 時行為與 15D 完全相同；提供 log 時先 save pending transaction（只含 low/medium 可執行 action），執行後標記 success/failed；plan gate 失敗時不建立 log。
+37. **Move rollback 只回滾 success action（15E）** — `rollback_move_transaction()` 不碰 pending/failed/rolled_back action；來源不存在 → `rollback_source_not_found`、原位置被佔用 → `rollback_target_already_exists`（不覆蓋）；需要時自動重建原資料夾。
+38. **Move rollback by id 與 log 同步（15E）** — `rollback_move_transaction_by_id()` 成功回滾的 action 標記 `rolled_back`；回滾失敗的 action 保持 `success`（檔案仍在新位置），log 不會被破壞；找不到 id 回傳 `transaction_not_found`。
+39. **Mock LINE 無任何 move rollback 入口（15E）** — 沒有 move rollback 指令；Mock LINE 原始碼不含 `rollback_move_transaction` / `MoveTransactionLog`（測試驗證）；既有「回滾改名」只作用於 rename transaction log。
 
 ---
 
@@ -141,8 +147,9 @@ WorkerRequest                                                               │
 - MovePlan 僅支援 Taipower bill folder template；其他 document type 一律進「未分類」。
 - MovePlan 已接 approval workflow 與 Mock LINE planning 指令（15B），但 Mock LINE 沒有任何真實搬移入口；`execute_move_plan()`（15D）僅為底層 API，須在程式中明確呼叫。
 - Move preflight（15C）刻意不檢查真實 filesystem；執行期檢查（來源存在、目標 collision、資料夾建立）由 15D executor 負責。
-- **尚未實作 Move Transaction Log** — `execute_move_plan()` 不持久化任何交易紀錄（rollback_from/rollback_to 僅存在於回傳結果）。
-- **尚未實作 Move rollback** — 沒有 move rollback function、沒有 rollback 指令。
+- Move transaction log 為 function-level API：`execute_move_plan()` 須明確傳入 `transaction_log` 才會持久化；log_path 由呼叫方指定，尚未整合 settings 全域預設。
+- Move rollback 僅為底層 API（`rollback_move_transaction` / `rollback_move_transaction_by_id`），沒有任何 Mock LINE rollback 指令、沒有 rollback 預覽。
+- Move transaction log 無 rotation / prune（rename log 的 14F 能力尚未移植）。
 - Move dry-run 顯示尚未掛 preflight summary：approval payload 的 plan status 不會隨核准同步（核准狀態在 Approval Engine），需待 move execution bridge 處理狀態同步後再整合。
 - MovePlan approval 沒有 once-only guard（核准只產生 dry-run 報告，沒有接執行路徑）。
 
@@ -150,7 +157,7 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 15E — Move Transaction Log / Rollback Foundation**
+**Phase 15F — Move Approval-to-Execution Bridge**
 
-- 仿照 14C 設計 Move Transaction Log：持久化成功搬移的 rollback_from / rollback_to。
-- 仿照 14B/14C 設計 move rollback foundation（function-level，先不接指令）。
+- 仿照 14D-1 設計受控 bridge：approved + validated MovePlan → `execute_move_plan()`（含 plan status 同步與 transaction log 整合）。
+- 執行入口仍須明確指令（留待後續階段接 Mock LINE）。

@@ -171,6 +171,7 @@ coverage_html_report/
 
 # Runtime artifacts (generated at run time, never commit)
 runtime/rename_transactions.json
+runtime/move_transactions.json
 
 # Credentials (never commit these!)
 *.pem
