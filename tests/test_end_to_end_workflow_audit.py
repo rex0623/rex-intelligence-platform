@@ -11,10 +11,9 @@ Move：  整理資料夾 → MovePlan → Approval → 確認搬移 → Move Tra
 preview / cleanup 純讀取、destructive regex full match、
 runtime 檔案全數 gitignored。
 
-稽核發現（記錄於 PROJECT_STATUS Known Limitations）：
-- rename 計畫存純檔名、move 計畫的 proposed_path 為相對路徑，
-  executor 以 CWD 解析 —— E2E 測試以 monkeypatch.chdir(SAFE_PDF_ROOT)
-  模擬正確執行情境；路徑錨定建議於 Phase 16B 處理。
+16A 稽核發現的 CWD 相依已於 16B 修正：executor 層以 SAFE_PDF_ROOT
+錨定相對路徑（resolve_under_safe_root），本檔 E2E 不再需要
+monkeypatch.chdir 即可通過。
 
 所有測試使用 tmp_path / monkeypatch，不污染 runtime/。
 """
@@ -182,11 +181,8 @@ def _save_move_success_tx(tmp_path: Path, move_log: MoveTransactionLog) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_rename_full_e2e_happy_path(
-    taipower_inbox, isolated_approvals, rename_log, monkeypatch
-):
-    # rename 計畫以純檔名存放，executor 以 CWD 解析（稽核發現，見 docstring）
-    monkeypatch.chdir(taipower_inbox)
+def test_rename_full_e2e_happy_path(taipower_inbox, isolated_approvals, rename_log):
+    # 16B 起 rename 計畫的純檔名由 executor 錨定 SAFE_PDF_ROOT，無需 chdir
 
     # 1. 產生 RenamePlan + approval
     output = mock_line_payload("整理檔名")
@@ -242,11 +238,8 @@ def test_rename_full_e2e_happy_path(
 # ---------------------------------------------------------------------------
 
 
-def test_move_full_e2e_happy_path(
-    taipower_inbox, isolated_approvals, move_log, monkeypatch
-):
-    # move 計畫的 proposed_path 為相對路徑，executor 以 CWD 解析（稽核發現）
-    monkeypatch.chdir(taipower_inbox)
+def test_move_full_e2e_happy_path(taipower_inbox, isolated_approvals, move_log):
+    # 16B 起 move 計畫的相對 proposed_path 由 executor 錨定 SAFE_PDF_ROOT，無需 chdir
 
     # 8. 產生 MovePlan + 9. approval
     output = mock_line_payload("整理資料夾")

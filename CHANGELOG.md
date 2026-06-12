@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.1-alpha] — Phase 16B Runtime Settings Consolidation
+
+### Added
+- `app/core/config.py`（沿用既有 pydantic Settings，未新增平行架構）—
+  - `Settings.RUNTIME_DIR`（預設 `<repo>/runtime`）。
+  - Runtime path helpers（動態讀 settings，monkeypatch `settings.RUNTIME_DIR` 即全面生效）：`get_runtime_dir()`、`get_approval_store_path()`、`get_rename_transaction_log_path()`、`get_move_transaction_log_path()`、`get_safe_pdf_root()`。
+  - `resolve_under_safe_root(path, root=None)`：絕對路徑原樣回傳（既有語意不變）；相對路徑錨定 SAFE_PDF_ROOT（os.path.normpath 純字串正規化，不碰 filesystem、檔案不存在不 throw）；相對路徑逃出 root（path traversal）→ `ValueError("path_escapes_safe_root")`。
+- `tests/test_runtime_settings.py` — 12 個新測試（四個預設路徑、monkeypatch 覆寫、approval manager / rename log / move log 預設改走 settings、gitignore 與 git 追蹤稽核、app//scripts/ 不再 hardcode runtime 路徑）。
+- `tests/test_path_resolution.py` — 14 個新測試（絕對路徑不變、相對路徑錨定、不碰 filesystem、explicit root、traversal blocked（`../`、`a/../../`）、root 內 `..` 允許、rename/move execute 與 rollback 均可在相對路徑下運作且無需 chdir、executor 層 traversal fail-safe（`path_escapes_safe_root` failed result，不動任何檔案）、絕對路徑行為回歸）。
+
+### Changed
+- `app/approvals/manager.py` — 預設 store path 改用 `get_approval_store_path()`（行為相容：仍為 runtime/approvals.json）。
+- `scripts/mock_line.py` — 移除 `_DEFAULT_TRANSACTION_LOG_PATH` 常數，三個使用點改 `get_rename_transaction_log_path()`；指令語意完全不變。
+- `app/folder_intelligence/approval_bridge.py` — `default_move_transaction_log()` 改用 `get_move_transaction_log_path()`。
+- `app/filename/executor.py`、`app/folder_intelligence/executor.py` — execute 與 rollback 的路徑建構改經 `resolve_under_safe_root()`：相對路徑錨定 SAFE_PDF_ROOT（修正 16A 稽核發現的 CWD 相依）；traversal → failed reason `path_escapes_safe_root`（fail-safe，不操作檔案）。
+- `tests/test_end_to_end_workflow_audit.py` — Rename / Move E2E 移除 `monkeypatch.chdir`（錨定生效後不再需要）。
+- `tests/test_mock_line_confirm_rename.py` — default log path 測試改 monkeypatch `settings.RUNTIME_DIR`。
+
+### Safety guarantees
+- 預設路徑與 16B 前完全相容；Mock LINE 指令集與語意零變更。
+- 絕對路徑行為不變（既有測試與呼叫端的主要用法）；錨定只影響相對路徑。
+- Path traversal 防護：相對路徑不可逃出 SAFE_PDF_ROOT，executor 以 failed result fail-safe 處理。
+- runtime JSON 持續 gitignored 且不被 git 追蹤（測試固定稽核）。
+
+### Recommended next phase
+- **Phase 16C — Operator UX / Command Help Text**。
+
+---
+
 ## [v0.7.0-alpha] — Phase 16A Production Hardening / End-to-End Workflow Audit
 
 里程碑版本：Rename 與 Move 兩條主流程均完成安全閉環（planning → approval →

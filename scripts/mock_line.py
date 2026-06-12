@@ -12,6 +12,7 @@ import re
 import uuid
 
 from app.approvals.manager import approval_manager
+from app.core.config import get_rename_transaction_log_path
 from app.filename.approval_bridge import execute_approved_rename_plan
 from app.filename.executor import rollback_transaction_by_id
 from app.filename.schemas import RenamePlan
@@ -231,10 +232,6 @@ _PREVIEW_MOVE_ROLLBACK_PATTERN = re.compile(r"^預覽回滾搬移\s+([A-Za-z0-9_
 # 「回滾改名 …」「確認搬移 …」均不匹配。
 _ROLLBACK_MOVE_PATTERN = re.compile(r"^回滾搬移\s+([A-Za-z0-9_-]+)$")
 
-_DEFAULT_TRANSACTION_LOG_PATH = (
-    Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
-)
-
 # Approval bridge 的 plan-level gate 拒絕理由 → 使用者訊息
 _BRIDGE_REJECT_MESSAGES = {
     "plan_not_approved": "改名計畫尚未核准，無法執行",
@@ -304,7 +301,7 @@ def confirm_rename(
     plan.status = "approved"
 
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
 
     result = execute_approved_rename_plan(plan, transaction_log=transaction_log)
 
@@ -703,7 +700,7 @@ def preview_rollback(
     back, never renames files, never writes to the transaction log.
     """
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
 
     preview = preview_rollback_transaction(transaction_id, transaction_log)
     if preview is None:
@@ -748,7 +745,7 @@ def rollback_rename(
     this module never renames files itself.
     """
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(_DEFAULT_TRANSACTION_LOG_PATH)
+        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
 
     # Once-only guard (Phase 14E)：先以 read-only preview 判斷狀態，
     # 沒有可回滾 action 時完全不進入 rollback 執行路徑（不動檔案、不寫 log）。

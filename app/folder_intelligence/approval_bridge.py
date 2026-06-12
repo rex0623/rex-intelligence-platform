@@ -28,11 +28,11 @@ Safety rules:
     全數失敗（檔案未動）時不標記，允許重試。
 """
 
-from pathlib import Path
 from typing import Optional
 
 from pydantic import ValidationError
 
+from app.core.config import get_move_transaction_log_path
 from app.folder_intelligence.executor import execute_move_plan
 from app.folder_intelligence.schemas import (
     MoveExecutionResult,
@@ -40,11 +40,6 @@ from app.folder_intelligence.schemas import (
     MovePlan,
 )
 from app.folder_intelligence.transaction_log import MoveTransactionLog
-
-
-_DEFAULT_MOVE_TRANSACTION_LOG_PATH = (
-    Path(__file__).resolve().parents[2] / "runtime" / "move_transactions.json"
-)
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +208,8 @@ def execute_approved_move_by_approval_id(
 def default_move_transaction_log() -> MoveTransactionLog:
     """Return a MoveTransactionLog at the default runtime path.
 
-    預設路徑 runtime/move_transactions.json（已列入 .gitignore）。
-    測試一律改用 tmp_path，不可使用本 helper 以免污染 runtime/。
+    預設路徑由 settings 取得（16B）：runtime/move_transactions.json
+    （已列入 .gitignore）。測試以 monkeypatch settings.RUNTIME_DIR
+    或注入 tmp_path log，不可污染 runtime/。
     """
-    return MoveTransactionLog(_DEFAULT_MOVE_TRANSACTION_LOG_PATH)
+    return MoveTransactionLog(get_move_transaction_log_path())

@@ -62,6 +62,9 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[2] / "workspace" / "sandbox" / "pdf_inbox"
     )
 
+    # Runtime artifacts (Phase 16B — consolidated; all gitignored)
+    RUNTIME_DIR: str = str(Path(__file__).resolve().parents[2] / "runtime")
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -70,3 +73,60 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+# ---------------------------------------------------------------------------
+# Phase 16B — Runtime path helpers（集中 runtime 路徑；動態讀取 settings，
+# 測試以 monkeypatch.setattr(settings, "RUNTIME_DIR", ...) 即可覆寫）
+# ---------------------------------------------------------------------------
+
+
+def get_runtime_dir() -> Path:
+    """Return the runtime artifacts directory (default: <repo>/runtime)."""
+    return Path(settings.RUNTIME_DIR)
+
+
+def get_approval_store_path() -> Path:
+    """Default approval store path: runtime/approvals.json（gitignored）。"""
+    return get_runtime_dir() / "approvals.json"
+
+
+def get_rename_transaction_log_path() -> Path:
+    """Default rename transaction log: runtime/rename_transactions.json。"""
+    return get_runtime_dir() / "rename_transactions.json"
+
+
+def get_move_transaction_log_path() -> Path:
+    """Default move transaction log: runtime/move_transactions.json。"""
+    return get_runtime_dir() / "move_transactions.json"
+
+
+def get_safe_pdf_root() -> Path:
+    """Return SAFE_PDF_ROOT as a Path (PDF planning / execution root)."""
+    return Path(settings.SAFE_PDF_ROOT)
+
+
+def resolve_under_safe_root(path: str | Path, root: Path | None = None) -> Path:
+    """Resolve *path* for executor-level filesystem access (Phase 16B).
+
+    - Absolute path → returned unchanged（既有語意：絕對路徑不受 safe root
+      限制，呼叫端一律以絕對 tmp_path 操作）。
+    - Relative path → anchored under *root*（預設 get_safe_pdf_root()），
+      以字串正規化（os.path.normpath）處理，不觸碰 filesystem、
+      不解析 symlink、檔案不存在也不會 throw。
+    - Relative path 經正規化後逃出 root（path traversal，如 "../../etc"）
+      → raise ValueError("path_escapes_safe_root")；executor 呼叫端
+      以 failed result fail-safe 處理，不操作任何檔案。
+    """
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+
+    if root is None:
+        root = get_safe_pdf_root()
+    root_norm = Path(os.path.normpath(str(Path(root).absolute())))
+    resolved = Path(os.path.normpath(str(root_norm / candidate)))
+
+    if resolved != root_norm and root_norm not in resolved.parents:
+        raise ValueError(f"path_escapes_safe_root: {path}")
+    return resolved

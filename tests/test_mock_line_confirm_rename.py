@@ -245,10 +245,12 @@ def test_confirm_rename_executes_approved_plan(tmp_path, isolated_approvals):
 
 
 def test_confirm_rename_uses_default_log_path(tmp_path, monkeypatch, isolated_approvals):
-    default_log_path = tmp_path / "runtime" / "rename_transactions.json"
-    monkeypatch.setattr(
-        mock_line_module, "_DEFAULT_TRANSACTION_LOG_PATH", default_log_path
-    )
+    """16B 起預設路徑由 settings 取得：monkeypatch settings.RUNTIME_DIR 即可隔離。"""
+    from app.core.config import settings
+
+    runtime_dir = tmp_path / "runtime"
+    monkeypatch.setattr(settings, "RUNTIME_DIR", str(runtime_dir))
+    default_log_path = runtime_dir / "rename_transactions.json"
     assert not default_log_path.parent.exists(), "runtime 目錄測試前不應存在"
 
     c = _candidate(tmp_path, "bill.pdf", "renamed.pdf")

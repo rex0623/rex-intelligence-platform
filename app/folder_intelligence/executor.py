@@ -32,6 +32,7 @@ Safety rules:
 
 from pathlib import Path
 
+from app.core.config import resolve_under_safe_root
 from app.folder_intelligence.preflight import preflight_move_plan
 from app.folder_intelligence.schemas import (
     MoveExecutionResult,
@@ -157,9 +158,15 @@ def execute_move_plan(
             continue
 
         # ── From here onward we check the real filesystem ──────────────────
+        # 相對路徑錨定 SAFE_PDF_ROOT（16B）；path traversal → fail-safe failed
         any_attempted = True
-        original_path = Path(original)
-        proposed_path = Path(proposed)
+        try:
+            original_path = resolve_under_safe_root(original)
+            proposed_path = resolve_under_safe_root(proposed)
+        except ValueError:
+            results.append(_result("failed", "path_escapes_safe_root"))
+            failed_count += 1
+            continue
 
         # 5. Original file must exist
         if not original_path.exists():
@@ -266,8 +273,19 @@ def rollback_move_transaction(transaction: MoveTransaction) -> MoveExecutionResu
         any_attempted = True
         rollback_from = action.rollback_from or ""
         rollback_to = action.rollback_to or ""
-        from_path = Path(rollback_from)
-        to_path = Path(rollback_to)
+        # 相對路徑錨定 SAFE_PDF_ROOT（16B）；path traversal → fail-safe failed
+        try:
+            from_path = resolve_under_safe_root(rollback_from)
+            to_path = resolve_under_safe_root(rollback_to)
+        except ValueError:
+            results.append(MoveFileResult(
+                original_path=rollback_from,
+                proposed_path=rollback_to,
+                status="failed",
+                reason="path_escapes_safe_root",
+            ))
+            failed_count += 1
+            continue
 
         if not from_path.exists():
             results.append(MoveFileResult(

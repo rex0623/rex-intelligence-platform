@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.0-alpha |
-| **Test Count** | 544 passing |
+| **Current Version** | v0.7.1-alpha |
+| **Test Count** | 570 passing |
 | **Last Updated** | 2026-06-12 |
 
 ---
@@ -38,6 +38,7 @@
 | 15I | Explicit Mock LINE Move Rollback Command | ✅ Complete |
 | 15J | Move Transaction Log Rotation / Cleanup | ✅ Complete |
 | 16A | Production Hardening / End-to-End Workflow Audit | ✅ Complete |
+| 16B | Runtime Settings Consolidation | ✅ Complete |
 
 ---
 
@@ -53,6 +54,7 @@
 - Preview commands never mutate files or logs — byte-level 驗證。
 - Cleanup never touches filesystem — 只動 log JSON，且不接 Mock LINE。
 - Runtime logs are gitignored — `runtime/approvals.json`、`runtime/rename_transactions.json`、`runtime/move_transactions.json` 均不被 git 追蹤。
+- Runtime paths are consolidated（16B）— 所有 runtime 路徑由 `app/core/config.py` 的 settings helpers 單一來源提供；相對路徑由 executor 層錨定 SAFE_PDF_ROOT，path traversal 以 `path_escapes_safe_root` fail-safe 拒絕。
 
 ---
 
@@ -165,13 +167,16 @@ WorkerRequest                                                               │
 51. **Move rollback fail-safe 與 log 分離（15I）** — 來源缺失 → `rollback_source_not_found`、原位置被佔用 → `rollback_target_already_exists`（不覆寫任何檔案）；失敗的 action 保持 `success`、不標記 `rolled_back`、log 不被破壞；「回滾搬移」只作用 move transaction log、「回滾改名」「預覽回滾改名」只作用 rename transaction log（互不影響，測試驗證）。
 52. **Move log prune 永不刪除可回滾交易（15J）** — `prune_transactions()` 對含 success action 的交易一律保留（protected，即使過期）；無法解析的 entry / 整檔 invalid JSON 永不刪除且不覆寫；只動 log JSON、不檢查 filesystem、不搬移、不回滾、不建資料夾、不改 action status；dry_run 與無可刪項目時不重寫檔案；保留的 entry 以 raw 形式原樣保留（未知欄位不丟失）。
 53. **Move log prune 僅為維運 API（15J）** — 未接任何 Mock LINE 指令（測試驗證原始碼不含 prune）；「確認搬移」「預覽回滾搬移」「回滾搬移」行為完全不變。
+54. **Runtime 路徑單一來源 + SAFE_PDF_ROOT 錨定（16B）** — runtime 路徑（approval store、rename / move transaction log）只定義在 `app/core/config.py`（測試掃描 app/ 與 scripts/ 不得 hardcode）；executor 層相對路徑一律經 `resolve_under_safe_root()` 錨定 SAFE_PDF_ROOT（純字串正規化、不碰 filesystem）；相對路徑逃出 root → executor 以 failed reason `path_escapes_safe_root` fail-safe 拒絕，不操作任何檔案；絕對路徑語意不變。
 
 ---
 
 ## Known Limitations / Not Yet Implemented
 
-- **路徑解析依賴 CWD（16A 稽核發現）** — Rename 計畫以純檔名存放、Move 計畫的 `proposed_path` 為相對路徑，executor 以 CWD 解析；CWD ≠ SAFE_PDF_ROOT 時執行會以 `original_file_not_found` fail-safe 拒絕（不會誤改檔案），但路徑未錨定 SAFE_PDF_ROOT。建議於 **Phase 16B — Runtime Settings Consolidation** 處理。
-- **log_path 由呼叫方指定** — rename / move transaction log 與 approval store 的預設路徑為各模組 hardcoded，尚未整合到 settings.py 作為全域設定（同樣留待 16B）。
+- ~~路徑解析依賴 CWD（16A 稽核發現）~~ — **已於 16B 修正**：executor 層以 `resolve_under_safe_root()` 錨定 SAFE_PDF_ROOT，E2E 不再需要 chdir。
+- ~~log_path 散落各模組 hardcoded~~ — **已於 16B 修正**：runtime 路徑集中於 `app/core/config.py` settings helpers。
+- **絕對路徑不受 safe root 限制（16B 設計決策）** — 計畫/transaction 中的絕對路徑原樣使用（既有語意，所有測試與呼叫端依賴此行為）；safe root 錨定與 traversal 防護僅針對相對路徑。
+- **Transaction log 內的相對路徑與 SAFE_PDF_ROOT 綁定** — 若執行與回滾之間變更 SAFE_PDF_ROOT 設定，相對路徑會解析到新 root（罕見情境，單人 CLI 可接受）。
 - **Transaction log 無壓縮 / SQLite** — JSON persistence；大量交易時可於後續階段評估 TTL 進階策略或 SQLite。
 - Only Taipower electricity bills are fully supported for rename.
 - No multi-user / tenant isolation.
@@ -196,7 +201,7 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 16B — Runtime Settings Consolidation**
+**Phase 16C — Operator UX / Command Help Text**
 
-- 將 runtime 路徑（approval store、rename / move transaction log）整合到 settings.py 全域設定。
-- 路徑錨定：rename / move 計畫的相對路徑解析錨定 SAFE_PDF_ROOT，移除 CWD 相依（16A 稽核發現）。
+- Mock LINE 指令說明 / help text：列出可用指令、格式與安全語意（哪些是 dry-run、哪些需要 full match）。
+- 錯誤回覆的操作指引一致化（找不到 approval / transaction 時提示正確指令格式）。

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from app.approvals.schemas import Approval
+from app.core.config import get_approval_store_path
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,7 +18,7 @@ class ApprovalManager:
         self.store_path = (
             Path(store_path)
             if store_path is not None
-            else Path(__file__).resolve().parents[2] / "runtime" / "approvals.json"
+            else get_approval_store_path()
         )
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
         self._store: Dict[str, Approval] = {}
