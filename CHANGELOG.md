@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.8-alpha] — Phase 15I Explicit Mock LINE Move Rollback Command
+
+### Added
+- `scripts/mock_line.py` — 明確「回滾搬移 {transaction_id}」指令（唯一可觸發真實 move rollback 的 Mock LINE 入口）：
+  - `_ROLLBACK_MOVE_PATTERN = ^回滾搬移\s+([A-Za-z0-9_-]+)$`：full match 才生效；「回滾搬移」「回滾搬移一下 …」「請幫我回滾搬移 …」「預覽回滾搬移 …」「預覽搬移回滾 …」「回滾改名 …」「預覽回滾改名 …」「確認搬移 …」「確認改名 …」均不觸發。
+  - `rollback_move(transaction_id, move_transaction_log=None)`：預設使用 `default_move_transaction_log()`；once-only guard（仿 14E）先以 read-only `preview_move_rollback_transaction_by_id()` 判斷 —— 找不到 → `transaction_not_found`、全部已回滾 → `already_fully_rolled_back`（不重複回滾）、無可回滾 → `no_rollbackable_actions`，三者皆不進入執行路徑；通過後一律透過 `rollback_move_transaction_by_id()` 執行並同步 log（成功 → `rolled_back`，失敗保持 `success`）。
+  - `_format_move_rollback_execution_response()`：標題「搬移回滾結果」、transaction_id、executed/dry_run、總數/成功/失敗/跳過/blocked、每筆 original_path → proposed_path / status / reason / rollback_from / rollback_to；成功時附「已完成回滾搬移。」。
+- `tests/test_mock_line_move_rollback_execution.py` — 27 個新測試（明確指令觸發 rollback spy、tmp_path 真實搬回檔案、log 標記 rolled_back、response 標題/flags/counts/rollback 路徑/「已完成回滾搬移」、transaction_not_found、無可回滾不進入執行路徑、once-only guard 不重複搬移/不破壞 log/不誤報 source missing、來源缺失與目標佔用 fail-safe（不覆寫、不標記 rolled_back）、部分回滾只更新成功 action、4 種模糊文字不觸發、「預覽回滾搬移」仍 read-only 不觸發 rollback、「回滾改名」「預覽回滾改名」不碰 move log、「確認搬移」「確認改名」不觸發 rollback、default_move_transaction_log() 預設路徑、AST 驗證 mock_line 不直接呼叫 rename/replace/move、不 import os/shutil）。
+
+### Changed
+- `scripts/mock_line.py` — 「確認搬移」成功回覆與「預覽回滾搬移」回覆中的「尚未開放回滾指令」提示更新為實際可用指令提示（「如需復原，請輸入：預覽回滾搬移 {tx}」「或輸入：回滾搬移 {tx}」/「若要執行回滾，請輸入：回滾搬移 {tx}」），比照 rename 流程（14D-3B 後的「確認改名」回覆）。
+- `tests/test_move_transaction_log.py`、`tests/test_move_approval_bridge.py`、`tests/test_mock_line_confirm_move.py`、`tests/test_mock_line_move_rollback_preview.py` — 15H 時代「不可有『回滾搬移』指令 regex」「不可 import rollback_move_transaction_by_id」的不變式更新為 15I 現實：「回滾搬移」regex 必須存在且 full match（^…$）；`rollback_move_transaction_by_id` 為唯一允許的 rollback import（exact-name 比對，非 by_id 低階 API 與 executor 仍禁止）；「回滾搬移 {tx}」觸發測試改為模糊文字變形測試。
+
+### Safety guarantees
+- 真實 move rollback 唯一入口：「回滾搬移 {transaction_id}」full match；一律走 `rollback_move_transaction_by_id()`，Mock LINE 不直接操作 filesystem（AST 驗證）。
+- Once-only guard：已全部回滾 → `already_fully_rolled_back`，不進入執行路徑、不動檔案、不寫 log、不誤報 `rollback_source_not_found`。
+- Fail-safe：來源缺失 → `rollback_source_not_found`、原位置被佔用 → `rollback_target_already_exists`（不覆寫）；失敗的 action 保持 `success`，log 不被破壞；部分回滾只標記成功的 action。
+- 「預覽回滾搬移」仍純讀取；rename 與 move 的 rollback 指令／transaction log 完全分離（互不影響，測試驗證）。
+- 所有真實 rollback 測試使用 pytest tmp_path。
+
+### Recommended next phase
+- **Phase 15J — Move Transaction Log Rotation / Cleanup**。
+
+---
+
 ## [v0.6.7-alpha] — Phase 15H Move Rollback Preview Command
 
 ### Added

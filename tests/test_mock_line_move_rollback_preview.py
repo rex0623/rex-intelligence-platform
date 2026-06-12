@@ -81,15 +81,19 @@ def preview_spy(monkeypatch):
 
 @pytest.fixture
 def rollback_guard(monkeypatch):
-    """任何路徑呼叫 move rollback API 都直接失敗。"""
+    """任何路徑呼叫 move rollback API 都直接失敗（含 mock_line 在 15I
+    綁定的 rollback_move_transaction_by_id 名稱）。"""
     import app.folder_intelligence.executor as executor_module
 
     def _forbidden(*args, **kwargs):
-        raise AssertionError("Mock LINE 不可觸發真實 move rollback")
+        raise AssertionError("此情境不可觸發真實 move rollback")
 
     monkeypatch.setattr(executor_module, "rollback_move_transaction", _forbidden)
     monkeypatch.setattr(
         executor_module, "rollback_move_transaction_by_id", _forbidden
+    )
+    monkeypatch.setattr(
+        mock_line_module, "rollback_move_transaction_by_id", _forbidden
     )
 
 
@@ -135,7 +139,8 @@ def test_preview_response_says_not_rolled_back_yet(moved_state, move_log):
     )
 
     assert "這只是預覽，尚未實際回滾任何檔案。" in output
-    assert "尚未開放" in output
+    # 15I 起提示可用的執行指令（取代 15H 的「尚未開放」提示）
+    assert f"回滾搬移 {moved_state['tx_id']}" in output
 
 
 def test_preview_missing_transaction_returns_transaction_not_found(move_log):
@@ -152,18 +157,24 @@ def test_preview_missing_transaction_returns_transaction_not_found(move_log):
 # ---------------------------------------------------------------------------
 
 
-def test_rollback_move_command_does_not_trigger_anything(
+def test_fuzzy_rollback_move_texts_do_not_trigger_anything(
     moved_state, move_log, preview_spy, rollback_guard
 ):
-    """「回滾搬移 {transaction_id}」不是指令：不 rollback、不 preview。"""
+    """模糊的「回滾搬移」變形不是指令：不 rollback、不 preview
+    （15I 的 full match「回滾搬移 {transaction_id}」行為見
+    test_mock_line_move_rollback_execution.py）。"""
     before = moved_state["log_path"].read_bytes()
 
-    output = mock_line_payload(
-        f"回滾搬移 {moved_state['tx_id']}", move_transaction_log=move_log
-    )
+    for text in (
+        "回滾搬移",
+        f"回滾搬移一下 {moved_state['tx_id']}",
+        f"請幫我回滾搬移 {moved_state['tx_id']}",
+    ):
+        output = mock_line_payload(text, move_transaction_log=move_log)
+        assert "搬移回滾預覽" not in output
+        assert "搬移回滾結果" not in output
 
-    assert preview_spy == [], "「回滾搬移」不可觸發 preview"
-    assert "搬移回滾預覽" not in output
+    assert preview_spy == [], "模糊文字不可觸發 preview"
     assert moved_state["moved"].exists(), "檔案必須留在新位置（未被回滾）"
     assert not moved_state["original"].exists()
     assert moved_state["log_path"].read_bytes() == before, "log 不可被改動"
@@ -276,17 +287,19 @@ def test_mock_line_imports_preview_but_not_rollback_apis():
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in node.names:
                 imported.add(alias.name)
+    # 15I 起允許 rollback_move_transaction_by_id（「回滾搬移」唯一執行路徑）；
+    # executor 與非 by_id 低階 rollback API 仍不可 import（exact-name 比對）
     for forbidden in (
         "execute_move_plan",
         "rollback_move_transaction",
-        "rollback_move_transaction_by_id",
     ):
         assert forbidden not in imported, f"Mock LINE 不可 import {forbidden}"
+    assert "rollback_move_transaction_by_id" in imported
 
 
-def test_mock_line_has_no_real_move_rollback_regex():
-    """「預覽回滾搬移」regex 允許（read-only）；不可存在能匹配
-    「回滾搬移 …」真實 rollback 指令的 regex。"""
+def test_move_rollback_regexes_are_full_match():
+    """「預覽回滾搬移」regex 允許（read-only）；15I 起「回滾搬移」真實
+    rollback 指令 regex 允許，但兩者都必須 full match（^ 開頭、$ 結尾）。"""
     source = inspect.getsource(mock_line_module)
     tree = ast.parse(source)
     patterns: list[str] = []
@@ -304,7 +317,11 @@ def test_mock_line_has_no_real_move_rollback_regex():
     assert any("預覽回滾搬移" in p for p in patterns), (
         "15H 應有 read-only「預覽回滾搬移」regex"
     )
+    assert any(p.lstrip("^").startswith("回滾搬移") for p in patterns), (
+        "15I 應有「回滾搬移」指令 regex"
+    )
     for pattern in patterns:
-        assert not pattern.lstrip("^").startswith("回滾搬移"), (
-            f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
-        )
+        if "回滾搬移" in pattern:
+            assert pattern.startswith("^") and pattern.endswith("$"), (
+                f"move rollback 相關 regex 必須 full match：{pattern}"
+            )

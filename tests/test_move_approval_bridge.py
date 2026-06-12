@@ -454,21 +454,24 @@ def test_target_collision_still_rejected(tmp_path, manager):
 
 
 def test_mock_line_uses_bridge_not_executor():
-    """Phase 15G 起 Mock LINE 透過「確認搬移」呼叫 approval_id bridge，
-    但不可直接接 executor、rollback API 或 payload-level bridge。"""
+    """Phase 15G 起 Mock LINE 透過「確認搬移」呼叫 approval_id bridge；
+    15I 起「回滾搬移」走 rollback_move_transaction_by_id()；
+    但不可直接接 executor、低階 rollback API 或 payload-level bridge。"""
     source = inspect.getsource(mock_line_module)
     assert "execute_approved_move_by_approval_id" in source  # 15G 唯一執行路徑
     assert "execute_approved_move_plan" not in source  # payload-level bridge 不直接接
     assert "execute_move_plan" not in source
-    assert "rollback_move_transaction" not in source
+    assert "rollback_move_transaction_by_id" in source  # 15I 唯一 rollback 路徑
+    assert "rollback_move_transaction(" not in source  # 非 by_id 低階 API 不可用
     assert "MoveTransactionLog" not in source
 
 
-def test_mock_line_has_no_move_rollback_command_regex():
-    """提示訊息可提及「回滾搬移」尚未開放、15H 起允許 read-only
-    「預覽回滾搬移」regex，但不可存在可執行的真實 rollback 指令 regex。"""
+def test_mock_line_move_rollback_regex_is_full_match():
+    """15I 起允許「回滾搬移」真實 rollback 指令 regex，但必須 full match
+    （^ 開頭、$ 結尾），模糊文字不可觸發。"""
     source = inspect.getsource(mock_line_module)
     tree = ast.parse(source)
+    found = False
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Call)
@@ -479,9 +482,12 @@ def test_mock_line_has_no_move_rollback_command_regex():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert not pattern.lstrip("^").startswith("回滾搬移"), (
-                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
-            )
+            if pattern.lstrip("^").startswith("回滾搬移"):
+                found = True
+                assert pattern.startswith("^") and pattern.endswith("$"), (
+                    f"move rollback 指令 regex 必須 full match：{pattern}"
+                )
+    assert found, "15I 應有「回滾搬移」指令 regex"
 
 
 def test_bridge_module_never_touches_filesystem_ast():

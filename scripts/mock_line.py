@@ -23,6 +23,7 @@ from app.folder_intelligence.approval_bridge import (
     default_move_transaction_log,
     execute_approved_move_by_approval_id,
 )
+from app.folder_intelligence.executor import rollback_move_transaction_by_id
 from app.folder_intelligence.formatter import format_move_plan_for_cli
 from app.folder_intelligence.schemas import MoveExecutionResult, MovePlan
 from app.folder_intelligence.transaction_log import (
@@ -222,8 +223,13 @@ _CONFIRM_MOVE_PATTERN = re.compile(r"^確認搬移\s+([A-Za-z0-9_-]+)$")
 # 純讀取，不 rollback、不搬移檔案、不寫 transaction log。
 # full match 才生效；「回滾搬移 …」「預覽搬移回滾 …」「請幫我預覽回滾搬移 …」
 # 「預覽回滾搬移」「預覽回滾搬移一下 …」均不匹配。
-# 仍沒有任何真實 move rollback 指令。
 _PREVIEW_MOVE_ROLLBACK_PATTERN = re.compile(r"^預覽回滾搬移\s+([A-Za-z0-9_-]+)$")
+
+# Move rollback 執行指令格式（Phase 15I）：「回滾搬移 {transaction_id}」。
+# 唯一可觸發真實 move rollback 的指令；full match 才生效。
+# 「回滾搬移」「回滾搬移一下 …」「請幫我回滾搬移 …」「預覽回滾搬移 …」
+# 「回滾改名 …」「確認搬移 …」均不匹配。
+_ROLLBACK_MOVE_PATTERN = re.compile(r"^回滾搬移\s+([A-Za-z0-9_-]+)$")
 
 _DEFAULT_TRANSACTION_LOG_PATH = (
     Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
@@ -398,7 +404,10 @@ def _format_move_execution_response(
                 lines.append(f"      rollback_to：{r.rollback_to}")
 
     if result.rollback_available:
-        lines.append("已建立 rollback 資訊，但目前尚未開放 Mock LINE 回滾搬移指令。")
+        lines.append("已建立 rollback 資訊。")
+        if transaction_id:
+            lines.append(f"如需復原，請輸入：預覽回滾搬移 {transaction_id}")
+            lines.append(f"或輸入：回滾搬移 {transaction_id}")
     return "\n".join(lines)
 
 
@@ -472,7 +481,8 @@ def _format_move_rollback_preview_response(preview, transaction_id: str) -> str:
         else:
             lines.append("目前沒有可回滾項目。")
     lines.append("這只是預覽，尚未實際回滾任何檔案。")
-    lines.append("目前尚未開放 Mock LINE 的真實 move rollback 指令。")
+    if preview.has_rollbackable_actions:
+        lines.append(f"若要執行回滾，請輸入：回滾搬移 {preview.transaction_id}")
     return "\n".join(lines)
 
 
@@ -493,6 +503,95 @@ def preview_move_rollback(
         transaction_id, move_transaction_log
     )
     return _format_move_rollback_preview_response(preview, transaction_id)
+
+
+# ---------------------------------------------------------------------------
+# Phase 15I — Explicit move rollback execution command
+# ---------------------------------------------------------------------------
+
+
+def _format_move_rollback_execution_response(
+    result: MoveExecutionResult,
+    transaction_id: str,
+) -> str:
+    """Format a move rollback MoveExecutionResult into the mock LINE reply."""
+    lines = ["小雷收到：搬移回滾結果"]
+    lines.append(f"- transaction_id：{transaction_id}")
+    lines.append(f"- executed：{result.executed} | dry_run：{result.dry_run}")
+    lines.append(
+        f"- 總數：{result.total} 筆"
+        f" | 成功：{result.success_count} 筆"
+        f" | 失敗：{result.failed_count} 筆"
+        f" | 跳過：{result.skipped_count} 筆"
+        f" | blocked：{result.blocked_count} 筆"
+    )
+    if result.results:
+        lines.append("檔案結果：")
+        for i, r in enumerate(result.results, 1):
+            entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
+            if r.reason:
+                entry += f"（{r.reason}）"
+            lines.append(entry)
+            if r.rollback_from and r.rollback_to:
+                lines.append(f"      rollback_from：{r.rollback_from}")
+                lines.append(f"      rollback_to：{r.rollback_to}")
+    if result.success_count > 0:
+        lines.append("已完成回滾搬移。")
+    return "\n".join(lines)
+
+
+def rollback_move(
+    transaction_id: str,
+    move_transaction_log=None,
+) -> str:
+    """Handle the explicit 「回滾搬移 {transaction_id}」 command (Phase 15I).
+
+    The only Mock LINE path that can trigger a real move rollback.  All
+    execution goes through rollback_move_transaction_by_id(), which reverses
+    successful actions via the safe move executor and marks them
+    "rolled_back" in the log; this module never moves files itself.
+    """
+    if move_transaction_log is None:
+        move_transaction_log = default_move_transaction_log()
+
+    # Once-only guard（仿 14E）：先以 read-only preview 判斷狀態，
+    # 沒有可回滾 action 時完全不進入 rollback 執行路徑（不動檔案、不寫 log）。
+    preview = preview_move_rollback_transaction_by_id(
+        transaction_id, move_transaction_log
+    )
+    if preview is None:
+        return (
+            f"小雷收到：找不到 transaction：{transaction_id}"
+            f"（transaction_not_found）"
+        )
+    if not preview.has_rollbackable_actions:
+        if preview.is_fully_rolled_back:
+            return (
+                f"小雷收到：此交易已全部回滾"
+                f"（已回滾 {preview.already_rolled_back_count} 筆），"
+                f"不會重複回滾（already_fully_rolled_back）"
+            )
+        return (
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+            f"（no_rollbackable_actions）"
+        )
+
+    result = rollback_move_transaction_by_id(transaction_id, move_transaction_log)
+
+    if not result.executed:
+        # 理論上 preview guard 已擋掉；保留作為防護
+        reasons = {r.reason for r in result.results}
+        if "transaction_not_found" in reasons:
+            return (
+                f"小雷收到：找不到 transaction：{transaction_id}"
+                f"（transaction_not_found）"
+            )
+        return (
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+            f"（no_rollbackable_actions）"
+        )
+
+    return _format_move_rollback_execution_response(result, transaction_id)
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -708,11 +807,21 @@ def mock_line_payload(
         )
 
     # Move rollback preview (Phase 15H): exact「預覽回滾搬移 {transaction_id}」
-    # only.  Read-only：不 rollback、不搬移、不寫 log；「回滾搬移 …」不是指令。
+    # only.  Read-only：不 rollback、不搬移、不寫 log。
     preview_move_rollback_match = _PREVIEW_MOVE_ROLLBACK_PATTERN.match(text.strip())
     if preview_move_rollback_match:
         return preview_move_rollback(
             preview_move_rollback_match.group(1),
+            move_transaction_log=move_transaction_log,
+        )
+
+    # Move rollback execution (Phase 15I): exact「回滾搬移 {transaction_id}」
+    # only.  唯一可觸發真實 move rollback 的指令；只作用於 move transaction
+    # log，與「回滾改名」（rename log）完全分離。
+    rollback_move_match = _ROLLBACK_MOVE_PATTERN.match(text.strip())
+    if rollback_move_match:
+        return rollback_move(
+            rollback_move_match.group(1),
             move_transaction_log=move_transaction_log,
         )
 

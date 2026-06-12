@@ -228,17 +228,20 @@ def test_response_includes_rollback_paths_for_success(
     assert f"rollback_to：{candidate.original_path}" in output
 
 
-def test_response_warns_rollback_command_not_available(
+def test_response_mentions_rollback_info_and_commands(
     tmp_path, isolated_approvals, move_log
 ):
+    """15I 起回覆提示可用的預覽/回滾指令（取代 15G 的「尚未開放」提示）。"""
     candidate = _tmp_candidate(tmp_path)
     plan = _make_plan([candidate], ["low"])
     approval_id = _approved_move_approval(isolated_approvals, plan)
 
     output = mock_line_payload(f"確認搬移 {approval_id}", move_transaction_log=move_log)
 
+    tx_id = move_log.list_transactions()[0].transaction_id
     assert "已建立 rollback 資訊" in output
-    assert "尚未開放" in output
+    assert f"預覽回滾搬移 {tx_id}" in output
+    assert f"回滾搬移 {tx_id}" in output
 
 
 # ---------------------------------------------------------------------------
@@ -352,25 +355,27 @@ def test_confirm_rename_does_not_trigger_move(
 # ---------------------------------------------------------------------------
 
 
-def test_move_rollback_commands_do_not_exist(tmp_path, isolated_approvals, move_log):
-    """「回滾搬移」不是指令；「預覽回滾搬移」（15H）為 read-only 預覽：
-    兩者都不可動檔案 —— 成功搬移後檔案保持在新位置，
-    transaction log 的 action 狀態不變。"""
+def test_preview_move_rollback_remains_read_only(
+    tmp_path, isolated_approvals, move_log
+):
+    """「預覽回滾搬移」（15H）為 read-only 預覽：成功搬移後檔案保持在
+    新位置，transaction log 的 action 狀態不變（15I 起「回滾搬移」為
+    真實 rollback 指令，行為見 test_mock_line_move_rollback_execution.py）。"""
     candidate = _tmp_candidate(tmp_path)
     plan = _make_plan([candidate], ["low"])
     approval_id = _approved_move_approval(isolated_approvals, plan)
     mock_line_payload(f"確認搬移 {approval_id}", move_transaction_log=move_log)
     tx_id = move_log.list_transactions()[0].transaction_id
 
-    for command in (f"回滾搬移 {tx_id}", f"預覽回滾搬移 {tx_id}"):
-        mock_line_payload(command, move_transaction_log=move_log)
-        assert Path(candidate.proposed_path).exists(), (
-            f"「{command}」不可回滾搬移（檔案應留在新位置）"
-        )
-        assert not Path(candidate.original_path).exists()
-        assert move_log.list_transactions()[0].actions[0].status == "success", (
-            "log 狀態不可被改動"
-        )
+    mock_line_payload(f"預覽回滾搬移 {tx_id}", move_transaction_log=move_log)
+
+    assert Path(candidate.proposed_path).exists(), (
+        "「預覽回滾搬移」不可回滾搬移（檔案應留在新位置）"
+    )
+    assert not Path(candidate.original_path).exists()
+    assert move_log.list_transactions()[0].actions[0].status == "success", (
+        "log 狀態不可被改動"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -528,17 +533,19 @@ def test_mock_line_imports_bridge_but_not_executor_or_rollback():
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 imported.add(alias.name)
+    # 15I 起允許 rollback_move_transaction_by_id（「回滾搬移」唯一執行路徑）；
+    # executor 與非 by_id 低階 rollback API 仍不可 import（exact-name 比對）
     for forbidden in (
         "execute_move_plan",
         "rollback_move_transaction",
-        "rollback_move_transaction_by_id",
     ):
         assert forbidden not in imported, f"Mock LINE 不可 import {forbidden}"
+    assert "rollback_move_transaction_by_id" in imported
 
 
 def test_mock_line_has_no_move_rollback_regex():
-    """「回滾搬移」不可成為可執行指令 regex（15H 起 read-only
-    「預覽回滾搬移」regex 是允許的；提示訊息提及尚未開放也允許）。"""
+    """15I 起「回滾搬移」為合法指令，但 regex 必須 full match
+    （^ 開頭、$ 結尾），模糊文字不可觸發真實 rollback。"""
     source = inspect.getsource(mock_line_module)
     tree = ast.parse(source)
     for node in ast.walk(tree):
@@ -551,6 +558,7 @@ def test_mock_line_has_no_move_rollback_regex():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert not pattern.lstrip("^").startswith("回滾搬移"), (
-                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
-            )
+            if pattern.lstrip("^").startswith("回滾搬移"):
+                assert pattern.startswith("^") and pattern.endswith("$"), (
+                    f"move rollback 指令 regex 必須 full match：{pattern}"
+                )

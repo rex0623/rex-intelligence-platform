@@ -451,22 +451,23 @@ def test_failed_rollback_does_not_corrupt_log(tmp_path):
 
 
 def test_mock_line_has_no_move_rollback_wiring():
-    """Phase 15G 起 Mock LINE 有「確認搬移」，但仍無任何 move rollback 接線：
-    沒有「回滾搬移」/「預覽回滾搬移」可執行 regex、不引用 rollback API。
-    （提示訊息可提及「回滾搬移」尚未開放，故不檢查原始碼 raw substring。）"""
+    """Phase 15I 起 Mock LINE 有「回滾搬移」明確指令，但只能透過
+    rollback_move_transaction_by_id()（safe executor），不可直接接
+    executor 的搬移/低階 rollback API、不可引用 MoveTransactionLog。"""
     import scripts.mock_line as mock_line_module
 
     source = inspect.getsource(mock_line_module)
-    for symbol in (
-        "execute_move_plan",
-        "rollback_move_transaction",
-        "rollback_move_transaction_by_id",
-        "MoveTransactionLog",
-    ):
-        assert symbol not in source, f"Mock LINE 不可引用 {symbol}"
+    assert "execute_move_plan" not in source, "Mock LINE 不可直接呼叫 move executor"
+    assert "MoveTransactionLog" not in source, "Mock LINE 不可直接引用 log class"
+    # 不可使用非 by_id 的低階 rollback API（by_id 會同步 log 狀態）
+    assert "rollback_move_transaction(" not in source, (
+        "Mock LINE 只可使用 rollback_move_transaction_by_id()"
+    )
+    assert "rollback_move_transaction_by_id" in source, (
+        "「回滾搬移」必須走 rollback_move_transaction_by_id()"
+    )
 
-    # 不可存在能匹配「回滾搬移 …」真實 rollback 指令的 compiled regex
-    # （15H 的「預覽回滾搬移」read-only regex 是允許的）
+    # 「回滾搬移」regex 必須 full match（^ 開頭、$ 結尾）
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if (
@@ -478,9 +479,10 @@ def test_mock_line_has_no_move_rollback_wiring():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert not pattern.lstrip("^").startswith("回滾搬移"), (
-                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
-            )
+            if pattern.lstrip("^").startswith("回滾搬移"):
+                assert pattern.startswith("^") and pattern.endswith("$"), (
+                    f"move rollback 指令 regex 必須 full match：{pattern}"
+                )
 
 
 def test_mock_line_rollback_command_only_targets_rename(tmp_path):
