@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.9-alpha] — Phase 15J Move Transaction Log Rotation / Cleanup
+
+### Added
+- `app/folder_intelligence/schemas.py` — `MoveTransactionLogPruneResult`（before_count / after_count / pruned_count / retained_count / protected_count / corrupted_count / dry_run / pruned_transaction_ids / retained_transaction_ids / protected_transaction_ids / corrupted_entries）；語意：protected = 仍可回滾永不刪、retained = 未達清理條件、corrupted = 無法解析必須保留、pruned = 已清除。
+- `app/folder_intelligence/transaction_log.py` —
+  - `MoveTransactionLog.prune_transactions(older_than_days=30, dry_run=False, now=None)`：維運 API（鏡像 14F）。log 不存在 → 安全 no-op（不建立 log、不建資料夾）；整檔 invalid JSON / 結構錯誤 → 不刪不覆寫、corrupted 計數 ≥ 1；無法解析的 entry → 原樣保留（corrupted_entries）；任一 success action（rollbackable）→ 永不刪除（protected，即使過期）；全部 rolled_back 或只有 failed/pending/skipped → 超過 older_than_days 才刪，未過期保留（retained）；dry_run=True 只回報將刪除清單、不重寫 log；pruned_count == 0 不重寫 log；以 raw entry 過濾重寫，保留的 entry（含 corrupted 與未知欄位）原樣保留。
+  - `prune_move_transactions(transaction_log, older_than_days=30, dry_run=False)`：module-level 便利 wrapper。
+- `tests/test_move_transaction_log_rotation.py` — 25 個新測試（missing log no-op 不建檔不建資料夾、invalid JSON 不覆寫、corrupted entry 原樣保留、rollbackable 過期仍保留、old/recent × rolled_back/failed/pending 六種組合、dry_run 不重寫、no-op 不重寫（byte + mtime）、混合情境計數與三組 id 清單、corrupted_entries 回報、不搬移檔案不建資料夾（filesystem 快照）、rollback API monkeypatch guard、不改 action status、未知欄位原樣保留、Mock LINE 無 prune 接線、AST 驗證 prune functions 不碰 filesystem/rollback API、wrapper 委派與 dry_run）。
+
+### Safety guarantees
+- 仍可回滾的 transaction（任一 success action）永不刪除，即使符合過期條件。
+- Corrupted / 無法解析 entry 永不刪除、原樣保留（不重新序列化、不丟失未知欄位）。
+- Cleanup 只修改 log JSON：不檢查 filesystem、不搬移、不回滾、不建立或刪除實體檔案、不改變 action status。
+- 僅為底層維運 API：未接任何 Mock LINE 指令（測試驗證 mock_line 原始碼不含 prune）。
+- 「確認搬移」「預覽回滾搬移」「回滾搬移」行為完全不變。
+
+### Recommended next phase
+- **Phase 16A — Production Hardening / End-to-End Workflow Audit**。
+
+---
+
 ## [v0.6.8-alpha] — Phase 15I Explicit Mock LINE Move Rollback Command
 
 ### Added

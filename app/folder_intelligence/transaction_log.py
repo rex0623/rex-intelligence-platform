@@ -15,6 +15,7 @@ runtime/move_transactions.json（已列入 .gitignore），但 log_path 由
 """
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.folder_intelligence.schemas import (
@@ -22,6 +23,7 @@ from app.folder_intelligence.schemas import (
     MoveRollbackPreviewAction,
     MoveTransaction,
     MoveTransactionAction,
+    MoveTransactionLogPruneResult,
 )
 
 
@@ -135,6 +137,127 @@ class MoveTransactionLog:
         tx.actions = new_actions
         self._upsert(tx)
         return tx
+
+    # ── Phase 15J — Rotation / cleanup ──────────────────────────────────────
+
+    def prune_transactions(
+        self,
+        older_than_days: int = 30,
+        dry_run: bool = False,
+        now: datetime | None = None,
+    ) -> MoveTransactionLogPruneResult:
+        """Prune old transactions from the log（維運 API，Phase 15J，鏡像 14F）。
+
+        清理規則：
+          - log 不存在 → 安全 no-op（不建立 log）。
+          - 整檔 invalid JSON / 結構錯誤 → 不刪、不覆寫，corrupted 計數 ≥ 1。
+          - entry 無法解析成 MoveTransaction → 原樣保留（corrupted_entries +1）。
+          - 仍有 status=="success" 的 action（rollbackable）→ 永不刪除
+            （protected，即使已過期）。
+          - 全部 rolled_back 或只有 failed/pending/skipped → created_at 超過
+            older_than_days 才刪，未過期則保留（retained）。
+          - dry_run=True → 只回報將刪除哪些 transaction，不重寫 log。
+          - 無可刪項目（pruned_count == 0）→ 不重寫 log。
+
+        Safety rules：
+          - 只動 log 檔；不檢查 filesystem、不搬移/回滾任何檔案、
+            不建資料夾、不改變任何 action status。
+          - 以 raw entry 過濾重寫：保留的 entry（含 corrupted 與未知欄位）
+            原樣保留，不重新序列化。
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        if not self._log_path.exists():
+            return MoveTransactionLogPruneResult(dry_run=dry_run)
+
+        try:
+            data = json.loads(self._log_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return MoveTransactionLogPruneResult(
+                corrupted_count=1, corrupted_entries=1, dry_run=dry_run
+            )
+        if not isinstance(data, dict) or not isinstance(
+            data.get("transactions"), list
+        ):
+            return MoveTransactionLogPruneResult(
+                corrupted_count=1, corrupted_entries=1, dry_run=dry_run
+            )
+
+        raw_entries = data["transactions"]
+        before_count = len(raw_entries)
+        cutoff = now - timedelta(days=older_than_days)
+
+        def _aware(dt: datetime) -> datetime:
+            # naive datetime 視為 UTC；不用 dt.replace() 以符合本模組
+            # 「不得出現 rename/move/replace 呼叫」的 AST 安全防護
+            if dt.tzinfo is not None:
+                return dt
+            return datetime(
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second, dt.microsecond,
+                tzinfo=timezone.utc,
+            )
+
+        prune_indexes: set[int] = set()
+        pruned_ids: list[str] = []
+        retained_ids: list[str] = []
+        protected_ids: list[str] = []
+        corrupted = 0
+
+        for i, entry in enumerate(raw_entries):
+            try:
+                tx = MoveTransaction.model_validate(entry)
+            except Exception:
+                corrupted += 1  # 無法解析的 entry 永不刪除，原樣保留
+                continue
+
+            # 仍可回滾（任一 success action）→ 永不刪除，即使已過期
+            if any(action.status == "success" for action in tx.actions):
+                protected_ids.append(tx.transaction_id)
+                continue
+
+            if _aware(tx.created_at) < cutoff:
+                prune_indexes.add(i)
+                pruned_ids.append(tx.transaction_id)
+            else:
+                retained_ids.append(tx.transaction_id)
+
+        if pruned_ids and not dry_run:
+            data["transactions"] = [
+                entry
+                for i, entry in enumerate(raw_entries)
+                if i not in prune_indexes
+            ]
+            self._write(data)
+
+        return MoveTransactionLogPruneResult(
+            before_count=before_count,
+            after_count=before_count - len(pruned_ids),
+            pruned_count=len(pruned_ids),
+            retained_count=len(retained_ids),
+            protected_count=len(protected_ids),
+            corrupted_count=corrupted,
+            corrupted_entries=corrupted,
+            dry_run=dry_run,
+            pruned_transaction_ids=pruned_ids,
+            retained_transaction_ids=retained_ids,
+            protected_transaction_ids=protected_ids,
+        )
+
+
+def prune_move_transactions(
+    transaction_log: MoveTransactionLog,
+    older_than_days: int = 30,
+    dry_run: bool = False,
+) -> MoveTransactionLogPruneResult:
+    """Module-level convenience wrapper for prune_transactions()（15J）。
+
+    僅為維運 API：未接任何 Mock LINE 指令。
+    """
+    return transaction_log.prune_transactions(
+        older_than_days=older_than_days, dry_run=dry_run
+    )
 
 
 # ---------------------------------------------------------------------------

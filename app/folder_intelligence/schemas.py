@@ -99,6 +99,35 @@ class MoveTransaction(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Phase 15J — Move transaction log rotation / cleanup schemas
+# ---------------------------------------------------------------------------
+
+
+class MoveTransactionLogPruneResult(BaseModel):
+    """Result of MoveTransactionLog.prune_transactions() (maintenance API).
+
+    語意：
+      - protected  = 仍有 rollbackable success action，永不刪除
+      - retained   = 可解析但未達清理條件（未過期），保留
+      - corrupted  = 無法解析的 entry / 檔案，必須原樣保留
+      - pruned     = 已清除（dry_run=True 時為「將會清除」，log 未改動，
+                     after_count 為預計刪除後的筆數）
+    """
+
+    before_count: int = 0
+    after_count: int = 0
+    pruned_count: int = 0
+    retained_count: int = 0
+    protected_count: int = 0
+    corrupted_count: int = 0
+    dry_run: bool = False
+    pruned_transaction_ids: List[str] = Field(default_factory=list)
+    retained_transaction_ids: List[str] = Field(default_factory=list)
+    protected_transaction_ids: List[str] = Field(default_factory=list)
+    corrupted_entries: int = 0
+
+
+# ---------------------------------------------------------------------------
 # Phase 15H — Move rollback preview schemas（read-only，無任何執行行為）
 # ---------------------------------------------------------------------------
 
