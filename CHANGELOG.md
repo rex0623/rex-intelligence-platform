@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.0-alpha] — Phase 16A Production Hardening / End-to-End Workflow Audit
+
+里程碑版本：Rename 與 Move 兩條主流程均完成安全閉環（planning → approval →
+明確執行指令 → transaction log → read-only 預覽 → 明確回滾指令 → log cleanup），
+本階段不新增功能，對全平台做生產化前稽核。
+
+### Added
+- `tests/test_end_to_end_workflow_audit.py` — 20 個稽核測試：
+  - **Rename full E2E happy path**：「整理檔名」→ RenamePlan + approval →（模糊文字/未核准均被擋）→「確認 {id}」dry-run →「確認改名 {id}」真實改名 → rename transaction log →「預覽回滾改名」read-only（byte-level）→「回滾改名」復原 → 第二次回滾不重複執行。
+  - **Move full E2E happy path**：「整理資料夾」→ MovePlan + approval →（模糊文字/未核准均被擋）→「確認 {id}」僅 dry-run →「確認搬移 {id}」真實搬移 → move transaction log →「預覽回滾搬移」read-only →「回滾搬移」復原 → 第二次回滾 `already_fully_rolled_back`。
+  - **指令邊界稽核**：「確認改名」不執行 move plan、「確認搬移」不執行 rename plan、preview / rollback 指令各自只作用對應 log（rename log 與 move log 完全分離）、「整理檔名」「整理資料夾」非破壞性（filesystem 快照）、6 種模糊指令（請幫我確認改名/確認搬移/回滾改名/回滾搬移、回滾一下、確認一下）絕不動檔案或 log。
+  - **Safety invariants**：mock_line destructive path 只經 bridge / by_id safe API（不可直接呼叫 low-level executors）；preview functions 不呼叫 rollback execution；prune functions 不呼叫 rename/move/rollback/filesystem API（AST）；六個指令 regex（確認改名/回滾改名/預覽回滾改名/確認搬移/回滾搬移/預覽回滾搬移）全數 `^…$` full match；cleanup 不接 Mock LINE。
+  - **Runtime 稽核**：三個 runtime JSON 均在 .gitignore；`git ls-files runtime/` 必須為空（測試汙染不會進入版本控制）。
+
+### Changed / Fixed
+- `.gitignore` + git index — **稽核發現並修正**：`runtime/approvals.json` 先前被 git 追蹤且未列入 .gitignore，導致每次跑測試後 approval store 出現未提交變更；已加入 .gitignore 並自 git index 移除（`git rm --cached`，本機檔案保留）。自此 runtime/ 三個 JSON 全數 gitignored 且不被追蹤。
+
+### Audit findings（記錄於 PROJECT_STATUS Known Limitations，留待 16B）
+- Rename 計畫以純檔名存放、Move 計畫的 `proposed_path` 為相對路徑，executor 以 CWD 解析：CWD ≠ SAFE_PDF_ROOT 時執行會以 `original_file_not_found` fail-safe 拒絕（不會誤改檔案），但路徑解析未錨定 SAFE_PDF_ROOT。
+- runtime log 路徑（rename / move transaction log、approval store）為各模組 hardcoded 預設，未整合 settings。
+
+### Recommended next phase
+- **Phase 16B — Runtime Settings Consolidation**（路徑錨定 + settings 整合）。
+
+---
+
 ## [v0.6.9-alpha] — Phase 15J Move Transaction Log Rotation / Cleanup
 
 ### Added

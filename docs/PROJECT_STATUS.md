@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.6.9-alpha |
-| **Test Count** | 524 passing |
+| **Current Version** | v0.7.0-alpha |
+| **Test Count** | 544 passing |
 | **Last Updated** | 2026-06-12 |
 
 ---
@@ -37,6 +37,22 @@
 | 15H | Move Rollback Preview Command | ✅ Complete |
 | 15I | Explicit Mock LINE Move Rollback Command | ✅ Complete |
 | 15J | Move Transaction Log Rotation / Cleanup | ✅ Complete |
+| 16A | Production Hardening / End-to-End Workflow Audit | ✅ Complete |
+
+---
+
+## Current Capability Snapshot（v0.7.0-alpha）
+
+**Rename capabilities**：RenamePlan → Approval → Confirm rename（「確認改名」）→ Transaction log → Rollback preview（「預覽回滾改名」）→ Rollback execution（「回滾改名」）→ Log cleanup（`prune_transactions`，14F）
+
+**Move capabilities**：MovePlan → Approval → Confirm move（「確認搬移」）→ Transaction log → Rollback preview（「預覽回滾搬移」）→ Rollback execution（「回滾搬移」）→ Log cleanup（`prune_transactions`，15J）
+
+**Safety rules（核心不變式，均有 E2E / AST / regex 稽核測試，16A）**：
+- Destructive commands require full match — 六個指令 regex 全數 `^…$` 錨定。
+- Dry-run planning commands never mutate files — 「整理檔名」「整理資料夾」純產生計畫。
+- Preview commands never mutate files or logs — byte-level 驗證。
+- Cleanup never touches filesystem — 只動 log JSON，且不接 Mock LINE。
+- Runtime logs are gitignored — `runtime/approvals.json`、`runtime/rename_transactions.json`、`runtime/move_transactions.json` 均不被 git 追蹤。
 
 ---
 
@@ -154,8 +170,9 @@ WorkerRequest                                                               │
 
 ## Known Limitations / Not Yet Implemented
 
-- **Transaction log 無 rotation/壓縮** — 大量交易時 JSON 檔案會成長，Phase 14D+ 可加入 TTL 或 SQLite。
-- **log_path 由呼叫方指定** — 尚未整合到 settings.py 作為全域預設路徑。
+- **路徑解析依賴 CWD（16A 稽核發現）** — Rename 計畫以純檔名存放、Move 計畫的 `proposed_path` 為相對路徑，executor 以 CWD 解析；CWD ≠ SAFE_PDF_ROOT 時執行會以 `original_file_not_found` fail-safe 拒絕（不會誤改檔案），但路徑未錨定 SAFE_PDF_ROOT。建議於 **Phase 16B — Runtime Settings Consolidation** 處理。
+- **log_path 由呼叫方指定** — rename / move transaction log 與 approval store 的預設路徑為各模組 hardcoded，尚未整合到 settings.py 作為全域設定（同樣留待 16B）。
+- **Transaction log 無壓縮 / SQLite** — JSON persistence；大量交易時可於後續階段評估 TTL 進階策略或 SQLite。
 - Only Taipower electricity bills are fully supported for rename.
 - No multi-user / tenant isolation.
 - RenamePlan 透過 approval payload（JSON）持久化，無獨立 plan 儲存系統。
@@ -179,7 +196,7 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 16A — Production Hardening / End-to-End Workflow Audit**
+**Phase 16B — Runtime Settings Consolidation**
 
-- 端到端流程稽核：planning → approval → 確認搬移/改名 → 預覽回滾 → 回滾 全鏈路整合驗證與安全規則總盤點。
-- Production hardening：log_path / 預設路徑整合 settings、錯誤處理與邊界案例強化。
+- 將 runtime 路徑（approval store、rename / move transaction log）整合到 settings.py 全域設定。
+- 路徑錨定：rename / move 計畫的相對路徑解析錨定 SAFE_PDF_ROOT，移除 CWD 相依（16A 稽核發現）。

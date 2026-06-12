@@ -170,6 +170,7 @@ coverage_html_report/
 *.dump
 
 # Runtime artifacts (generated at run time, never commit)
+runtime/approvals.json
 runtime/rename_transactions.json
 runtime/move_transactions.json
 
