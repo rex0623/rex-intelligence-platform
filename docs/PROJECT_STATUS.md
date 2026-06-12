@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.1-alpha |
-| **Test Count** | 570 passing |
-| **Last Updated** | 2026-06-12 |
+| **Current Version** | v0.7.2-alpha |
+| **Test Count** | 606 passing |
+| **Last Updated** | 2026-06-13 |
 
 ---
 
@@ -39,6 +39,7 @@
 | 15J | Move Transaction Log Rotation / Cleanup | ✅ Complete |
 | 16A | Production Hardening / End-to-End Workflow Audit | ✅ Complete |
 | 16B | Runtime Settings Consolidation | ✅ Complete |
+| 16C | Operator UX / Command Help Text | ✅ Complete |
 
 ---
 
@@ -55,6 +56,28 @@
 - Cleanup never touches filesystem — 只動 log JSON，且不接 Mock LINE。
 - Runtime logs are gitignored — `runtime/approvals.json`、`runtime/rename_transactions.json`、`runtime/move_transactions.json` 均不被 git 追蹤。
 - Runtime paths are consolidated（16B）— 所有 runtime 路徑由 `app/core/config.py` 的 settings helpers 單一來源提供；相對路徑由 executor 層錨定 SAFE_PDF_ROOT，path traversal 以 `path_escapes_safe_root` fail-safe 拒絕。
+- Operator UX（16C）— 「說明 / 指令說明 / help / /help」回覆完整指令分類；錯誤 reason code 一律附中文說明與建議下一步（`humanize_reason()`）；execution / rollback / 核准回覆附下一步提示。
+
+---
+
+## Operator Commands Snapshot（Mock LINE，16C）
+
+| 分類 | 指令 | 動檔案？ |
+|------|------|---------|
+| Help | `說明` / `指令說明` / `help` / `/help` | ❌ 純文字回覆 |
+| Planning / Dry-run | `整理檔名` / `產生改名計畫` / `分析 PDF 並產生改名計畫` | ❌ 只產生計畫 |
+| Planning / Dry-run | `分析 PDF` / `分析 PDF 詳細` | ❌ 只讀取分析 |
+| Planning / Dry-run | `整理資料夾` / `產生搬移計畫` / `分析 PDF 並產生搬移計畫` / `產生資料夾歸檔計畫` | ❌ 只產生計畫 |
+| Approval | `確認 {approval_id}` | ❌ 只核准 + dry-run 報告 |
+| Approval | `取消 {approval_id}` | ❌ 取消 approval |
+| Rename execution | `確認改名 {approval_id}` | ✅ 真實改名（full match） |
+| Rename rollback | `預覽回滾改名 {transaction_id}` | ❌ 只預覽，不改檔案、不改 log |
+| Rename rollback | `回滾改名 {transaction_id}` | ✅ 真實回滾改名（full match、once-only） |
+| Move execution | `確認搬移 {approval_id}` | ✅ 真實搬移（full match） |
+| Move rollback | `預覽回滾搬移 {transaction_id}` | ❌ 只預覽，不搬檔案、不改 log |
+| Move rollback | `回滾搬移 {transaction_id}` | ✅ 真實回滾搬移（full match、once-only） |
+
+所有 ✅ 指令 regex 均 `^…$` 全錨定；模糊文字一律不觸發 destructive action（16A 稽核測試鎖定）。
 
 ---
 
@@ -77,7 +100,7 @@
 | Safe Rename Executor | `app/filename/executor.py` | 真實更名執行、交易建立、rollback、rollback_by_id（14B/14C） |
 | Transaction Log | `app/filename/transaction_log.py` | JSON 持久化 RenameTransaction，支援 save/load/list/update/mark；含 read-only `preview_rollback_transaction()`（14D-3A）與 `prune_transactions()` 維運清理 API（14F） |
 | Approval Bridge | `app/filename/approval_bridge.py` | 受控 application-layer bridge：approved + validated plan → execute_rename_plan()（14D-1） |
-| Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）、「確認搬移 {approval_id}」（15G，唯一真實搬移入口，走 move approval bridge）、「預覽回滾搬移 {transaction_id}」（15H，read-only）、「回滾搬移 {transaction_id}」（15I，唯一真實 move rollback 入口，走 `rollback_move_transaction_by_id()`）指令 |
+| Mock LINE CLI | `scripts/mock_line.py` | Local CLI simulator for AI Router；含明確「確認改名 {approval_id}」（14D-2）、「預覽回滾改名 {transaction_id}」（14D-3A）、「回滾改名 {transaction_id}」（14D-3B）、「確認搬移 {approval_id}」（15G，唯一真實搬移入口，走 move approval bridge）、「預覽回滾搬移 {transaction_id}」（15H，read-only）、「回滾搬移 {transaction_id}」（15I，唯一真實 move rollback 入口，走 `rollback_move_transaction_by_id()`）指令；16C 起含「說明 / 指令說明 / help / /help」純文字 help 指令、`humanize_reason()` 錯誤 reason 中文說明、execution / rollback / 核准回覆下一步提示 |
 | Folder Intelligence | `app/folder_intelligence/` | MovePlan 產生（planner/template/validator/formatter）；planning 不碰 filesystem（15A）；已接 router/worker/approval/dry-run（15B）；read-only preflight 與 execution schemas（15C） |
 | Safe Move Executor | `app/folder_intelligence/executor.py` | `execute_move_plan(plan, transaction_log=None)` — 唯一可真實搬移檔案的入口；preflight gate → 執行期檢查 → mkdir + move → rollback_from/rollback_to（15D）；可選持久化 transaction、`build_move_transaction()`、`rollback_move_transaction()`、`rollback_move_transaction_by_id()`（15E）；未接 Mock LINE |
 | Move Transaction Log | `app/folder_intelligence/transaction_log.py` | JSON 持久化 MoveTransaction，支援 save/load/list/update/mark（15E）；建議路徑 `runtime/move_transactions.json`（已列入 .gitignore）；含 read-only `preview_move_rollback_transaction()` / `preview_move_rollback_transaction_by_id()`（15H，接 Mock LINE「預覽回滾搬移」）與 `prune_transactions()` / `prune_move_transactions()` 維運清理 API（15J，未接 Mock LINE） |
@@ -168,6 +191,9 @@ WorkerRequest                                                               │
 52. **Move log prune 永不刪除可回滾交易（15J）** — `prune_transactions()` 對含 success action 的交易一律保留（protected，即使過期）；無法解析的 entry / 整檔 invalid JSON 永不刪除且不覆寫；只動 log JSON、不檢查 filesystem、不搬移、不回滾、不建資料夾、不改 action status；dry_run 與無可刪項目時不重寫檔案；保留的 entry 以 raw 形式原樣保留（未知欄位不丟失）。
 53. **Move log prune 僅為維運 API（15J）** — 未接任何 Mock LINE 指令（測試驗證原始碼不含 prune）；「確認搬移」「預覽回滾搬移」「回滾搬移」行為完全不變。
 54. **Runtime 路徑單一來源 + SAFE_PDF_ROOT 錨定（16B）** — runtime 路徑（approval store、rename / move transaction log）只定義在 `app/core/config.py`（測試掃描 app/ 與 scripts/ 不得 hardcode）；executor 層相對路徑一律經 `resolve_under_safe_root()` 錨定 SAFE_PDF_ROOT（純字串正規化、不碰 filesystem）；相對路徑逃出 root → executor 以 failed reason `path_escapes_safe_root` fail-safe 拒絕，不操作任何檔案；絕對路徑語意不變。
+55. **Help 指令純文字（16C）** — 「說明」「指令說明」「help」「/help」full match 才觸發；只回覆指令說明文字，不建立 approval、不讀寫 transaction log、不碰任何檔案、不進入 router / planning / execution / rollback 任何路徑（零副作用，測試驗證）。
+56. **錯誤訊息只改文字、不改 reason（16C）** — `humanize_reason()` 在輸出層為 reason code 附中文說明與建議下一步，原始 code 一律保留方便 debug；底層 result reason、bridge gates、once-only guard 行為完全不變；未知 code 安全顯示不 raise。
+57. **下一步提示不改變流程（16C）** — execution 成功回覆附「預覽回滾改名/搬移」「回滾改名/搬移」提示；preview 回覆明示 read-only；核准（「確認 {approval_id}」）回覆明示不會改名/搬移並提示明確執行指令；MovePlan 產生回覆維持 15B 不變式（不直接提示「確認搬移」，改以「指令說明」導引）。
 
 ---
 
@@ -194,14 +220,15 @@ WorkerRequest                                                               │
 - Move rollback once-only 以 preview 的可回滾狀態判斷：部分回滾失敗的 action 保持 `success`，可重試；但若檔案已被外部移走，重試仍會以 `rollback_source_not_found` 失敗（需人工處理）。
 - Move log prune（15J）為手動維運 API，無自動排程；條件以 transaction 為單位（created_at），不支援 plan_id 或 action 層級篩選、不支援 max_transactions 上限（rename 14F 有）。
 - Move dry-run 顯示尚未掛 preflight summary：approval payload 內序列化的 plan status 仍為 `pending_approval`（核准狀態在 Approval Engine）；move bridge 在執行時同步 status，但 dry-run 顯示整合仍未做。
-- 「產生搬移計畫」的回覆未提示「確認搬移」指令（僅提示「確認 {approval_id}」核准 dry-run）；使用者需自行得知執行指令格式。
+- 「產生搬移計畫」的回覆仍不直接提示「確認搬移」指令（15B 測試不變式）；16C 起改以「指令說明」導引，且核准後的 dry-run 報告會明確提示「確認搬移 {approval_id}」。
+- Help text 為靜態維護文字（16C）：新增指令時需手動同步 `command_help_text()`，無自動由 regex 清單產生。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 16C — Operator UX / Command Help Text**
+**Phase 16D — Packaging / CLI Smoke Test**
 
-- Mock LINE 指令說明 / help text：列出可用指令、格式與安全語意（哪些是 dry-run、哪些需要 full match）。
-- 錯誤回覆的操作指引一致化（找不到 approval / transaction 時提示正確指令格式）。
+- 套件化與安裝流程驗證（poetry build / 入口點）。
+- CLI smoke test：以乾淨環境跑過 help → planning → approval → dry-run 全鏈，確認非開發機也能操作。

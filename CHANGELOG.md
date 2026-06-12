@@ -5,6 +5,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.2-alpha] — Phase 16C Operator UX / Command Help Text
+
+本階段只改善人機互動文字（help、錯誤訊息、下一步提示）：
+未新增任何 destructive action、未新增真實執行指令、未改變既有 Mock LINE 指令語意、
+未放寬 full match 規則、未修改 transaction log 行為。
+
+### Added
+- `scripts/mock_line.py`
+  - Help 指令：「說明」「指令說明」「help」「/help」（full match 才生效；`_HELP_PATTERN`）。
+    `command_help_text()` 純文字回覆，列出 Planning / Approval / Rename execution /
+    Rename rollback / Move execution / Move rollback / 安全提醒七大分類，
+    明確標示哪些指令會動檔案、哪些只是 dry-run / preview；零副作用
+    （不建立 approval、不讀寫 transaction log、不碰任何檔案、不進 router）。
+  - `humanize_reason(reason)`：17 個 reason code（approval_not_found、
+    approval_not_approved、not_move_plan、not_rename_plan、already_executed、
+    transaction_not_found、no_rollbackable_actions、already_fully_rolled_back、
+    target_file_already_exists、original_file_not_found、rollback_source_not_found、
+    rollback_target_already_exists、validation_has_blocked_candidates、
+    path_escapes_safe_root、plan_not_approved、missing_validation_report、
+    invalid_move_plan_payload）附中文說明與建議下一步；保留原始 code 方便 debug；
+    未知 code 安全顯示不 raise。
+- `tests/test_operator_help_text.py` — 16 個新測試（四種 help 指令 full match、
+  模糊文字不觸發 help、七大分類涵蓋、destructive / non-destructive 標示、
+  help 零副作用：不建 approval、不碰 transaction log、不改名不搬移檔案）。
+- `tests/test_operator_error_messages.py` — 20 個新測試（reason code 中文說明
+  與未知 code 安全顯示、錯誤回覆同時帶 code 與中文（整合）、execution 成功回覆
+  的 preview / rollback 下一步提示、preview 回覆 read-only 明示、rollback 成功
+  回覆 once-only 提示、「確認 {id}」核准回覆明示不會改名 / 搬移並提示明確執行
+  指令、MovePlan 產生回覆維持「不直接提示確認搬移」不變式）。
+
+### Changed（只改回覆文字，不改執行流程）
+- `scripts/mock_line.py`
+  - 錯誤回覆統一附「- 原因：{reason}：{中文說明}」（找不到 approval / 尚未核准 /
+    已執行過 / 非對應計畫 / bridge gate 拒絕 / 找不到 transaction / 無可回滾 /
+    已全部回滾）；檔案結果列的 reason 一律經 `humanize_reason()`。
+  - 「確認改名」「確認搬移」成功回覆附下一步提示：「預覽回滾改名/搬移 {tx}」
+    （只預覽，不會動檔案）與「回滾改名/搬移 {tx}」（會真的復原）。
+  - 「預覽回滾改名」「預覽回滾搬移」回覆加註「預覽不會修改任何檔案或 transaction
+    log」與 full match 提醒。
+  - 「回滾改名」「回滾搬移」成功回覆加註「已完成回滾」與「同一 transaction_id
+    不會重複回滾（once-only）」。
+  - RenamePlan / MovePlan 產生回覆明示「確認 {id}」只核准 + dry-run、不會動檔案，
+    並導引「指令說明」；MovePlan 回覆維持 15B 不變式（不直接出現「確認搬移」）。
+- `app/router/ai_router.py` — 「確認 {approval_id}」的 dry-run 報告附帶
+  `approval_id`（純顯示用途），讓核准回覆能提示「確認改名 {id}」「確認搬移 {id}」
+  明確執行指令；dry-run 報告內容與核准流程不變。
+
+### Safety guarantees
+- 未新增 destructive action、未新增真實執行指令；六個 destructive / preview
+  regex 與 full match 規則零變更（16A 稽核測試持續鎖定）。
+- Help 指令零副作用（測試以 approval store / transaction log / filesystem
+  snapshot 驗證）。
+- 底層 result reason code 完全不變，只改輸出文字。
+- 所有測試使用 tmp_path / monkeypatch，runtime JSON 持續 gitignored。
+
+### Recommended next phase
+- **Phase 16D — Packaging / CLI Smoke Test**。
+
+---
+
 ## [v0.7.1-alpha] — Phase 16B Runtime Settings Consolidation
 
 ### Added

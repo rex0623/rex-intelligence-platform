@@ -167,8 +167,11 @@ def _format_rename_plan(response: dict) -> str:
     if approval_id:
         lines.append("")
         lines.append(f"若要確認，請輸入：確認 {approval_id}")
+        lines.append(f"（「確認 {approval_id}」只會核准並顯示 dry-run 報告，不會實際改名任何檔案）")
         lines.append(f"若要取消，請輸入：取消 {approval_id}")
         lines.append(f"核准後若要實際執行改名，請輸入：確認改名 {approval_id}")
+        lines.append("（只有「確認改名」會真的改名檔案，且指令必須完整輸入）")
+        lines.append("輸入「指令說明」可查看完整指令列表。")
 
     return "\n".join(lines)
 
@@ -195,8 +198,131 @@ def _format_move_plan_response(response: dict) -> str:
         lines.append("")
         lines.append(f"- approval_id：{approval_id}")
         lines.append(f"若要核准此搬移計畫（僅 dry-run 報告），請輸入：確認 {approval_id}")
+        lines.append(f"（「確認 {approval_id}」只會核准並顯示 dry-run 報告，不會搬移任何檔案）")
         lines.append(f"若要取消，請輸入：取消 {approval_id}")
+        lines.append("輸入「指令說明」可查看完整指令列表。")
     return "\n".join(lines)
+
+# ---------------------------------------------------------------------------
+# Phase 16C — Operator help text（純文字回覆，不觸發任何 planning / execution）
+# ---------------------------------------------------------------------------
+
+# Help 指令格式：「說明」「指令說明」「help」「/help」（full match 才生效）。
+# 「請給我指令說明」「說明一下」等模糊文字不匹配，照常走 router。
+_HELP_PATTERN = re.compile(r"^(?:說明|指令說明|help|/help)$", re.IGNORECASE)
+
+
+def command_help_text() -> str:
+    """Return the operator command help text (Phase 16C).
+
+    Pure formatting only — never creates approvals, never reads or writes
+    transaction logs, never renames or moves files.
+    """
+    return "\n".join([
+        "小雷收到：目前可用指令說明",
+        "",
+        "一、Planning / Dry-run（只產生計畫與報告，不會動任何檔案）：",
+        "  - 整理檔名 / 產生改名計畫 / 分析 PDF 並產生改名計畫",
+        "  - 分析 PDF / 分析 PDF 詳細",
+        "  - 整理資料夾 / 產生搬移計畫 / 分析 PDF 並產生搬移計畫 / 產生資料夾歸檔計畫",
+        "",
+        "二、Approval（只核准計畫，仍不會動任何檔案）：",
+        "  - 確認 {approval_id}：只核准 approval；對改名 / 搬移計畫只顯示 dry-run 報告，",
+        "    不會真實改名或搬移任何檔案",
+        "  - 取消 {approval_id}：取消尚未核准的 approval",
+        "",
+        "三、Rename execution（會真的改名檔案）：",
+        "  - 確認改名 {approval_id}",
+        "",
+        "四、Rename rollback：",
+        "  - 預覽回滾改名 {transaction_id}：只預覽，不改檔案、不改 log",
+        "  - 回滾改名 {transaction_id}：會真的回滾改名（把檔名復原）",
+        "",
+        "五、Move execution（會真的搬移檔案）：",
+        "  - 確認搬移 {approval_id}",
+        "",
+        "六、Move rollback：",
+        "  - 預覽回滾搬移 {transaction_id}：只預覽，不搬檔案、不改 log",
+        "  - 回滾搬移 {transaction_id}：會真的回滾搬移（把檔案搬回原位）",
+        "",
+        "七、安全提醒：",
+        "  - execution / rollback 指令必須完整輸入（full match），格式不符不會執行",
+        "  - 模糊文字（例如「請幫我確認改名」「回滾一下」）不會觸發任何 destructive action",
+        "  - 建議先輸入預覽指令確認內容，再執行回滾",
+    ])
+
+
+# ---------------------------------------------------------------------------
+# Phase 16C — Reason code 中文說明（只改善輸出文字，不改變底層 result reason）
+# ---------------------------------------------------------------------------
+
+# reason code → 中文說明與建議下一步。輸出時保留原始 code 方便 debug。
+_REASON_EXPLANATIONS = {
+    "approval_not_found": (
+        "找不到這筆核准資料，請確認 approval_id 是否正確，或重新產生計畫。"
+    ),
+    "approval_not_approved": (
+        "這筆 approval 尚未核准，請先輸入「確認 {approval_id}」（替換為實際 ID）核准計畫。"
+    ),
+    "not_move_plan": (
+        "這筆 approval 的內容不是搬移計畫，「確認搬移」只能用於 MovePlan。"
+    ),
+    "not_rename_plan": (
+        "這筆 approval 的內容不是改名計畫，「確認改名」只能用於 RenamePlan。"
+    ),
+    "already_executed": (
+        "這筆核准已執行過，系統不會重複執行；如需復原請查詢 transaction_id，"
+        "或重新產生計畫。"
+    ),
+    "transaction_not_found": (
+        "找不到這筆交易紀錄，請確認 transaction_id 是否正確。"
+    ),
+    "no_rollbackable_actions": (
+        "這筆交易目前沒有可回滾項目，無需執行回滾。"
+    ),
+    "already_fully_rolled_back": (
+        "這筆交易已全部回滾，系統不會重複回滾。"
+    ),
+    "target_file_already_exists": (
+        "目標檔案已存在，為避免覆寫，系統已停止該筆操作。"
+    ),
+    "original_file_not_found": (
+        "找不到原始檔案，可能已被移動或刪除，請重新產生計畫。"
+    ),
+    "rollback_source_not_found": (
+        "找不到要回滾的來源檔案，可能已被移動或刪除，該筆無法回滾。"
+    ),
+    "rollback_target_already_exists": (
+        "回滾目標位置已有檔案，為避免覆寫，該筆回滾已停止。"
+    ),
+    "validation_has_blocked_candidates": (
+        "計畫包含 blocked candidate，系統拒絕執行整份計畫，請重新產生計畫。"
+    ),
+    "path_escapes_safe_root": (
+        "路徑超出 SAFE_PDF_ROOT 安全範圍，系統已拒絕操作。"
+    ),
+    "plan_not_approved": (
+        "計畫尚未核准，請先輸入「確認 {approval_id}」（替換為實際 ID）核准計畫。"
+    ),
+    "missing_validation_report": (
+        "計畫缺少 validation_report，無法通過安全檢查，請重新產生計畫。"
+    ),
+    "invalid_move_plan_payload": (
+        "approval payload 無法還原成搬移計畫，請重新產生計畫。"
+    ),
+}
+
+
+def humanize_reason(reason: str) -> str:
+    """Format a result reason code as「code：中文說明與建議下一步」.
+
+    保留原始 reason code 方便 debug；未知 code 仍安全顯示，不會 raise。
+    """
+    explanation = _REASON_EXPLANATIONS.get(reason)
+    if explanation is None:
+        return f"{reason}：未知的原因代碼，請確認指令格式；若持續發生請保留此代碼回報。"
+    return f"{reason}：{explanation}"
+
 
 # ---------------------------------------------------------------------------
 # Phase 14D-2 — Explicit confirm rename command
@@ -271,12 +397,16 @@ def confirm_rename(
     """
     approval = approval_manager.get(approval_id)
     if approval is None:
-        return f"小雷收到：找不到 approval：{approval_id}"
+        return (
+            f"小雷收到：找不到 approval：{approval_id}\n"
+            f"- 原因：{humanize_reason('approval_not_found')}"
+        )
 
     if approval.status != "approved":
         return (
             f"小雷收到：approval {approval_id} 尚未核准（狀態：{approval.status}），"
-            f"請先輸入：確認 {approval_id}"
+            f"請先輸入：確認 {approval_id}\n"
+            f"- 原因：{humanize_reason('approval_not_approved')}"
         )
 
     # Once-only guard (Phase 14E)：同一 approval 成功執行過即不可重複執行。
@@ -286,6 +416,7 @@ def confirm_rename(
         executed_tx = payload.get("execution_transaction_id")
         lines = ["小雷收到：此改名計畫已執行過，不會重複執行"]
         lines.append(f"- approval_id：{approval_id}")
+        lines.append(f"- 原因：{humanize_reason('already_executed')}")
         if executed_tx:
             lines.append(f"- transaction_id：{executed_tx}")
             lines.append(f"如需復原，請輸入：預覽回滾改名 {executed_tx}")
@@ -294,7 +425,10 @@ def confirm_rename(
 
     plan = _payload_to_rename_plan(approval.payload)
     if plan is None:
-        return f"小雷收到：approval {approval_id} 的內容不是改名計畫，不支援「確認改名」"
+        return (
+            f"小雷收到：approval {approval_id} 的內容不是改名計畫，不支援「確認改名」\n"
+            f"- 原因：{humanize_reason('not_rename_plan')}"
+        )
 
     # Approval Engine 已核准此 approval，將核准狀態同步到 plan 物件，
     # 由 approval bridge 重新驗證所有 gate（validation_report、blocked_count）。
@@ -311,7 +445,10 @@ def confirm_rename(
         if len(reasons) == 1:
             reason = next(iter(reasons))
             if reason in _BRIDGE_REJECT_MESSAGES:
-                return f"小雷收到：{_BRIDGE_REJECT_MESSAGES[reason]}"
+                return (
+                    f"小雷收到：{_BRIDGE_REJECT_MESSAGES[reason]}\n"
+                    f"- 原因：{humanize_reason(reason)}"
+                )
 
     # 從 log 取回本次 plan 對應的 transaction_id（executor 內部建立）
     transaction_id = None
@@ -339,8 +476,16 @@ def confirm_rename(
         for i, r in enumerate(result.results, 1):
             entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
             if r.reason:
-                entry += f"（{r.reason}）"
+                entry += f"（{humanize_reason(r.reason)}）"
             lines.append(entry)
+    if result.success_count > 0 and transaction_id:
+        lines.append("下一步：")
+        lines.append(
+            f"- 可用「預覽回滾改名 {transaction_id}」查看回滾內容（只預覽，不會動檔案）"
+        )
+        lines.append(
+            f"- 可用「回滾改名 {transaction_id}」執行回滾（會真的把檔名復原）"
+        )
     return "\n".join(lines)
 
 
@@ -394,7 +539,7 @@ def _format_move_execution_response(
         for i, r in enumerate(result.results, 1):
             entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
             if r.reason:
-                entry += f"（{r.reason}）"
+                entry += f"（{humanize_reason(r.reason)}）"
             lines.append(entry)
             if r.rollback_from and r.rollback_to:
                 lines.append(f"      rollback_from：{r.rollback_from}")
@@ -403,8 +548,13 @@ def _format_move_execution_response(
     if result.rollback_available:
         lines.append("已建立 rollback 資訊。")
         if transaction_id:
-            lines.append(f"如需復原，請輸入：預覽回滾搬移 {transaction_id}")
-            lines.append(f"或輸入：回滾搬移 {transaction_id}")
+            lines.append("下一步：")
+            lines.append(
+                f"- 可用「預覽回滾搬移 {transaction_id}」查看回滾內容（只預覽，不會動檔案）"
+            )
+            lines.append(
+                f"- 可用「回滾搬移 {transaction_id}」執行回滾（會真的把檔案搬回原位）"
+            )
     return "\n".join(lines)
 
 
@@ -447,8 +597,8 @@ def _format_move_rollback_preview_response(preview, transaction_id: str) -> str:
     """Format a MoveRollbackPreview (or None) into the mock LINE reply."""
     if preview is None:
         return (
-            f"小雷收到：找不到 transaction：{transaction_id}"
-            f"（transaction_not_found）"
+            f"小雷收到：找不到 transaction：{transaction_id}\n"
+            f"- 原因：{humanize_reason('transaction_not_found')}"
         )
 
     lines = ["小雷收到：搬移回滾預覽"]
@@ -466,7 +616,7 @@ def _format_move_rollback_preview_response(preview, transaction_id: str) -> str:
             lines.append(
                 f"      狀態：{action.status}"
                 f" | 可回滾：{'是' if action.rollbackable else '否'}"
-                + (f"（{action.reason}）" if action.reason else "")
+                + (f"（{humanize_reason(action.reason)}）" if action.reason else "")
             )
             if action.rollback_from:
                 lines.append(f"      rollback_from：{action.rollback_from}")
@@ -478,8 +628,10 @@ def _format_move_rollback_preview_response(preview, transaction_id: str) -> str:
         else:
             lines.append("目前沒有可回滾項目。")
     lines.append("這只是預覽，尚未實際回滾任何檔案。")
+    lines.append("預覽不會修改任何檔案或 transaction log。")
     if preview.has_rollbackable_actions:
         lines.append(f"若要執行回滾，請輸入：回滾搬移 {preview.transaction_id}")
+        lines.append("（回滾指令必須完整輸入才會生效，且會真的把檔案搬回原位）")
     return "\n".join(lines)
 
 
@@ -527,13 +679,14 @@ def _format_move_rollback_execution_response(
         for i, r in enumerate(result.results, 1):
             entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
             if r.reason:
-                entry += f"（{r.reason}）"
+                entry += f"（{humanize_reason(r.reason)}）"
             lines.append(entry)
             if r.rollback_from and r.rollback_to:
                 lines.append(f"      rollback_from：{r.rollback_from}")
                 lines.append(f"      rollback_to：{r.rollback_to}")
     if result.success_count > 0:
         lines.append("已完成回滾搬移。")
+        lines.append("同一 transaction_id 不會重複回滾（once-only）。")
     return "\n".join(lines)
 
 
@@ -558,19 +711,20 @@ def rollback_move(
     )
     if preview is None:
         return (
-            f"小雷收到：找不到 transaction：{transaction_id}"
-            f"（transaction_not_found）"
+            f"小雷收到：找不到 transaction：{transaction_id}\n"
+            f"- 原因：{humanize_reason('transaction_not_found')}"
         )
     if not preview.has_rollbackable_actions:
         if preview.is_fully_rolled_back:
             return (
                 f"小雷收到：此交易已全部回滾"
                 f"（已回滾 {preview.already_rolled_back_count} 筆），"
-                f"不會重複回滾（already_fully_rolled_back）"
+                f"不會重複回滾\n"
+                f"- 原因：{humanize_reason('already_fully_rolled_back')}"
             )
         return (
-            f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
-            f"（no_rollbackable_actions）"
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目\n"
+            f"- 原因：{humanize_reason('no_rollbackable_actions')}"
         )
 
     result = rollback_move_transaction_by_id(transaction_id, move_transaction_log)
@@ -580,12 +734,12 @@ def rollback_move(
         reasons = {r.reason for r in result.results}
         if "transaction_not_found" in reasons:
             return (
-                f"小雷收到：找不到 transaction：{transaction_id}"
-                f"（transaction_not_found）"
+                f"小雷收到：找不到 transaction：{transaction_id}\n"
+                f"- 原因：{humanize_reason('transaction_not_found')}"
             )
         return (
-            f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
-            f"（no_rollbackable_actions）"
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目\n"
+            f"- 原因：{humanize_reason('no_rollbackable_actions')}"
         )
 
     return _format_move_rollback_execution_response(result, transaction_id)
@@ -617,6 +771,13 @@ def format_mock_response(worker_response: object) -> str:
                 lines.append(
                     f"注意：{worker_response.get('note', '本次沒有實際搬移任何檔案')}"
                 )
+                lines.append("此核准只產生 dry-run 報告，不會搬移任何檔案。")
+                approval_id = worker_response.get("approval_id")
+                if approval_id:
+                    lines.append(
+                        f"若要實際執行搬移，請輸入：確認搬移 {approval_id}"
+                        f"（會真的搬移檔案，指令必須完整輸入）"
+                    )
                 return "\n".join(lines)
 
             if worker_response.get("action") == "rename_plan":
@@ -633,6 +794,13 @@ def format_mock_response(worker_response: object) -> str:
                 for step in worker_response.get("steps", []):
                     lines.append(f"- {step.get('name')}：{step.get('result')}")
                 lines.append(f"注意：{worker_response.get('note', '本次沒有實際更名任何 PDF')}")
+                lines.append("此核准只產生 dry-run 報告，不會改名任何檔案。")
+                approval_id = worker_response.get("approval_id")
+                if approval_id:
+                    lines.append(
+                        f"若要實際執行改名，請輸入：確認改名 {approval_id}"
+                        f"（會真的改名檔案，指令必須完整輸入）"
+                    )
             else:
                 lines = ["小雷收到：workflow 已確認，以下是 dry-run 執行報告"]
                 for step in worker_response.get("steps", []):
@@ -704,7 +872,10 @@ def preview_rollback(
 
     preview = preview_rollback_transaction(transaction_id, transaction_log)
     if preview is None:
-        return f"小雷收到：找不到 transaction：{transaction_id}"
+        return (
+            f"小雷收到：找不到 transaction：{transaction_id}\n"
+            f"- 原因：{humanize_reason('transaction_not_found')}"
+        )
 
     lines = ["小雷收到：回滾預覽"]
     lines.append(f"- 交易 ID：{preview.transaction_id}")
@@ -730,6 +901,10 @@ def preview_rollback(
         else:
             lines.append("目前沒有可回滾項目。")
     lines.append("目前僅預覽，尚未執行回滾。")
+    lines.append("預覽不會修改任何檔案或 transaction log。")
+    if preview.has_rollbackable_actions:
+        lines.append(f"若要執行回滾，請輸入：回滾改名 {preview.transaction_id}")
+        lines.append("（回滾指令必須完整輸入才會生效，且會真的把檔名復原）")
     return "\n".join(lines)
 
 
@@ -751,14 +926,21 @@ def rollback_rename(
     # 沒有可回滾 action 時完全不進入 rollback 執行路徑（不動檔案、不寫 log）。
     preview = preview_rollback_transaction(transaction_id, transaction_log)
     if preview is None:
-        return f"小雷收到：找不到 transaction：{transaction_id}"
+        return (
+            f"小雷收到：找不到 transaction：{transaction_id}\n"
+            f"- 原因：{humanize_reason('transaction_not_found')}"
+        )
     if not preview.has_rollbackable_actions:
         if preview.is_fully_rolled_back:
             return (
                 f"小雷收到：此交易已回滾完成"
-                f"（已回滾 {preview.rolled_back_count} 筆），沒有可回滾項目"
+                f"（已回滾 {preview.rolled_back_count} 筆），沒有可回滾項目\n"
+                f"- 原因：{humanize_reason('already_fully_rolled_back')}"
             )
-        return f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+        return (
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目\n"
+            f"- 原因：{humanize_reason('no_rollbackable_actions')}"
+        )
 
     result = rollback_transaction_by_id(transaction_id, transaction_log)
 
@@ -766,8 +948,14 @@ def rollback_rename(
         # 理論上 preview guard 已擋掉；保留原行為作為防護
         reasons = {r.reason for r in result.results}
         if "transaction_not_found" in reasons:
-            return f"小雷收到：找不到 transaction：{transaction_id}"
-        return f"小雷收到：transaction {transaction_id} 沒有可回滾項目"
+            return (
+                f"小雷收到：找不到 transaction：{transaction_id}\n"
+                f"- 原因：{humanize_reason('transaction_not_found')}"
+            )
+        return (
+            f"小雷收到：transaction {transaction_id} 沒有可回滾項目\n"
+            f"- 原因：{humanize_reason('no_rollbackable_actions')}"
+        )
 
     lines = ["小雷收到：已執行回滾改名"]
     lines.append(f"- transaction_id：{transaction_id}")
@@ -782,8 +970,11 @@ def rollback_rename(
         for i, r in enumerate(result.results, 1):
             entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
             if r.reason:
-                entry += f"（{r.reason}）"
+                entry += f"（{humanize_reason(r.reason)}）"
             lines.append(entry)
+    if result.success_count > 0:
+        lines.append("已完成回滾改名。")
+        lines.append("同一 transaction_id 不會重複回滾（once-only）。")
     return "\n".join(lines)
 
 
@@ -793,6 +984,12 @@ def mock_line_payload(
     move_transaction_log=None,
 ) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    # Operator help (Phase 16C): exact「說明」「指令說明」「help」「/help」only.
+    # 純文字回覆：不建立 approval、不讀寫 transaction log、不碰任何檔案，
+    # 也不會進入 router / planning / execution / rollback 任何路徑。
+    if _HELP_PATTERN.match(text.strip()):
+        return command_help_text()
+
     # Explicit confirm move (Phase 15G): exact「確認搬移 {approval_id}」only.
     # 唯一可觸發真實搬移的指令；其他文字（含「確認」「搬移」「整理資料夾」
     # 「產生搬移計畫」「確認改名」）一律不會進入 move 執行路徑。

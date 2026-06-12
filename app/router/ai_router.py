@@ -353,6 +353,9 @@ class AIRouter:
                 }
 
             report = workflow_executor.execute_dry_run(approval.payload)
+            # Phase 16C：附帶 approval_id 讓回覆層能提示後續明確執行指令；
+            # 純顯示用途，不影響 dry-run 報告內容與核准流程。
+            report["approval_id"] = approval_id
             return {
                 "status": "success",
                 "user_id": user_id,
