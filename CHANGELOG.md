@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.5-alpha] — Phase 15F Move Approval-to-Execution Bridge
+
+### Added
+- `app/folder_intelligence/approval_bridge.py` — 受控 approval-to-execution bridge（仿照 rename 的 14D-1），底層 API、未接 Mock LINE：
+  - `execute_approved_move_plan(approval_payload, transaction_log=None) -> MoveExecutionResult`：驗證 payload 為 move plan（`plan_type == "move_plan"` 或 `type == "move_plan"`，否則 `not_move_plan`）→ 還原 MovePlan（支援 nested plan dict 與 15B 扁平 payload 兩種格式，無法還原 → `invalid_move_plan_payload`）→ 將 plan.status 同步為 `"approved"`（保留 validation_report、不破壞 candidates）→ 委派 `execute_move_plan(plan, transaction_log=...)`；提供 log 時持久化 MoveTransaction，未提供時行為不變。
+  - `execute_approved_move_by_approval_id(approval_id, approval_manager, transaction_log=None) -> MoveExecutionResult`：approval-level gates 依序為 `approval_not_found` → `not_move_plan` → `approval_not_approved` → `already_executed`（once-only guard：payload 已有 `execution_status == "executed"` 即拒絕，不重複搬移）；通過後委派 `execute_approved_move_plan()`；至少一筆搬移成功才透過既有 `approval_manager.mark_executed()`（14E 機制）回寫 `execution_status="executed"` / `executed_at` / `execution_transaction_id`（有提供 log 時）；全數失敗（檔案未動）不標記，允許重試。
+  - `default_move_transaction_log() -> MoveTransactionLog`：預設路徑 `runtime/move_transactions.json`（已列入 .gitignore）；測試一律使用 tmp_path。
+- `app/folder_intelligence/__init__.py` — 匯出 `execute_approved_move_plan`、`execute_approved_move_by_approval_id`、`default_move_transaction_log`。
+- `tests/test_move_approval_bridge.py` — 24 個新測試（non-move payload 拒絕、invalid payload 拒絕、nested/flattened payload 還原、status 同步為 approved 且不破壞 candidates/validation_report、low-risk tmp_path 真實搬移、有/無 transaction_log 行為、approval_not_found、非 move approval 拒絕、未核准拒絕、核准後執行、execution_status / executed_at / execution_transaction_id 回寫、once-only guard 不重複執行、重複呼叫不再搬移檔案且不新增 transaction、high risk 仍跳過且不標記 executed、blocked validation 仍拒絕、目標 collision 仍拒絕且不覆寫、Mock LINE 不含任何 move bridge/executor/rollback 引用、無「確認搬移」、無 move rollback 指令、AST 驗證 bridge 不直接碰 filesystem）。
+
+### Safety guarantees
+- Bridge 不直接碰檔案系統 — 一律委派 `execute_move_plan()`（AST 測試驗證無 rename/move/replace/mkdir 呼叫）。
+- Once-only guard：同一 approval_id 成功執行後不可重複搬移（`already_executed`）。
+- Mock LINE 仍不可觸發真實搬移或 move rollback：沒有「確認搬移」、沒有 move rollback 指令，原始碼不含 `execute_approved_move_plan` / `execute_approved_move_by_approval_id` / `execute_move_plan` / `rollback_move_transaction` / `MoveTransactionLog`（測試驗證）。
+- 所有真實 move 測試使用 pytest tmp_path；approval store 與 transaction log 均隔離，不污染 runtime/。
+
+### Recommended next phase
+- **Phase 15G — Explicit Mock LINE Confirm Move Command**。
+
+---
+
 ## [v0.6.4-alpha] — Phase 15E Move Transaction Log / Rollback Foundation
 
 ### Added

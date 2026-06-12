@@ -7,6 +7,11 @@ must be called explicitly with an approved, validated MovePlan, and is
 NOT wired to Mock LINE or any fuzzy command.
 """
 
+from app.folder_intelligence.approval_bridge import (
+    default_move_transaction_log,
+    execute_approved_move_by_approval_id,
+    execute_approved_move_plan,
+)
 from app.folder_intelligence.executor import (
     build_move_transaction,
     execute_move_plan,
@@ -41,6 +46,9 @@ __all__ = [
     "MoveValidationReport",
     "build_move_plan",
     "build_move_transaction",
+    "default_move_transaction_log",
+    "execute_approved_move_by_approval_id",
+    "execute_approved_move_plan",
     "execute_move_plan",
     "rollback_move_transaction",
     "rollback_move_transaction_by_id",
