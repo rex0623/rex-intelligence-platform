@@ -453,24 +453,33 @@ def test_target_collision_still_rejected(tmp_path, manager):
 # ---------------------------------------------------------------------------
 
 
-def test_mock_line_does_not_call_move_bridge_or_executor():
+def test_mock_line_uses_bridge_not_executor():
+    """Phase 15G 起 Mock LINE 透過「確認搬移」呼叫 approval_id bridge，
+    但不可直接接 executor、rollback API 或 payload-level bridge。"""
     source = inspect.getsource(mock_line_module)
-    assert "execute_approved_move_plan" not in source
-    assert "execute_approved_move_by_approval_id" not in source
+    assert "execute_approved_move_by_approval_id" in source  # 15G 唯一執行路徑
+    assert "execute_approved_move_plan" not in source  # payload-level bridge 不直接接
     assert "execute_move_plan" not in source
     assert "rollback_move_transaction" not in source
     assert "MoveTransactionLog" not in source
 
 
-def test_mock_line_has_no_confirm_move_command():
+def test_mock_line_has_no_move_rollback_command_regex():
+    """提示訊息可提及「回滾搬移」尚未開放，但不可存在可執行的指令 regex。"""
     source = inspect.getsource(mock_line_module)
-    assert "確認搬移" not in source
-
-
-def test_mock_line_has_no_move_rollback_command():
-    source = inspect.getsource(mock_line_module)
-    assert "回滾搬移" not in source
-    assert "預覽回滾搬移" not in source
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "compile"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            pattern = node.args[0].value
+            assert "回滾搬移" not in pattern
+            assert "預覽回滾搬移" not in pattern
 
 
 def test_bridge_module_never_touches_filesystem_ast():

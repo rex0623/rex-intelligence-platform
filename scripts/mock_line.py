@@ -19,8 +19,12 @@ from app.filename.transaction_log import (
     RenameTransactionLog,
     preview_rollback_transaction,
 )
+from app.folder_intelligence.approval_bridge import (
+    default_move_transaction_log,
+    execute_approved_move_by_approval_id,
+)
 from app.folder_intelligence.formatter import format_move_plan_for_cli
-from app.folder_intelligence.schemas import MovePlan
+from app.folder_intelligence.schemas import MoveExecutionResult, MovePlan
 from app.router.ai_router import AIRouter
 from app.schemas.messages import WorkerRequest
 from app.workers.pdf_worker import PDFWorker
@@ -206,6 +210,12 @@ _PREVIEW_ROLLBACK_PATTERN = re.compile(r"^預覽回滾改名\s+(\S+)$")
 # 「回滾」「回滾改名」「確認」「好」「OK」「執行」或附加多餘文字均不匹配。
 _ROLLBACK_RENAME_PATTERN = re.compile(r"^回滾改名\s+(\S+)$")
 
+# 唯一可觸發真實搬移的指令格式（Phase 15G）：「確認搬移 {approval_id}」。
+# full match 才生效；「確認」「搬移」「確認搬移」「確認搬移一下 …」
+# 「請幫我確認搬移 …」「整理資料夾」「產生搬移計畫」均不匹配。
+# 沒有任何 move rollback 指令。
+_CONFIRM_MOVE_PATTERN = re.compile(r"^確認搬移\s+([A-Za-z0-9_-]+)$")
+
 _DEFAULT_TRANSACTION_LOG_PATH = (
     Path(__file__).resolve().parent.parent / "runtime" / "rename_transactions.json"
 )
@@ -320,6 +330,97 @@ def confirm_rename(
                 entry += f"（{r.reason}）"
             lines.append(entry)
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Phase 15G — Explicit confirm move command
+# ---------------------------------------------------------------------------
+
+# Move bridge 的拒絕理由 → 使用者訊息（bridge-level 與 plan-level gates）
+_MOVE_REJECT_MESSAGES = {
+    "approval_not_found": "找不到 approval",
+    "not_move_plan": "approval 的內容不是搬移計畫，不支援「確認搬移」",
+    "approval_not_approved": "approval 尚未核准，請先輸入：確認 {approval_id}",
+    "already_executed": "此搬移計畫已執行過，不會重複執行",
+    "invalid_move_plan_payload": "approval payload 無法還原搬移計畫，無法執行",
+    "plan_not_approved": "搬移計畫尚未核准，無法執行",
+    "missing_validation_report": "搬移計畫缺少 validation_report，無法執行",
+    "validation_has_blocked_candidates": "搬移計畫包含 blocked candidate，無法執行",
+}
+
+
+def _format_move_execution_response(
+    result: MoveExecutionResult,
+    approval_id: str,
+    transaction_id: str | None = None,
+) -> str:
+    """Format a MoveExecutionResult into the mock LINE reply."""
+    lines = ["小雷收到：搬移執行結果"]
+    lines.append(f"- approval_id：{approval_id}")
+    lines.append(f"- executed：{result.executed} | dry_run：{result.dry_run}")
+    lines.append(
+        f"- 總數：{result.total} 筆"
+        f" | 成功：{result.success_count} 筆"
+        f" | 失敗：{result.failed_count} 筆"
+        f" | 跳過：{result.skipped_count} 筆"
+        f" | blocked：{result.blocked_count} 筆"
+    )
+    if transaction_id:
+        lines.append(f"- transaction_id：{transaction_id}")
+
+    # 未執行且所有結果同一原因 → 顯示明確拒絕訊息
+    if not result.executed and result.results:
+        reasons = {r.reason for r in result.results}
+        if len(reasons) == 1:
+            reason = next(iter(reasons))
+            if reason in _MOVE_REJECT_MESSAGES:
+                message = _MOVE_REJECT_MESSAGES[reason].format(approval_id=approval_id)
+                lines.append(f"- 原因：{reason}（{message}）")
+
+    if result.results:
+        lines.append("檔案結果：")
+        for i, r in enumerate(result.results, 1):
+            entry = f"  [{i}] {r.original_path} → {r.proposed_path}：{r.status}"
+            if r.reason:
+                entry += f"（{r.reason}）"
+            lines.append(entry)
+            if r.rollback_from and r.rollback_to:
+                lines.append(f"      rollback_from：{r.rollback_from}")
+                lines.append(f"      rollback_to：{r.rollback_to}")
+
+    if result.rollback_available:
+        lines.append("已建立 rollback 資訊，但目前尚未開放 Mock LINE 回滾搬移指令。")
+    return "\n".join(lines)
+
+
+def confirm_move(
+    approval_id: str,
+    move_transaction_log=None,
+) -> str:
+    """Handle the explicit 「確認搬移 {approval_id}」 command (Phase 15G).
+
+    The only Mock LINE path that can trigger a real move.  All execution
+    goes through execute_approved_move_by_approval_id() (move approval
+    bridge), which enforces approval gates + once-only guard and delegates
+    to the safe move executor; this module never moves files itself.
+    """
+    if move_transaction_log is None:
+        move_transaction_log = default_move_transaction_log()
+
+    result = execute_approved_move_by_approval_id(
+        approval_id,
+        approval_manager,
+        transaction_log=move_transaction_log,
+    )
+
+    # 成功執行後 bridge 透過 mark_executed() 回寫 execution_transaction_id；
+    # already_executed 時 payload 也已帶有先前的 transaction_id。
+    transaction_id = None
+    approval = approval_manager.get(approval_id)
+    if approval is not None and approval.payload:
+        transaction_id = approval.payload.get("execution_transaction_id")
+
+    return _format_move_execution_response(result, approval_id, transaction_id)
 
 
 def format_mock_response(worker_response: object) -> str:
@@ -521,8 +622,19 @@ def rollback_rename(
 def mock_line_payload(
     text: str,
     transaction_log: RenameTransactionLog | None = None,
+    move_transaction_log=None,
 ) -> str:
     """Run the AI Router against a text input and return the mock LINE reply."""
+    # Explicit confirm move (Phase 15G): exact「確認搬移 {approval_id}」only.
+    # 唯一可觸發真實搬移的指令；其他文字（含「確認」「搬移」「整理資料夾」
+    # 「產生搬移計畫」「確認改名」）一律不會進入 move 執行路徑。
+    confirm_move_match = _CONFIRM_MOVE_PATTERN.match(text.strip())
+    if confirm_move_match:
+        return confirm_move(
+            confirm_move_match.group(1),
+            move_transaction_log=move_transaction_log,
+        )
+
     # Rollback preview (Phase 14D-3A): exact「預覽回滾改名 {transaction_id}」only
     preview_rollback_match = _PREVIEW_ROLLBACK_PATTERN.match(text.strip())
     if preview_rollback_match:

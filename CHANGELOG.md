@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.6-alpha] — Phase 15G Explicit Mock LINE Confirm Move Command
+
+### Added
+- `scripts/mock_line.py` — 明確「確認搬移 {approval_id}」指令（唯一可觸發真實搬移的 Mock LINE 入口）：
+  - `_CONFIRM_MOVE_PATTERN = ^確認搬移\s+([A-Za-z0-9_-]+)$`：full match 才生效；「確認」「搬移」「確認搬移」「確認搬移一下 …」「請幫我確認搬移 …」「整理資料夾」「產生搬移計畫」「確認改名」「回滾搬移」「預覽回滾搬移」均不觸發。
+  - `confirm_move(approval_id, move_transaction_log=None)`：一律透過 `execute_approved_move_by_approval_id()`（15F move approval bridge，含 approval gates + once-only guard + `mark_executed()` 回寫）；不直接呼叫 move executor；預設使用 `default_move_transaction_log()`（`runtime/move_transactions.json`）。
+  - `_format_move_execution_response()`：標題「搬移執行結果」、executed/dry_run、總數/成功/失敗/跳過/blocked、transaction_id（如有）、每筆 original_path → proposed_path / status / reason / rollback_from / rollback_to；`rollback_available=True` 時提示「已建立 rollback 資訊，但目前尚未開放 Mock LINE 回滾搬移指令」；未執行時顯示明確原因（approval_not_found / not_move_plan / approval_not_approved / already_executed / validation_has_blocked_candidates / target_file_already_exists / original_file_not_found 等）。
+  - `mock_line_payload(text, transaction_log=None, move_transaction_log=None)`：新增可選 move log 注入（測試用 tmp_path）。
+- `tests/test_mock_line_confirm_move.py` — 26 個新測試（明確指令觸發 bridge spy、tmp_path 真實搬移、transaction log 建立、response 標題/flags/counts/transaction_id/rollback 路徑/尚未開放提示、4 種模糊指令 + 「確認」不觸發搬移、planning 指令仍只 dry-run、「確認改名」拒絕 move plan、「回滾搬移」「預覽回滾搬移」不存在且不動檔案與 log、once-only guard 不重複搬移/不新增 transaction、approval_not_approved / approval_not_found / not_move_plan 回覆、目標 collision 不覆寫、high risk 跳過、blocked 不執行、import 掃描（必須有 bridge + default log、不可 import executor/rollback API）、AST 驗證無 move rollback 指令 regex）。
+
+### Changed
+- `tests/test_move_plan_workflow.py`、`tests/test_safe_move_executor.py`、`tests/test_move_transaction_log.py`、`tests/test_move_approval_bridge.py` — 15D/15E/15F 時代「Mock LINE 不可含『確認搬移』」的不變式更新為 15G 現實：「確認搬移」存在但必須走 bridge（`execute_approved_move_by_approval_id` in source、`execute_move_plan` not in source）；「回滾搬移」檢查由 raw substring 改為「不可存在可執行指令 regex」（提示訊息可提及尚未開放）。
+
+### Safety guarantees
+- 真實搬移唯一入口：「確認搬移 {approval_id}」full match；一律走 approval bridge（once-only guard 生效，同一 approval_id 不會重複搬移、不會新增第二筆 transaction）。
+- 「確認 {approval_id}」仍只核准並顯示 move dry-run 報告，不搬移。
+- Mock LINE 不直接呼叫 `execute_move_plan` / `rollback_move_transaction` / `rollback_move_transaction_by_id` / `MoveTransactionLog`（測試驗證）。
+- 沒有任何 move rollback 指令（「回滾搬移」「預覽回滾搬移」不存在）。
+- 所有真實搬移測試使用 pytest tmp_path；approval store 與 move log 均隔離。
+
+### Recommended next phase
+- **Phase 15H — Move Rollback Preview Command**。
+
+---
+
 ## [v0.6.5-alpha] — Phase 15F Move Approval-to-Execution Bridge
 
 ### Added

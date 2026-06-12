@@ -176,11 +176,14 @@ def test_move_planning_does_not_move_files(taipower_inbox, isolated_approvals, t
 
 
 def test_move_executor_not_wired_to_mock_line():
-    """Phase 15D 起 executor.py 存在，但 Mock LINE 不可接觸真實搬移。"""
+    """Phase 15G 起 Mock LINE 有「確認搬移」明確指令，但真實搬移只能
+    透過 approval bridge，不可直接呼叫 move executor。"""
     source = inspect.getsource(mock_line_module)
-    assert "確認搬移" not in source, "Mock LINE 不可有「確認搬移」指令"
+    assert "execute_approved_move_by_approval_id" in source, (
+        "「確認搬移」必須走 move approval bridge"
+    )
     assert "execute_move_plan" not in source, (
-        "Mock LINE 不可呼叫 move executor"
+        "Mock LINE 不可直接呼叫 move executor"
     )
 
 

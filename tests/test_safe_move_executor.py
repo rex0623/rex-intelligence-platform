@@ -367,13 +367,17 @@ def test_executor_fails_missing_proposed_path(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_mock_line_has_no_confirm_move_command_and_no_executor_wiring():
+def test_mock_line_confirm_move_goes_through_bridge_only():
+    """Phase 15G：「確認搬移」存在，但只能走 approval bridge，
+    不可直接接 move executor。"""
     import scripts.mock_line as mock_line_module
 
     source = inspect.getsource(mock_line_module)
-    assert "確認搬移" not in source, "Mock LINE 不可有「確認搬移」指令"
+    assert "execute_approved_move_by_approval_id" in source, (
+        "「確認搬移」必須走 move approval bridge"
+    )
     assert "execute_move_plan" not in source, (
-        "Mock LINE 不可呼叫 move executor"
+        "Mock LINE 不可直接呼叫 move executor"
     )
 
 

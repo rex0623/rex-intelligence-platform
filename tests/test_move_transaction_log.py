@@ -451,11 +451,12 @@ def test_failed_rollback_does_not_corrupt_log(tmp_path):
 
 
 def test_mock_line_has_no_move_rollback_wiring():
+    """Phase 15G 起 Mock LINE 有「確認搬移」，但仍無任何 move rollback 接線：
+    沒有「回滾搬移」/「預覽回滾搬移」可執行 regex、不引用 rollback API。
+    （提示訊息可提及「回滾搬移」尚未開放，故不檢查原始碼 raw substring。）"""
     import scripts.mock_line as mock_line_module
 
     source = inspect.getsource(mock_line_module)
-    assert "確認搬移" not in source, "Mock LINE 不可有「確認搬移」指令"
-    assert "回滾搬移" not in source, "Mock LINE 不可有 move rollback 指令"
     for symbol in (
         "execute_move_plan",
         "rollback_move_transaction",
@@ -463,6 +464,22 @@ def test_mock_line_has_no_move_rollback_wiring():
         "MoveTransactionLog",
     ):
         assert symbol not in source, f"Mock LINE 不可引用 {symbol}"
+
+    # 不可存在能匹配 move rollback 指令的 compiled regex
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "compile"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            pattern = node.args[0].value
+            assert "回滾搬移" not in pattern, (
+                f"Mock LINE 不可有 move rollback 指令 regex：{pattern}"
+            )
 
 
 def test_mock_line_rollback_command_only_targets_rename(tmp_path):
