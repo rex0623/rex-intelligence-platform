@@ -465,7 +465,8 @@ def test_mock_line_uses_bridge_not_executor():
 
 
 def test_mock_line_has_no_move_rollback_command_regex():
-    """提示訊息可提及「回滾搬移」尚未開放，但不可存在可執行的指令 regex。"""
+    """提示訊息可提及「回滾搬移」尚未開放、15H 起允許 read-only
+    「預覽回滾搬移」regex，但不可存在可執行的真實 rollback 指令 regex。"""
     source = inspect.getsource(mock_line_module)
     tree = ast.parse(source)
     for node in ast.walk(tree):
@@ -478,8 +479,9 @@ def test_mock_line_has_no_move_rollback_command_regex():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert "回滾搬移" not in pattern
-            assert "預覽回滾搬移" not in pattern
+            assert not pattern.lstrip("^").startswith("回滾搬移"), (
+                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
+            )
 
 
 def test_bridge_module_never_touches_filesystem_ast():

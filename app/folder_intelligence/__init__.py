@@ -27,11 +27,17 @@ from app.folder_intelligence.schemas import (
     MoveExecutionResult,
     MoveFileResult,
     MovePlan,
+    MoveRollbackPreview,
+    MoveRollbackPreviewAction,
     MoveTransaction,
     MoveTransactionAction,
     MoveValidationReport,
 )
-from app.folder_intelligence.transaction_log import MoveTransactionLog
+from app.folder_intelligence.transaction_log import (
+    MoveTransactionLog,
+    preview_move_rollback_transaction,
+    preview_move_rollback_transaction_by_id,
+)
 from app.folder_intelligence.validator import validate_move_plan
 
 __all__ = [
@@ -40,6 +46,8 @@ __all__ = [
     "MoveExecutionResult",
     "MoveFileResult",
     "MovePlan",
+    "MoveRollbackPreview",
+    "MoveRollbackPreviewAction",
     "MoveTransaction",
     "MoveTransactionAction",
     "MoveTransactionLog",
@@ -55,4 +63,6 @@ __all__ = [
     "validate_move_plan",
     "format_move_plan_for_cli",
     "preflight_move_plan",
+    "preview_move_rollback_transaction",
+    "preview_move_rollback_transaction_by_id",
 ]

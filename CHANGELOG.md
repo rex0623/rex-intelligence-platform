@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.6.7-alpha] — Phase 15H Move Rollback Preview Command
+
+### Added
+- `app/folder_intelligence/schemas.py` — `MoveRollbackPreviewAction`（original_path / new_path / rollback_from / rollback_to / status / rollbackable / reason）與 `MoveRollbackPreview`（transaction_id / total / rollbackable_count / already_rolled_back_count / failed_count / actions；property：`has_rollbackable_actions`、`is_fully_rolled_back`）。
+- `app/folder_intelligence/transaction_log.py` —
+  - `preview_move_rollback_transaction(transaction)`：read-only preview；success + rollback 路徑存在 → rollbackable；rolled_back → `already_rolled_back`；failed → `action_failed`；success 缺路徑 → `missing_rollback_paths`；pending → `action_pending`。
+  - `preview_move_rollback_transaction_by_id(transaction_id, transaction_log)`：載入持久化 transaction 後 preview；找不到 → None；不搬移、不建資料夾、不修改 transaction、不更新 log。
+- `scripts/mock_line.py` — read-only「預覽回滾搬移 {transaction_id}」指令：
+  - `_PREVIEW_MOVE_ROLLBACK_PATTERN = ^預覽回滾搬移\s+([A-Za-z0-9_-]+)$`：full match 才生效；「回滾搬移 …」「預覽搬移回滾 …」「請幫我預覽回滾搬移 …」「預覽回滾搬移」「預覽回滾搬移一下 …」「預覽回滾改名」「回滾改名」均不觸發。
+  - `preview_move_rollback()`：使用 `default_move_transaction_log()`，只呼叫 `preview_move_rollback_transaction_by_id()`；不呼叫任何 rollback API。
+  - `_format_move_rollback_preview_response()`：標題「搬移回滾預覽」、transaction_id、total/rollbackable_count/already_rolled_back_count/failed_count、每筆 original_path/new_path/rollback_from/rollback_to/status/rollbackable/reason、「這只是預覽，尚未實際回滾任何檔案。」；transaction 不存在 → `transaction_not_found`。
+- `tests/test_move_rollback_preview.py` — 10 個新測試（success/rolled_back/failed/missing paths 語意、混合計數、by_id None/載入、log byte-level 不變、不搬移不建資料夾、AST 驗證 preview functions 不碰 filesystem）。
+- `tests/test_mock_line_move_rollback_preview.py` — 16 個新測試（明確指令回傳 preview、response 標題/counts/rollback 路徑/「尚未實際回滾」提示、transaction_not_found、「回滾搬移」不觸發 rollback 或 preview（含 rollback API monkeypatch guard）、4 種模糊文字不觸發、「預覽回滾改名」「回滾改名」仍只作用 rename log、重複 preview log 不變、import 掃描（必須有 preview helper、不可 import executor/rollback API）、regex 掃描（須有 preview regex、不可有真實「回滾搬移」regex））。
+
+### Changed
+- `tests/test_move_transaction_log.py`、`tests/test_move_approval_bridge.py`、`tests/test_mock_line_confirm_move.py` — regex 不變式由「compiled pattern 不含『回滾搬移』」更新為「不可有以『回滾搬移』開頭的可執行指令 regex」（15H 的「預覽回滾搬移」read-only regex 為允許）。
+
+### Safety guarantees
+- Preview 純讀取：不 rollback、不搬移檔案、不建資料夾、不寫 transaction log（byte-level 測試 + AST 驗證）。
+- 「回滾搬移 {transaction_id}」不是指令，不觸發任何 rollback 或 preview（rollback API monkeypatch guard 驗證）。
+- 真實 move rollback 仍只能透過底層 API `rollback_move_transaction_by_id()` 在測試/程式中直接呼叫；Mock LINE 不 import、不呼叫。
+- 所有測試使用 pytest tmp_path，不污染 runtime/。
+
+### Recommended next phase
+- **Phase 15I — Explicit Mock LINE Move Rollback Command**。
+
+---
+
 ## [v0.6.6-alpha] — Phase 15G Explicit Mock LINE Confirm Move Command
 
 ### Added

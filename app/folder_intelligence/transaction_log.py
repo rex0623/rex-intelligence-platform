@@ -18,6 +18,8 @@ import json
 from pathlib import Path
 
 from app.folder_intelligence.schemas import (
+    MoveRollbackPreview,
+    MoveRollbackPreviewAction,
     MoveTransaction,
     MoveTransactionAction,
 )
@@ -133,3 +135,80 @@ class MoveTransactionLog:
         tx.actions = new_actions
         self._upsert(tx)
         return tx
+
+
+# ---------------------------------------------------------------------------
+# Phase 15H — Move rollback preview（read-only；鏡像 14D-3A rename preview）
+# ---------------------------------------------------------------------------
+
+
+def preview_move_rollback_transaction(
+    transaction: MoveTransaction,
+) -> MoveRollbackPreview:
+    """Build a read-only rollback preview for an in-memory MoveTransaction.
+
+    Strictly read-only: never touches the filesystem, never writes to any
+    transaction log, never calls any rollback/move function.
+
+    Per-action semantics:
+      - status == "success" 且 rollback_from / rollback_to 存在 → rollbackable
+      - status == "success" 但缺 rollback 路徑 → reason "missing_rollback_paths"
+      - status == "rolled_back"                → reason "already_rolled_back"
+      - status == "failed"                     → reason "action_failed"
+      - status == "pending"                    → reason "action_pending"
+    """
+    actions: list[MoveRollbackPreviewAction] = []
+    rollbackable_count = already_rolled_back = failed = 0
+
+    for action in transaction.actions:
+        rollbackable = False
+        reason: str | None = None
+
+        if action.status == "success":
+            if action.rollback_from and action.rollback_to:
+                rollbackable = True
+                rollbackable_count += 1
+            else:
+                reason = "missing_rollback_paths"
+        elif action.status == "rolled_back":
+            reason = "already_rolled_back"
+            already_rolled_back += 1
+        elif action.status == "failed":
+            reason = "action_failed"
+            failed += 1
+        elif action.status == "pending":
+            reason = "action_pending"
+
+        actions.append(MoveRollbackPreviewAction(
+            original_path=action.original_path,
+            new_path=action.new_path,
+            rollback_from=action.rollback_from,
+            rollback_to=action.rollback_to,
+            status=action.status,
+            rollbackable=rollbackable,
+            reason=reason,
+        ))
+
+    return MoveRollbackPreview(
+        transaction_id=transaction.transaction_id,
+        total=len(transaction.actions),
+        rollbackable_count=rollbackable_count,
+        already_rolled_back_count=already_rolled_back,
+        failed_count=failed,
+        actions=actions,
+    )
+
+
+def preview_move_rollback_transaction_by_id(
+    transaction_id: str,
+    transaction_log: MoveTransactionLog,
+) -> MoveRollbackPreview | None:
+    """Load a persisted transaction and build a read-only rollback preview.
+
+    Returns None if transaction_id is not found.  Never moves files,
+    never creates folders, never modifies the transaction or the log.
+    """
+    tx = transaction_log.load_transaction(transaction_id)
+    if tx is None:
+        return None
+    return preview_move_rollback_transaction(tx)

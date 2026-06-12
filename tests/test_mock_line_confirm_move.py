@@ -353,7 +353,8 @@ def test_confirm_rename_does_not_trigger_move(
 
 
 def test_move_rollback_commands_do_not_exist(tmp_path, isolated_approvals, move_log):
-    """「回滾搬移」「預覽回滾搬移」不是指令：成功搬移後檔案保持在新位置，
+    """「回滾搬移」不是指令；「預覽回滾搬移」（15H）為 read-only 預覽：
+    兩者都不可動檔案 —— 成功搬移後檔案保持在新位置，
     transaction log 的 action 狀態不變。"""
     candidate = _tmp_candidate(tmp_path)
     plan = _make_plan([candidate], ["low"])
@@ -536,8 +537,8 @@ def test_mock_line_imports_bridge_but_not_executor_or_rollback():
 
 
 def test_mock_line_has_no_move_rollback_regex():
-    """「回滾搬移」「預覽回滾搬移」不可成為可執行指令 regex
-    （提示訊息提及「回滾搬移」尚未開放是允許的）。"""
+    """「回滾搬移」不可成為可執行指令 regex（15H 起 read-only
+    「預覽回滾搬移」regex 是允許的；提示訊息提及尚未開放也允許）。"""
     source = inspect.getsource(mock_line_module)
     tree = ast.parse(source)
     for node in ast.walk(tree):
@@ -550,5 +551,6 @@ def test_mock_line_has_no_move_rollback_regex():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert "回滾搬移" not in pattern
-            assert "預覽回滾搬移" not in pattern
+            assert not pattern.lstrip("^").startswith("回滾搬移"), (
+                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
+            )

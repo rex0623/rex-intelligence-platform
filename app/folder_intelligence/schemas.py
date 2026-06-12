@@ -98,6 +98,38 @@ class MoveTransaction(BaseModel):
     actions: List[MoveTransactionAction] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Phase 15H — Move rollback preview schemas（read-only，無任何執行行為）
+# ---------------------------------------------------------------------------
+
+
+class MoveRollbackPreviewAction(BaseModel):
+    original_path: str
+    new_path: str
+    rollback_from: Optional[str] = None
+    rollback_to: Optional[str] = None
+    status: str
+    rollbackable: bool
+    reason: Optional[str] = None
+
+
+class MoveRollbackPreview(BaseModel):
+    transaction_id: str
+    total: int = 0
+    rollbackable_count: int = 0
+    already_rolled_back_count: int = 0
+    failed_count: int = 0
+    actions: List[MoveRollbackPreviewAction] = Field(default_factory=list)
+
+    @property
+    def has_rollbackable_actions(self) -> bool:
+        return self.rollbackable_count > 0
+
+    @property
+    def is_fully_rolled_back(self) -> bool:
+        return self.total > 0 and self.already_rolled_back_count == self.total
+
+
 class MovePlan(BaseModel):
     plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     dry_run: bool = True

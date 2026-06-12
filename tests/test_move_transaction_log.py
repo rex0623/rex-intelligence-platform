@@ -465,7 +465,8 @@ def test_mock_line_has_no_move_rollback_wiring():
     ):
         assert symbol not in source, f"Mock LINE 不可引用 {symbol}"
 
-    # 不可存在能匹配 move rollback 指令的 compiled regex
+    # 不可存在能匹配「回滾搬移 …」真實 rollback 指令的 compiled regex
+    # （15H 的「預覽回滾搬移」read-only regex 是允許的）
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if (
@@ -477,8 +478,8 @@ def test_mock_line_has_no_move_rollback_wiring():
             and isinstance(node.args[0].value, str)
         ):
             pattern = node.args[0].value
-            assert "回滾搬移" not in pattern, (
-                f"Mock LINE 不可有 move rollback 指令 regex：{pattern}"
+            assert not pattern.lstrip("^").startswith("回滾搬移"), (
+                f"Mock LINE 不可有真實 move rollback 指令 regex：{pattern}"
             )
 
 
