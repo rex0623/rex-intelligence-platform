@@ -116,7 +116,7 @@ def test_readme_documents_known_limitations():
     readme = _readme()
     assert "非資料庫" in readme
     assert "console_scripts" in readme, (
-        "README 應記載尚未提供正式 console_scripts entry point"
+        "README 應記載 console_scripts entry point 資訊（Phase 17A）"
     )
 
 
@@ -129,7 +129,32 @@ def test_pyproject_exists_with_poetry_and_pytest():
     pyproject = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "[tool.poetry]" in pyproject
     assert "pytest" in pyproject, "pytest 應為 dev dependency（poetry run pytest -q）"
-    assert 'packages = [{ include = "app" }]' in pyproject
+    assert '{ include = "app" }' in pyproject
+    assert '{ include = "scripts" }' in pyproject, "scripts/ 應在 packages 中（Phase 17A）"
+
+
+def test_pyproject_defines_rip_console_script():
+    """pyproject.toml 應定義 rip console_scripts entry point（Phase 17A）。"""
+    pyproject = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "[tool.poetry.scripts]" in pyproject, (
+        "pyproject.toml 應含 [tool.poetry.scripts] 區塊"
+    )
+    assert 'rip = "scripts.mock_line:main"' in pyproject, (
+        "rip entry point 應指向 scripts.mock_line:main"
+    )
+
+
+def test_rip_entry_point_callable():
+    """scripts.mock_line:main 應可 import 且可呼叫（rip entry point 驗證）。"""
+    import importlib
+    module = importlib.import_module("scripts.mock_line")
+    assert callable(module.main), "scripts.mock_line:main 必須可呼叫"
+
+
+def test_readme_documents_rip_entry_point():
+    """README 應記載 poetry run rip 的使用方式（Phase 17A）。"""
+    readme = _readme()
+    assert "poetry run rip" in readme, "README 應文件化 poetry run rip 用法"
 
 
 def test_mock_line_cli_entrypoint_exists():

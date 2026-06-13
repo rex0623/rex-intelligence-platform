@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17A console_scripts Entry Point
+
+本階段新增正式 `rip` console_scripts entry point，使 `poetry run rip "..."` 可替代
+`poetry run python scripts/mock_line.py "..."`。舊用法保留（向下相容）。
+不新增任何 Mock LINE 指令、不改變指令語意、不修改 command dispatch / regex / destructive command 規則。
+
+### Added
+- `pyproject.toml`：`packages` 加入 `{ include = "scripts" }`；新增 `[tool.poetry.scripts]` 區塊，
+  定義 `rip = "scripts.mock_line:main"`。
+- `tests/test_cli_smoke.py`：新增 3 個測試（`test_pyproject_defines_rip_console_script`、
+  `test_rip_entry_point_callable`、`test_readme_documents_rip_entry_point`）。
+
+### Changed
+- `README.md`
+  - Version banner 更新至 Phase 17A。
+  - Mock LINE 使用方式新增 `poetry run rip "..."` 為主要入口；舊 `poetry run python scripts/mock_line.py "..."` 保留。
+  - 目前限制更新：`rip` console_scripts entry point 已提供（Phase 17A），舊用法向下相容。
+- `tests/test_cli_smoke.py`：
+  - `test_pyproject_exists_with_poetry_and_pytest` 更新 packages 斷言（同時驗證 app / scripts）。
+  - `test_readme_documents_known_limitations` 更新 assert 說明文字。
+- `docs/PROJECT_STATUS.md`：Phase 17A 加入 Completed Phases；✅ Formal console_scripts entry point；
+  測試數更新（690 → 693）；Recommended Next Phase 更新。
+- `docs/RELEASE_NOTES.md`：Test Count 表更新（+3 → 693）。
+- `CHANGELOG.md`：本條目。
+
+### Safety guarantees
+- 未新增任何 destructive action、未新增任何 Mock LINE 指令、未改變既有指令語意。
+- `mock_line.py` command dispatch、regex、full-match 規則完全未修改。
+- Transaction log / rename / move / rollback / cleanup workflow 行為完全不變。
+- `scripts/__init__.py` 已存在，不需要新增。
+- 所有測試使用 tmp_path / monkeypatch；runtime JSON 持續 gitignored。
+
+### Recommended next phase
+- **Phase 17B** — 視需求決定（pyproject.toml 現代化 / 功能擴充 / 正式 release）
+
+---
+
 ## [v0.7.4-alpha] — Phase 16G Git Tagging / Release Artifact Preparation
 
 本階段完成 v0.7.4-alpha 的 release artifact preparation：tagging instructions 文件化、

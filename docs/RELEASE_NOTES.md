@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–16G — Release Candidate Stabilization / Final Regression / Tag Readiness**
+**Phase 16E–17A — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point**
 
 ---
 
@@ -20,6 +20,7 @@
 - **Release readiness checklist completed** — 18 項 ✅ 已完成；5 項 ⬜ 待完成（16E）
 - **Final regression audit completed** — `tests/test_final_regression_release_candidate.py`；文件一致性、destructive command 不變式、runtime 零污染（16F）
 - **Tag readiness preparation completed** — Tagging Instructions 文件化、package artifact 建置驗證、pyproject version strategy 最終確認（16G）
+- **console_scripts entry point added** — `rip = "scripts.mock_line:main"`；`poetry run rip "..."` 可替代 `poetry run python scripts/mock_line.py "..."`；舊用法向下相容（17A）
 
 ---
 
@@ -66,9 +67,8 @@
 
 ### Known Limitations
 
-- **Local CLI / Mock LINE only** — operator 入口為 `poetry run python scripts/mock_line.py "…"`；尚無正式 console_scripts entry point。
+- **console_scripts entry point provided（Phase 17A）** — `poetry install` 後可用 `poetry run rip "…"`；`poetry run python scripts/mock_line.py "…"` 舊用法向下相容保留。
 - **JSON persistence only** — transaction log 為 JSON 檔，無資料庫；大量交易時可後續評估 SQLite。
-- **No formal console_scripts entry point yet** — 正式 entry point 留待後續 release packaging；目前 operator 入口為 `poetry run python scripts/mock_line.py "…"`。
 - **pyproject.toml version（0.1.0）未對齊 RIP release version（v0.7.4-alpha）** — 方案 A 決策：packaging metadata 與 release version 分離；版本對齊（例如 0.7.4a0）留待正式 release packaging 流程（16H+）。
 - **Not designed for multi-user concurrent production operation** — 無 tenant 隔離、無跨 process 鎖；適用於個人本機文件整理。
 - **pyproject version is packaging metadata, not RIP release source of truth** — `pyproject.toml` version（0.1.0）為 packaging metadata；release 版本以 PROJECT_STATUS / CHANGELOG 為準（目前 v0.7.4-alpha）。
@@ -153,3 +153,4 @@ git push origin v0.7.4-alpha
 | 16E（Release readiness） | +20 → 648 |
 | 16F（Final regression） | +26 → 674 |
 | 16G（Artifact readiness） | +16 → 690 |
+| 17A（console_scripts entry point） | +3 → 693 |

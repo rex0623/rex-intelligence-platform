@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Rex Intelligence Platform - LINE based AI OS"
 authors = ["Rex Chen <rex0623@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "app" }]
+packages = [{ include = "app" }, { include = "scripts" }]
+
+[tool.poetry.scripts]
+rip = "scripts.mock_line:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"

@@ -6,7 +6,7 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
-| **Test Count** | 690 passing |
+| **Test Count** | 693 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -44,6 +44,7 @@
 | 16E | Release Candidate Stabilization | ✅ Complete |
 | 16F | Release Candidate Tagging / Final Regression | ✅ Complete |
 | 16G | Git Tagging / Release Artifact Preparation | ✅ Complete |
+| 17A | console_scripts Entry Point | ✅ Complete |
 
 ---
 
@@ -73,7 +74,7 @@
 - [x] Package artifact built and verified（16G）
 - [x] Tagging instructions documented（16G）
 - [x] pyproject version strategy final decision confirmed（16G，方案 A）
-- [ ] Formal console_scripts entry point
+- [x] Formal console_scripts entry point（17A）
 - [ ] Packaged release artifact
 - [ ] Production deployment guide
 - [ ] Multi-user concurrency guard
@@ -291,7 +292,7 @@ WorkerRequest                                                               │
 - Move dry-run 顯示尚未掛 preflight summary：approval payload 內序列化的 plan status 仍為 `pending_approval`（核准狀態在 Approval Engine）；move bridge 在執行時同步 status，但 dry-run 顯示整合仍未做。
 - 「產生搬移計畫」的回覆仍不直接提示「確認搬移」指令（15B 測試不變式）；16C 起改以「指令說明」導引，且核准後的 dry-run 報告會明確提示「確認搬移 {approval_id}」。
 - Help text 為靜態維護文字（16C）：新增指令時需手動同步 `command_help_text()`，無自動由 regex 清單產生。
-- 尚未提供正式 console_scripts entry point（16D）：operator CLI 入口為 `poetry run python scripts/mock_line.py "…"`；README 已記載。
+- `rip` console_scripts entry point 已提供（17A）：`poetry install` 後可用 `poetry run rip "…"`；`poetry run python scripts/mock_line.py "…"` 舊用法向下相容保留。
 - `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.3-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
 - README operator 文件為靜態維護（16D）：指令清單與安全原則由 `tests/test_cli_smoke.py` 以子字串稽核鎖定，新增指令時需同步更新。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
@@ -305,14 +306,10 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 16H — Manual Tag Confirmation / Release Freeze**
+**Phase 17B** — 視需求決定（pyproject.toml 現代化 / 功能擴充 / 正式 release）
 
-- 確認所有 tests 通過後，人工執行：
-  ```bash
-  git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"
-  git push origin v0.7.4-alpha
-  ```
-- 視需要決策 `pyproject.toml` version 對齊（0.1.0 → 0.7.4a0）。
-- 決策 console_scripts entry point 是否正式提供。
-- Release freeze：凍結功能面，僅接受 bug fix。
-- 若選擇直接執行：以上 tag 指令即為 release 最後一步。
+可選方向：
+- `pyproject.toml` 現代化：從 `[tool.poetry]` 遷移至 `[project]` 標準格式（解決 `poetry check` deprecation warnings）。
+- pyproject version 對齊：0.1.0 → 0.7.4a0（PEP 440）。
+- 人工建立 git tag：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"` && `git push origin v0.7.4-alpha`。
+- 功能擴充：multi-user 支援、SQLite persistence、production deployment guide。

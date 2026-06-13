@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 16F — Final Regression；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 17A — console_scripts Entry Point；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 
@@ -31,14 +31,25 @@ poetry run pytest -q
 
 ```bash
 # 操作入口：先看指令說明（也可用「指令說明」「help」「/help」）
-poetry run python scripts/mock_line.py "說明"
+poetry run rip "說明"
 
 # Planning / Dry-run（只產生計畫，不會動任何檔案）
-poetry run python scripts/mock_line.py "整理檔名"
-poetry run python scripts/mock_line.py "分析 PDF 詳細"
-poetry run python scripts/mock_line.py "整理資料夾"
-poetry run python scripts/mock_line.py "產生搬移計畫"
+poetry run rip "整理檔名"
+poetry run rip "分析 PDF 詳細"
+poetry run rip "整理資料夾"
+poetry run rip "產生搬移計畫"
 ```
+
+> `rip` 為 console_scripts entry point（Phase 17A），需先執行 `poetry install`。
+> 舊用法仍然有效（向下相容）：
+>
+> ```bash
+> poetry run python scripts/mock_line.py "說明"
+> poetry run python scripts/mock_line.py "整理檔名"
+> poetry run python scripts/mock_line.py "分析 PDF 詳細"
+> poetry run python scripts/mock_line.py "整理資料夾"
+> poetry run python scripts/mock_line.py "產生搬移計畫"
+> ```
 
 ### 安全操作指令
 
@@ -94,7 +105,7 @@ poetry run python scripts/mock_line.py "產生搬移計畫"
 ### 目前限制
 
 - JSON persistence，非資料庫。
-- Mock LINE 為本機 CLI 模擬入口（`scripts/mock_line.py`），尚未提供正式 console_scripts entry point。
+- `rip` console_scripts entry point 透過 Poetry 提供（Phase 17A，需先 `poetry install`）；`poetry run python scripts/mock_line.py "..."` 舊用法仍然有效（向下相容）。
 - Help text 為靜態維護（新增指令需手動同步 `command_help_text()`）。
 - 絕對路徑仍依既有語意原樣使用，不受 SAFE_PDF_ROOT 錨定限制。
 - **版本策略**：`pyproject.toml` package version（0.1.0）為 packaging metadata，非 release version source of truth；現階段以 `PROJECT_STATUS` / `CHANGELOG` 的 RIP 版本（v0.7.4-alpha）為準。
