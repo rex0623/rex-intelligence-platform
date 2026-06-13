@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 16E — Release Candidate Stabilization；詳見 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) 與 [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 16F — Final Regression；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 
@@ -101,7 +101,9 @@ poetry run python scripts/mock_line.py "產生搬移計畫"
 
 ### Release Candidate Notes
 
-**目前版本**：v0.7.4-alpha（Phase 16E — Release Candidate Stabilization）
+**目前版本**：v0.7.4-alpha（Phase 16F — Release Candidate Final Regression）
+
+**Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ Git tag 尚未建立（建議完成 Phase 16G 後再 tag）
 
 **目前狀態**：本機 CLI / Mock LINE operator interface
 

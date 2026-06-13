@@ -6,7 +6,7 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
-| **Test Count** | 648 passing |
+| **Test Count** | 674 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -42,6 +42,7 @@
 | 16C | Operator UX / Command Help Text | ✅ Complete |
 | 16D | Packaging / CLI Smoke Test | ✅ Complete |
 | 16E | Release Candidate Stabilization | ✅ Complete |
+| 16F | Release Candidate Tagging / Final Regression | ✅ Complete |
 
 ---
 
@@ -65,6 +66,9 @@
 - [x] Release readiness checklist completed（16E）
 - [x] Command inventory documented（16E）
 - [x] Version strategy documented（16E）
+- [x] RELEASE_NOTES.md completed（16F）
+- [x] Final regression audit completed（16F）
+- [x] Tag readiness checklist completed（16F）
 - [ ] Formal console_scripts entry point
 - [ ] Packaged release artifact
 - [ ] Production deployment guide
@@ -77,7 +81,25 @@
 
 - **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
 - **Release 版本以 PROJECT_STATUS / CHANGELOG 的 RIP version 為準** — 目前 v0.7.4-alpha。
-- 版本策略已在 README「目前限制」區塊明確記載；pyproject version 對齊留待正式 release 階段（16F+）。
+- 版本策略已在 README「目前限制」區塊明確記載；pyproject version 對齊留待正式 release 階段（16G+）。
+
+---
+
+## Tag Readiness Checklist（v0.7.4-alpha）
+
+- [x] Final regression tests passed（test_final_regression_release_candidate.py，16F）
+- [x] README updated（v0.7.4-alpha、Command Inventory、Release Candidate Notes、RELEASE_NOTES 連結）
+- [x] CHANGELOG updated（16E + 16F 條目）
+- [x] RELEASE_NOTES updated（docs/RELEASE_NOTES.md，v0.7.4-alpha）
+- [x] PROJECT_STATUS updated（Tag Readiness Checklist、16F 完成）
+- [x] Runtime files gitignored（runtime/ 三個 JSON，git ls-files 驗證）
+- [x] Command inventory documented（README 完整指令一覽）
+- [x] Release readiness checklist completed（18 項 ✅）
+- [x] Working tree clean before tag（需人工確認 git status --short 為空）
+- [ ] Git tag created
+- [ ] Tag pushed
+- [ ] Packaged artifact created
+- [ ] Production deployment guide completed
 
 ---
 
@@ -268,14 +290,18 @@ WorkerRequest                                                               │
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
 - Release candidate 狀態（16E）：不適用於多人同時操作、長期高併發、真正 production daemon；適用於本機文件整理與安全流程驗證。
 - Command Inventory 與 Release Candidate Notes 為靜態維護（16E）：新增指令時需同步更新 README 對應區塊，`tests/test_release_readiness.py` 會稽核關鍵子字串。
+- RELEASE_NOTES.md 為靜態維護（16F）：新增指令或版本更新時需同步；`tests/test_final_regression_release_candidate.py` 稽核內容存在與關鍵子字串。
+- Tag Readiness Checklist（16F）：Git tag 與 push 尚未執行，留待 Phase 16G 人工完成。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 16F — Release Candidate Tagging / Final Regression**
+**Phase 16G — Git Tagging / Release Artifact Preparation**
 
-- 最終全回歸測試（確認所有 648+ tests 通過）。
-- 版本資訊最終對齊確認（pyproject version alignment 若需要）。
-- 正式 git tag v0.7.4-alpha 或 v0.8.0-rc1 candidate 決策。
-- Release notes 最終確認與整理。
+- 確認 `git status --short` 為空（working tree clean）。
+- 確認 `poetry run pytest -q` 全數通過（674+ tests）。
+- 建立正式 git tag：`git tag -a v0.7.4-alpha -m "Release Candidate v0.7.4-alpha"`。
+- 推送 tag：`git push origin v0.7.4-alpha`。
+- 決策是否建立 packaging artifact（wheel / sdist）。
+- 視需要補 `pyproject.toml` version 對齊（0.1.0 → 0.7.4a0）。

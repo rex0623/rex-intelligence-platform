@@ -5,6 +5,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 16F Release Candidate Tagging / Final Regression
+
+本階段完成 v0.7.4-alpha release candidate 前的最後穩定化檢查：final regression audit、
+release notes 整理、tag readiness checklist。不新增核心功能、不新增 destructive action、
+不改變既有指令語意、不自動建立 git tag。
+
+### Added
+- `docs/RELEASE_NOTES.md` — v0.7.4-alpha 完整 release notes：
+  - **Highlights**（Rename / Move / Approval / Transaction log / Runtime settings /
+    Help text / CLI smoke / Release readiness checklist / Final regression audit）。
+  - **Safety Guarantees** 表（planning non-destructive、preview read-only、destructive full match、
+    logs separated、runtime gitignored、SAFE_PDF_ROOT 錨定、once-only guard、bridge not direct）。
+  - **Operator Commands** 表（Non-destructive 8 指令 / Destructive full-match only 4 指令）。
+  - **Known Limitations**（local CLI only、JSON persistence、no console_scripts、
+    不適合多人/生產、pyproject version 為 packaging metadata）。
+  - **Tagging Recommendation**（不自動 tag；建議條件：clean working tree + all tests pass
+    + 版本一致 + runtime 無追蹤；tag 留待 Phase 16G 人工執行）。
+  - **Test Count** 歷程（16D +22 / 16E +20 / 16F +26 → 674）。
+- `tests/test_final_regression_release_candidate.py` — 26 個最終回歸稽核測試：
+  - **Destructive command invariants（2）**：四個指令仍 ^…$ full match；無 approved list 以外的危險 pattern。
+  - **Preview command invariants（1）**：preview 指令 full match regex 存在。
+  - **Non-destructive smoke（3）**：planning 指令不動檔案、不寫 log；generic 確認未知 id 安全回覆；rename/move logs 互不干擾（2 個分離測試）。
+  - **Runtime / git（1）**：runtime JSON 無 git 追蹤。
+  - **Docs consistency（5）**：version 一致（README/PROJECT_STATUS/CHANGELOG）、
+    README command inventory、PROJECT_STATUS checklist、CHANGELOG 16F 條目、pyproject 策略。
+  - **Help regression（1）**：help 指令仍可用。
+  - **RELEASE_NOTES 稽核（6）**：RELEASE_NOTES 存在、版本、safety guarantees、
+    operator commands、known limitations、no-auto-tag 聲明。
+  - **Tag readiness（2）**：PROJECT_STATUS 含 Tag Readiness Checklist、git tag 項目標記未完成（[ ]）。
+  - **README links（1）**：README 含 RELEASE_NOTES 連結。
+  - **Command inventory final（3）**：destructive inventory 不變（4 個）、
+    mock_line no new regex、RELEASE_NOTES 含完整指令。
+
+### Changed
+- `README.md`
+  - 版本橫幅 phase 參照更新為 Phase 16F — Final Regression。
+  - 新增 RELEASE_NOTES.md 連結。
+  - Release Candidate Notes 區塊補 Release Notes 連結與 git tag 尚未建立聲明。
+- `docs/PROJECT_STATUS.md`
+  - 16F 加入 Completed Phases 表。
+  - Release Readiness Checklist 補 RELEASE_NOTES / final regression / tag readiness 三項 ✅。
+  - 新增「Tag Readiness Checklist（v0.7.4-alpha）」— ✅ 9 項已完成、⬜ 4 項待完成。
+  - Version Strategy 區塊更新（pyproject 版本對齊移至 16G+）。
+  - Known Limitations 補 16F RELEASE_NOTES 靜態維護與 Tag Readiness 說明。
+  - Recommended Next Phase 更新為 Phase 16G。
+  - 測試數更新（648 → 673）。
+- `tests/test_cli_smoke.py`（無更動）— 16D 版本字串已在 16E 更新，16F 維持不變。
+
+### Safety guarantees
+- 未新增任何 destructive action、未新增任何 Mock LINE 指令、未改變既有指令語意。
+- 四個 destructive regex 仍全數 ^…$ 全錨定（test_final_regression_release_candidate.py 鎖定驗證）。
+- 未建立任何 git tag、未執行任何 git push。
+- 所有測試使用 tmp_path / monkeypatch；runtime JSON 持續 gitignored。
+
+### Recommended next phase
+- **Phase 16G — Git Tagging / Release Artifact Preparation**
+
+---
+
 ## [v0.7.4-alpha] — Phase 16E Release Candidate Stabilization
 
 本階段以 release candidate 穩定化為主：不新增核心功能、不新增 destructive action、
