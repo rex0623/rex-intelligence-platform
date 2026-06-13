@@ -5,6 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.3-alpha] — Phase 16D Packaging / CLI Smoke Test
+
+本階段以 packaging、README、CLI smoke test、最小可交付檢查為主：
+不改變任何核心功能；未新增 destructive action、未新增真實執行指令、
+未改變既有 Mock LINE 指令語意、未修改 transaction log 行為。
+
+### Added
+- `README.md` — 開頭新增「Operator 快速上手」區塊：
+  - 一句話定位（PDF intelligence / Approval workflow / Rename·Move safe execution
+    本機文件智慧整理平台）與目前版本（v0.7.3-alpha）。
+  - 主要能力九項（PDF / Document Intelligence、RenamePlan、MovePlan、Approval
+    workflow、safe rename / safe move、transaction log、rollback preview /
+    execution、runtime settings、Mock LINE operator interface）。
+  - 安裝與測試（`poetry install`、`poetry run pytest -q`）。
+  - Mock LINE 使用方式（說明 / 整理檔名 / 分析 PDF 詳細 / 整理資料夾 /
+    產生搬移計畫）。
+  - 安全操作指令表（確認 / 確認改名 / 預覽回滾改名 / 回滾改名 / 確認搬移 /
+    預覽回滾搬移 / 回滾搬移，明確標示哪些會真的動檔案）。
+  - 安全原則（planning 不改檔案、preview read-only、destructive full match、
+    模糊文字不觸發、runtime JSON gitignored、相對路徑錨定 SAFE_PDF_ROOT）。
+  - Runtime files 清單與目前限制（JSON persistence、本機 CLI 入口、
+    help text 靜態維護、絕對路徑語意）。
+- `tests/test_cli_smoke.py` — 22 個新測試：
+  - **README 稽核（10）**：存在、版本與定位、install / pytest 指令、mock_line
+    用法、planning 安全、destructive 指令與 full match、preview read-only、
+    runtime files gitignored、SAFE_PDF_ROOT、known limitations（console_scripts）。
+  - **Packaging 稽核（3）**：pyproject.toml 存在（poetry + pytest dev dep +
+    packages include app）、`scripts/mock_line.py` 入口存在、module import 成功。
+  - **CLI smoke（7）**：「說明」「/help」回覆 help、help 含六個 rename / move
+    指令、help 零副作用（不建 approval、不建 log）、未知指令安全回覆不 crash、
+    「整理檔名」對空 SAFE_PDF_ROOT 不 crash 且不動檔案、subprocess 真實 CLI
+    跑「說明」exit 0 且 runtime JSON byte-level 零污染。
+  - **Runtime / gitignore smoke（2）**：三個 runtime JSON 在 .gitignore、
+    `git ls-files runtime/` 為空。
+
+### Changed
+- `docs/PROJECT_STATUS.md` — 版本推進 v0.7.3-alpha、測試數 628、16D 完成列表、
+  capability snapshot 補 packaging 行、known limitations 補 console_scripts
+  未提供與 pyproject version（0.1.0）未同步、Recommended Next Phase 改為 16E。
+- 核心程式碼（app/、scripts/）零變更。
+
+### Safety guarantees
+- 未新增 destructive action、未新增真實執行指令；指令語意與 full match 規則
+  零變更。
+- Smoke 測試只透過無副作用路徑（help / 未知指令 / 空資料夾 planning）與
+  read-only git 查詢；subprocess 僅限「說明」。
+- 所有測試使用 tmp_path / monkeypatch；runtime JSON 持續 gitignored 且
+  byte-level 驗證零污染。
+
+### Recommended next phase
+- **Phase 16E — Release Candidate Stabilization**。
+
+---
+
 ## [v0.7.2-alpha] — Phase 16C Operator UX / Command Help Text
 
 本階段只改善人機互動文字（help、錯誤訊息、下一步提示）：

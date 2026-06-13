@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.2-alpha |
-| **Test Count** | 606 passing |
+| **Current Version** | v0.7.3-alpha |
+| **Test Count** | 628 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -40,6 +40,7 @@
 | 16A | Production Hardening / End-to-End Workflow Audit | ✅ Complete |
 | 16B | Runtime Settings Consolidation | ✅ Complete |
 | 16C | Operator UX / Command Help Text | ✅ Complete |
+| 16D | Packaging / CLI Smoke Test | ✅ Complete |
 
 ---
 
@@ -57,6 +58,7 @@
 - Runtime logs are gitignored — `runtime/approvals.json`、`runtime/rename_transactions.json`、`runtime/move_transactions.json` 均不被 git 追蹤。
 - Runtime paths are consolidated（16B）— 所有 runtime 路徑由 `app/core/config.py` 的 settings helpers 單一來源提供；相對路徑由 executor 層錨定 SAFE_PDF_ROOT，path traversal 以 `path_escapes_safe_root` fail-safe 拒絕。
 - Operator UX（16C）— 「說明 / 指令說明 / help / /help」回覆完整指令分類；錯誤 reason code 一律附中文說明與建議下一步（`humanize_reason()`）；execution / rollback / 核准回覆附下一步提示。
+- Packaging / 可交付性（16D）— README 開頭含 Operator 快速上手（安裝 / 測試 / Mock LINE 用法 / 安全指令表 / 安全原則 / runtime files / 目前限制）；`tests/test_cli_smoke.py` 鎖定 README 文件內容、pyproject metadata、CLI 入口可用性與 runtime / gitignore 行為。
 
 ---
 
@@ -222,13 +224,16 @@ WorkerRequest                                                               │
 - Move dry-run 顯示尚未掛 preflight summary：approval payload 內序列化的 plan status 仍為 `pending_approval`（核准狀態在 Approval Engine）；move bridge 在執行時同步 status，但 dry-run 顯示整合仍未做。
 - 「產生搬移計畫」的回覆仍不直接提示「確認搬移」指令（15B 測試不變式）；16C 起改以「指令說明」導引，且核准後的 dry-run 報告會明確提示「確認搬移 {approval_id}」。
 - Help text 為靜態維護文字（16C）：新增指令時需手動同步 `command_help_text()`，無自動由 regex 清單產生。
+- 尚未提供正式 console_scripts entry point（16D）：operator CLI 入口為 `poetry run python scripts/mock_line.py "…"`；README 已記載。
+- `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.3-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
+- README operator 文件為靜態維護（16D）：指令清單與安全原則由 `tests/test_cli_smoke.py` 以子字串稽核鎖定，新增指令時需同步更新。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 16D — Packaging / CLI Smoke Test**
+**Phase 16E — Release Candidate Stabilization**
 
-- 套件化與安裝流程驗證（poetry build / 入口點）。
-- CLI smoke test：以乾淨環境跑過 help → planning → approval → dry-run 全鏈，確認非開發機也能操作。
+- 凍結功能面，全面回歸與文件一致性檢查（README / PROJECT_STATUS / CHANGELOG / help text 對齊）。
+- 版本資訊整理（pyproject version 對齊文件版本）、release notes 草稿。

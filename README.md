@@ -1,6 +1,80 @@
 # RIP - Rex Intelligence Platform
 
-打造企業級以 LINE 為入口的 AI 作業系統。
+本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
+
+> **目前版本：v0.7.3-alpha**（詳見 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) 與 [CHANGELOG.md](CHANGELOG.md)）
+
+---
+
+## 🧭 Operator 快速上手
+
+### 主要能力
+
+- **PDF / Document Intelligence** — 讀取、分類 PDF 並抽取欄位（台電電費單完整支援）
+- **Filename Intelligence / RenamePlan** — 產生標準化改名計畫（dry-run）
+- **Folder Intelligence / MovePlan** — 產生資料夾歸檔搬移計畫（dry-run）
+- **Approval workflow** — 計畫一律先核准，核准本身不動檔案
+- **Safe rename / safe move** — 真實執行只走 approval bridge + safe executor
+- **Transaction log** — 每次真實執行寫入交易紀錄（JSON）
+- **Rollback preview / rollback execution** — 先 read-only 預覽，再明確指令回滾
+- **Runtime settings** — runtime 路徑單一來源（`app/core/config.py`），相對路徑錨定 SAFE_PDF_ROOT
+- **Mock LINE operator interface** — 本機 CLI 模擬 LINE 操作入口
+
+### 安裝與測試
+
+```bash
+poetry install
+poetry run pytest -q
+```
+
+### Mock LINE 使用方式
+
+```bash
+# 操作入口：先看指令說明（也可用「指令說明」「help」「/help」）
+poetry run python scripts/mock_line.py "說明"
+
+# Planning / Dry-run（只產生計畫，不會動任何檔案）
+poetry run python scripts/mock_line.py "整理檔名"
+poetry run python scripts/mock_line.py "分析 PDF 詳細"
+poetry run python scripts/mock_line.py "整理資料夾"
+poetry run python scripts/mock_line.py "產生搬移計畫"
+```
+
+### 安全操作指令
+
+| 指令 | 效果 |
+|------|------|
+| `確認 {approval_id}` | 只核准 / dry-run 報告，不會動檔案 |
+| `確認改名 {approval_id}` | **真的改名** |
+| `預覽回滾改名 {transaction_id}` | 只預覽，不改檔案、不改 log |
+| `回滾改名 {transaction_id}` | **真的回滾改名** |
+| `確認搬移 {approval_id}` | **真的搬移** |
+| `預覽回滾搬移 {transaction_id}` | 只預覽，不搬檔案、不改 log |
+| `回滾搬移 {transaction_id}` | **真的回滾搬移** |
+
+### 安全原則
+
+- **Planning 指令不會改檔案** — 「整理檔名」「整理資料夾」等只產生計畫。
+- **Preview 指令不會改檔案、不改 log** — 「預覽回滾改名」「預覽回滾搬移」純讀取（read-only）。
+- **Destructive 指令必須 full match** — 六個執行 / 回滾指令 regex 全數 `^…$` 錨定，格式不符不會執行。
+- **模糊文字不會觸發 destructive action** — 「請幫我確認改名」「回滾一下」等一律不執行。
+- **Runtime JSON 不納入 Git** — 均已 gitignored。
+- **相對路徑錨定 SAFE_PDF_ROOT** — path traversal 以 `path_escapes_safe_root` fail-safe 拒絕；絕對路徑依既有語意原樣使用。
+
+### Runtime files（本機 runtime state，已 gitignored）
+
+- `runtime/approvals.json`
+- `runtime/rename_transactions.json`
+- `runtime/move_transactions.json`
+
+### 目前限制
+
+- JSON persistence，非資料庫。
+- Mock LINE 為本機 CLI 模擬入口（`scripts/mock_line.py`），尚未提供正式 console_scripts entry point。
+- Help text 為靜態維護（新增指令需手動同步 `command_help_text()`）。
+- 絕對路徑仍依既有語意原樣使用，不受 SAFE_PDF_ROOT 錨定限制。
+
+---
 
 ## 🎯 願景
 
