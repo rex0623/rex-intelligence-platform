@@ -5,6 +5,62 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 16G Git Tagging / Release Artifact Preparation
+
+本階段完成 v0.7.4-alpha 的 release artifact preparation：tagging instructions 文件化、
+package artifact 建置驗證、pyproject version strategy 最終確認。
+不新增核心功能、不新增 destructive action、不改變既有指令語意、
+不自動建立 git tag、不自動 push。
+
+### Added
+- `tests/test_release_artifact_readiness.py` — 16 個 artifact readiness 驗收測試（詳見下）。
+
+### Changed
+- `docs/RELEASE_NOTES.md`
+  - Phase 標題更新至 Phase 16E–16G。
+  - Highlights 補「Tag readiness preparation completed（16G）」。
+  - Known Limitations 補 pyproject version 未對齊說明與 console_scripts limitation 更新。
+  - 新增「Package Artifact（Phase 16G）」— `poetry check` 結果（warnings 非 errors）、
+    `poetry build` 成功（sdist + wheel，0.1.0）、artifact 路徑與 gitignored 狀態。
+  - 「Tagging Recommendation」改寫為「Tagging Instructions（Phase 16G）」— 前置條件確認
+    指令、annotated tag 建立指令、`git show` 確認指令、人工 push 指令；明確聲明不自動 push。
+  - Test Count 補 16G（+16 → 690）。
+- `docs/PROJECT_STATUS.md`
+  - 16G 加入 Completed Phases 表。
+  - Release Readiness Checklist 補三項 ✅（artifact built / tagging instructions / version decision）。
+  - Tag Readiness Checklist 更新：補「Tagging instructions documented」「Package artifact built」✅；
+    「Git tag created」「Tag pushed」仍為 ⬜（含人工執行指令說明）。
+  - Version Strategy 區塊更新為 16G 最終確認（方案 A 確認、artifact 版本說明、poetry check warnings）。
+  - Known Limitations 補 artifact 與 tag 狀態說明。
+  - Recommended Next Phase 更新為 Phase 16H。
+  - 測試數更新（674 → 690）。
+
+### pyproject version strategy final decision（Task 2，方案 A 確認）
+- **保守維持方案 A**：`pyproject.toml` version（0.1.0）不修改。
+- `poetry build` 產生 `rex_intelligence_platform-0.1.0.tar.gz` / `.whl`（dist/，已 gitignored）。
+- `poetry check` 顯示 deprecation warnings（`[tool.poetry]` 舊格式），非 errors，不影響 build。
+- 版本對齊（0.1.0 → 0.7.4a0）留待正式 release packaging 決策（16H+）。
+
+### Release artifact status（Task 3）
+- `poetry build` 成功；`dist/` 已 gitignored；dist artifacts 未 commit；working tree 保持乾淨。
+- `poetry check` 通過（有 deprecation warnings，需未來遷移至 `[project]` 標準格式）。
+
+### Tag decision（Task 5，保守方案）
+- **不自動建立 git tag**。
+- Tagging Instructions 已文件化於 `docs/RELEASE_NOTES.md`（前置條件 / annotated tag / git show / push）。
+- 人工 tag 指令：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"` && `git push origin v0.7.4-alpha`。
+
+### Safety guarantees
+- 未新增任何 destructive action、未新增任何 Mock LINE 指令、未改變既有指令語意。
+- 未建立任何 git tag、未執行任何 git push。
+- dist/ 已 gitignored；runtime/ 無 git 追蹤。
+- 所有測試使用 tmp_path / monkeypatch；runtime JSON 持續 gitignored。
+
+### Recommended next phase
+- **Phase 16H — Manual Tag Confirmation / Release Freeze**（人工執行 tag push，或視為最後 release step）
+
+---
+
 ## [v0.7.4-alpha] — Phase 16F Release Candidate Tagging / Final Regression
 
 本階段完成 v0.7.4-alpha release candidate 前的最後穩定化檢查：final regression audit、

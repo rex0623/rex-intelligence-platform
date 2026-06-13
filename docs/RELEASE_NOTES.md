@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–16F — Release Candidate Stabilization / Final Regression**
+**Phase 16E–16G — Release Candidate Stabilization / Final Regression / Tag Readiness**
 
 ---
 
@@ -19,6 +19,7 @@
 - **CLI smoke tests completed** — `tests/test_cli_smoke.py` 22 個測試稽核 README、packaging metadata、CLI 入口、runtime gitignore
 - **Release readiness checklist completed** — 18 項 ✅ 已完成；5 項 ⬜ 待完成（16E）
 - **Final regression audit completed** — `tests/test_final_regression_release_candidate.py`；文件一致性、destructive command 不變式、runtime 零污染（16F）
+- **Tag readiness preparation completed** — Tagging Instructions 文件化、package artifact 建置驗證、pyproject version strategy 最終確認（16G）
 
 ---
 
@@ -67,7 +68,8 @@
 
 - **Local CLI / Mock LINE only** — operator 入口為 `poetry run python scripts/mock_line.py "…"`；尚無正式 console_scripts entry point。
 - **JSON persistence only** — transaction log 為 JSON 檔，無資料庫；大量交易時可後續評估 SQLite。
-- **No formal console_scripts entry point yet** — 正式 entry point 留待 release artifact 打包（16G+）。
+- **No formal console_scripts entry point yet** — 正式 entry point 留待後續 release packaging；目前 operator 入口為 `poetry run python scripts/mock_line.py "…"`。
+- **pyproject.toml version（0.1.0）未對齊 RIP release version（v0.7.4-alpha）** — 方案 A 決策：packaging metadata 與 release version 分離；版本對齊（例如 0.7.4a0）留待正式 release packaging 流程（16H+）。
 - **Not designed for multi-user concurrent production operation** — 無 tenant 隔離、無跨 process 鎖；適用於個人本機文件整理。
 - **pyproject version is packaging metadata, not RIP release source of truth** — `pyproject.toml` version（0.1.0）為 packaging metadata；release 版本以 PROJECT_STATUS / CHANGELOG 為準（目前 v0.7.4-alpha）。
 - **Help text / command inventory 為靜態維護** — 新增指令時需手動同步 `command_help_text()` 與 README command inventory。
@@ -75,22 +77,70 @@
 
 ---
 
-### Tagging Recommendation
+### Package Artifact（Phase 16G）
 
-**本 phase 不自動建立 git tag。**
+**`poetry check` 結果**：通過（有 deprecation warnings，非 errors）
 
-| 項目 | 狀態 |
-|------|------|
-| Suggested tag candidate | `v0.7.4-alpha` |
-| Alternative future RC tag | `v0.8.0-rc1` |
-| Tag creation | ⬜ 留待 Phase 16G（人工執行） |
-| Tag push | ⬜ 留待 Phase 16G（人工執行） |
+> Poetry 2.x 建議從 `[tool.poetry]` 遷移至 `[project]` 標準欄位；目前使用 `[tool.poetry]` 為舊格式 warnings，不影響 build 功能。
 
-建議在以下條件全數滿足後再建立 tag：
-1. `git status --short` 輸出為空（working tree clean）
-2. `poetry run pytest -q` 全數通過（648+ tests）
-3. README / PROJECT_STATUS / CHANGELOG 版本一致
-4. runtime/ 無被 git 追蹤的檔案
+**`poetry build` 結果**：成功 ✅
+
+```
+Building rex-intelligence-platform (0.1.0)
+Built rex_intelligence_platform-0.1.0.tar.gz
+Built rex_intelligence_platform-0.1.0-py3-none-any.whl
+```
+
+| Artifact | 路徑 | 是否 committed |
+|----------|------|----------------|
+| sdist | `dist/rex_intelligence_platform-0.1.0.tar.gz` | ❌（dist/ 已 gitignored） |
+| wheel | `dist/rex_intelligence_platform-0.1.0-py3-none-any.whl` | ❌（dist/ 已 gitignored） |
+
+**注意**：artifact 版本為 `0.1.0`（pyproject.toml packaging version），非 RIP release version v0.7.4-alpha。版本對齊（例如 `0.7.4a0`）留待正式 release packaging 決策。
+
+---
+
+### Tagging Instructions（Phase 16G）
+
+**本 phase 不自動建立 git tag，亦不自動 push。**
+
+Tag 流程需由人工確認後執行：
+
+#### 前置條件確認
+
+```bash
+# 1. 確認 working tree 乾淨
+git status --short          # 輸出應為空
+
+# 2. 確認所有測試通過
+poetry run pytest -q        # 應顯示 690+ passed
+
+# 3. 確認版本一致（四份文件均含 v0.7.4-alpha）
+grep "v0.7.4-alpha" README.md docs/PROJECT_STATUS.md CHANGELOG.md docs/RELEASE_NOTES.md
+
+# 4. 確認 runtime 無 git 追蹤
+git ls-files runtime/        # 輸出應為空
+```
+
+#### 建立本機 annotated tag
+
+```bash
+git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"
+```
+
+#### 確認 tag
+
+```bash
+git show v0.7.4-alpha
+```
+
+#### 推送 tag（人工確認後執行）
+
+```bash
+git push origin v0.7.4-alpha
+```
+
+> **重要**：push tag 為不可逆操作，請確認以上前置條件全數通過後再執行。
 
 ---
 
@@ -102,3 +152,4 @@
 | 16D（Packaging smoke） | +22 → 628 |
 | 16E（Release readiness） | +20 → 648 |
 | 16F（Final regression） | +26 → 674 |
+| 16G（Artifact readiness） | +16 → 690 |
