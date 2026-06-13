@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–17E — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization**
+**Phase 16E–17F — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI**
 
 ---
 
@@ -25,6 +25,7 @@
 - **Operator Deployment Runbook** — `docs/OPERATOR_DEPLOYMENT.md`；涵蓋安裝 / 設定（.env / SAFE_PDF_ROOT / RUNTIME_DIR）/ smoke test / runtime 目錄 / 備份 / 還原 / 升級 / runtime_lock_busy 處理 / Git hygiene（17C）
 - **Operator Preflight Validation** — `app/core/preflight.py`；safe preflight（low-write）；7 個 check（Python 版本 / fcntl / SAFE_PDF_ROOT / RUNTIME_DIR writable / git hygiene / pyproject）；不取 lock / 不建 JSON state；`tests/test_operator_preflight.py`（17 tests）（17D）
 - **Packaging Metadata Modernization** — `pyproject.toml` 遷移至 PEP 621 `[project]` 標準格式；消除所有 6 個 `poetry check` deprecation warnings；`poetry check` 結果：**All set!**；runtime dependencies PEP 508 等價轉換；**PyMuPDF is now declared as a locked runtime dependency for PDF analysis workflows**（`pymupdf>=1.27.2,<1.28.0`，先前僅手動安裝）；package version 維持 0.1.0（17E）
+- **GitHub Actions CI** — `.github/workflows/ci.yml`；push / pull_request to main 自動觸發；Python 3.12 / ubuntu-22.04 / Poetry 2.4.1；`poetry check` + `pytest -q`（726 tests）+ `poetry run rip "說明"`（console_scripts smoke）+ `poetry build`（packaging 驗證）；venv cache keyed on `poetry.lock`（17F）
 
 ---
 
@@ -163,3 +164,4 @@ git push origin v0.7.4-alpha
 | 17C（Operator Deployment Runbook） | +0 → 709（純文件）|
 | 17D（Operator Preflight Validation） | +17 → 726 |
 | 17E（Packaging Metadata Modernization） | +0 → 726（pyproject.toml 格式遷移；1 個斷言更新，非新增）|
+| 17F（GitHub Actions CI） | +0 → 726（純 workflow 新增 + 文件）|

@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17F GitHub Actions CI / Release Validation
+
+本階段新增 `.github/workflows/ci.yml`，在 push / pull_request to main 時自動執行
+`poetry check`、`pytest -q`（726 tests）、`poetry run rip "說明"`（CLI entry point smoke）、
+`poetry build`（packaging 驗證）。不修改任何程式邏輯、不修改 pyproject.toml / poetry.lock /
+runtime JSON schema。
+
+### Added
+- `.github/workflows/ci.yml`：GitHub Actions CI workflow（Python 3.12 / ubuntu-22.04 /
+  Poetry 2.4.1；含 virtualenv cache keyed on `poetry.lock`）。
+
+### Changed
+- `README.md`：Version banner 更新至 Phase 17F；新增 CI badge。
+- `docs/PROJECT_STATUS.md`：Phase 17F 加入 Completed Phases。
+- `docs/RELEASE_NOTES.md`：Highlights 補 GitHub Actions CI；test count 表更新。
+- `CHANGELOG.md`：本條目。
+
+### CI workflow 說明
+
+| Step | 指令 | 目的 |
+|------|------|------|
+| checkout | `actions/checkout@v4` | 取得 repo |
+| python | `actions/setup-python@v5` (3.12) | 符合 `requires-python = ">=3.12,<4.0"` |
+| poetry | `pip install "poetry==2.4.1"` | 對齊本機版本，避免行為差異 |
+| venv config | `poetry config virtualenvs.in-project true` | 啟用 `.venv` in-project，方便 cache |
+| cache | `actions/cache@v4` (key: `hashFiles('poetry.lock')`) | 避免重複下載 pymupdf 等套件 |
+| install | `poetry install` | 安裝全部 locked dependencies |
+| poetry check | `poetry check` | 驗證 pyproject.toml 格式（應為 All set!）|
+| tests | `poetry run pytest -q` | 726 tests |
+| CLI smoke | `poetry run rip "說明"` | 驗證 Phase 17A/17E console_scripts entry point |
+| build | `poetry build` | 驗證 packaging 正常（artifact 不 commit）|
+
+### Safety guarantees
+- 未修改任何 application code / workflow / runtime JSON schema / transaction log。
+- `poetry.lock` 不變（Phase 17F 不改任何 dependency）。
+- `dist/` artifacts 仍 gitignored，不 commit。
+- 不新增、不修改任何測試（726 不變）。
+- 不進行 GitHub Release / publish / push tag 操作。
+
+### Recommended next phase
+- **Phase 17G** — 視需求決定
+
+---
+
 ## [v0.7.4-alpha] — Phase 17E Packaging Metadata Modernization
 
 本階段將 `pyproject.toml` 從 `[tool.poetry]` 舊格式遷移至 PEP 621 `[project]` 標準欄位，

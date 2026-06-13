@@ -7,7 +7,7 @@
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
 | **Test Count** | 726 passing |
-| **Last Updated** | 2026-06-13（Phase 17E）|
+| **Last Updated** | 2026-06-13（Phase 17F）|
 
 ---
 
@@ -49,6 +49,7 @@
 | 17C | Operator Deployment / Backup / Restore Runbook | ✅ Complete |
 | 17D | Operator Preflight Validation | ✅ Complete |
 | 17E | Packaging Metadata Modernization（PEP 621）+ PyMuPDF dependency lock | ✅ Complete |
+| 17F | GitHub Actions CI / Release Validation | ✅ Complete |
 
 ---
 
