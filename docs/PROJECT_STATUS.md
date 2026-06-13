@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.4-alpha |
+| **Current Version** | v0.7.5-alpha（準備中）|
 | **Test Count** | 726 passing |
-| **Last Updated** | 2026-06-13（Phase 17G）|
+| **Last Updated** | 2026-06-13（Phase 17H）|
 
 ---
 
@@ -51,10 +51,11 @@
 | 17E | Packaging Metadata Modernization（PEP 621）+ PyMuPDF dependency lock | ✅ Complete |
 | 17F | GitHub Actions CI / Release Validation | ✅ Complete |
 | 17G | CI Result Confirmation / Release Checkpoint Notes | ✅ Complete |
+| 17H | Release Tag Readiness / v0.7.5-alpha Preparation | ✅ Complete |
 
 ---
 
-## Release Readiness Checklist（v0.7.4-alpha）
+## Release Readiness Checklist（v0.7.5-alpha）
 
 - [x] RenamePlan workflow completed
 - [x] Rename safe execution completed
@@ -93,34 +94,47 @@
 ## Version Strategy（16E 決策，16G 最終確認，方案 A）
 
 - **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
-- **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — 目前 v0.7.4-alpha。
+- **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — 目前準備 v0.7.5-alpha（v0.7.4-alpha tag 已建立並 push）。
 - **`poetry build` 產生的 artifact 版本為 0.1.0**（來自 pyproject.toml），非 RIP release version；artifact 名稱 `rex_intelligence_platform-0.1.0.tar.gz`。
 - 版本對齊（例如 0.7.4a0）留待正式 release packaging（16H+）；`poetry check`：**All set!**（Phase 17E PEP 621 migration 後，deprecation warnings 已全數消除）。
 
 ---
 
-## Tag Readiness Checklist（v0.7.4-alpha）
+## Tag Readiness（v0.7.4-alpha — 歷史紀錄）
 
+- [x] v0.7.4-alpha Git tag created（98b4664，Phase 16G，`git tag -a v0.7.4-alpha`）
+- [x] v0.7.4-alpha tag pushed to origin（`git push origin v0.7.4-alpha`）
 - [x] Final regression tests passed（test_final_regression_release_candidate.py，16F）
-- [x] README updated（v0.7.4-alpha、Command Inventory、Release Candidate Notes、RELEASE_NOTES 連結）
-- [x] CHANGELOG updated（16E + 16F + 16G 條目）
-- [x] RELEASE_NOTES updated（docs/RELEASE_NOTES.md，v0.7.4-alpha，含 Tagging Instructions）
-- [x] PROJECT_STATUS updated（Tag Readiness Checklist、16G 完成）
+- [x] README / CHANGELOG / RELEASE_NOTES / PROJECT_STATUS 均含 v0.7.4-alpha
 - [x] Runtime files gitignored（runtime/ 三個 JSON，git ls-files 驗證）
-- [x] Command inventory documented（README 完整指令一覽）
-- [x] Release readiness checklist completed（21 項 ✅）
-- [x] Tagging instructions documented（RELEASE_NOTES Tagging Instructions，16G）
-- [x] Package artifact built（dist/，gitignored，未 commit；poetry build 成功，16G）
-- [x] Working tree clean before tag（git status --short 為空確認）
+- [x] Package artifact built（dist/，gitignored，未 commit）
 - [x] Production deployment guide completed（17C，`docs/OPERATOR_DEPLOYMENT.md`）
 - [x] CI pipeline green（17F；CI #1 commit 9c0173c，34s，726 passed）
-- [ ] Git tag created（人工執行：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"`）
-- [ ] Tag pushed（人工執行：`git push origin v0.7.4-alpha`）
-- [ ] pyproject version aligned（選做：0.1.0 → 0.7.4a0，留待 16H+）
 
 ---
 
-## Current Capability Snapshot（v0.7.4-alpha）
+## Tag Readiness Checklist（v0.7.5-alpha）
+
+- [x] Phase 17A–17G 所有工作已 commit（8 commits since v0.7.4-alpha）
+- [x] Final regression passed locally（Phase 17H 前）
+  - poetry check: All set!
+  - poetry run pytest -q: 726 passed
+  - poetry build: rex_intelligence_platform-0.1.0 ✅
+  - poetry run rip "說明": 正常 ✅
+- [x] GitHub Actions CI green before tag preparation（CI #1 commit 9c0173c，34s，726 passed）
+- [x] README updated（v0.7.5-alpha banner + Release Checkpoint Notes）
+- [x] CHANGELOG updated（v0.7.5-alpha Phase 17H 條目）
+- [x] RELEASE_NOTES updated（v0.7.5-alpha section）
+- [x] PROJECT_STATUS updated（Phase 17H、v0.7.5-alpha）
+- [x] Runtime files gitignored（git ls-files runtime/ 應為空）
+- [x] dist/ artifacts gitignored（git ls-files dist/ 應為空）
+- [ ] Git tag created（v0.7.5-alpha — 人工執行：`git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"`）
+- [ ] Tag pushed（v0.7.5-alpha — 人工執行：`git push origin v0.7.5-alpha`）
+- [ ] pyproject version aligned（選做：0.1.0 → 0.7.5a0，留待後續）
+
+---
+
+## Current Capability Snapshot（v0.7.5-alpha）
 
 **Rename capabilities**：RenamePlan → Approval → Confirm rename（「確認改名」）→ Transaction log → Rollback preview（「預覽回滾改名」）→ Rollback execution（「回滾改名」）→ Log cleanup（`prune_transactions`，14F）
 
@@ -302,7 +316,7 @@ WorkerRequest                                                               │
 - 「產生搬移計畫」的回覆仍不直接提示「確認搬移」指令（15B 測試不變式）；16C 起改以「指令說明」導引，且核准後的 dry-run 報告會明確提示「確認搬移 {approval_id}」。
 - Help text 為靜態維護文字（16C）：新增指令時需手動同步 `command_help_text()`，無自動由 regex 清單產生。
 - `rip` console_scripts entry point 已提供（17A）：`poetry install` 後可用 `poetry run rip "…"`；`poetry run python scripts/mock_line.py "…"` 舊用法向下相容保留。
-- `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.4-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
+- `pyproject.toml` 的 package version（0.1.0）與 RIP release version（v0.7.5-alpha）刻意分離（方案 A，16G 最終確認）：packaging version 為 0.1.0（metadata），RIP release source of truth 為 git tag / release docs。版本對齊留待正式 release packaging 決策。
 - README operator 文件為靜態維護（16D）：指令清單與安全原則由 `tests/test_cli_smoke.py` 以子字串稽核鎖定，新增指令時需同步更新。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
 - Release candidate 狀態（16E）：不適用於多人同時操作、長期高併發、真正 production daemon；適用於本機文件整理與安全流程驗證。
@@ -315,11 +329,12 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 17H** — TBD（視需求決定）
+**Phase 17I 或 Phase 18A** — TBD（視需求決定）
 
 可選方向：
-- 人工建立 git tag：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"` && `git push origin v0.7.4-alpha`。
-- pyproject version 對齊：0.1.0 → 0.7.4a0（PEP 440）。
+- 人工建立並 push v0.7.5-alpha tag（確認 CI green 後）：
+  `git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"` && `git push origin v0.7.5-alpha`。
+- pyproject version 對齊：0.1.0 → 0.7.5a0（PEP 440，選做）。
 - 功能擴充：multi-user 支援、SQLite persistence。
 
-（Phase 17B–17G 已完成：Runtime Lock / Runbook / Preflight / PEP 621 / PyMuPDF lock / GitHub Actions CI / CI Result Confirmation）
+（Phase 17A–17H 已完成：console_scripts / Runtime Lock / Runbook / Preflight / PEP 621 / PyMuPDF lock / GitHub Actions CI / CI Checkpoint / Release Tag Readiness）

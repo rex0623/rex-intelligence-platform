@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 17G — CI Result Confirmation / Release Checkpoint；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.5-alpha**（Phase 17H — Release Tag Readiness；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -113,15 +113,32 @@ poetry run rip "產生搬移計畫"
 - `rip` console_scripts entry point 透過 Poetry 提供（Phase 17A，需先 `poetry install`）；`poetry run python scripts/mock_line.py "..."` 舊用法仍然有效（向下相容）。
 - Help text 為靜態維護（新增指令需手動同步 `command_help_text()`）。
 - 絕對路徑仍依既有語意原樣使用，不受 SAFE_PDF_ROOT 錨定限制。
-- **版本策略**：`pyproject.toml` package version（0.1.0）為 packaging metadata，非 release version source of truth；現階段以 `PROJECT_STATUS` / `CHANGELOG` 的 RIP 版本（v0.7.4-alpha）為準。
+- **版本策略**：`pyproject.toml` package version（0.1.0）為 packaging metadata，非 release version source of truth；RIP release source of truth 為 git tag / release docs；目前準備 **v0.7.5-alpha**。
 
-### Release Candidate Notes
+### Release Checkpoint Notes
 
-**目前版本**：v0.7.4-alpha（Phase 16F — Release Candidate Final Regression）
+**目前版本**：v0.7.5-alpha（Phase 17H — Release Tag Readiness）
 
-**Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ Git tag 尚未建立（建議完成 Phase 16G 後再 tag）
+**Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
-**目前狀態**：本機 CLI / Mock LINE operator interface
+**v0.7.4-alpha**（commit 98b4664）已建立並 push 至 origin。
+
+**v0.7.5-alpha** 為 Phase 17A–17G 累積工作（8 commits since v0.7.4-alpha），包含：
+- Phase 17A：`rip` console_scripts entry point
+- Phase 17B：Runtime Lock / 並發保護（`fcntl.flock`）
+- Phase 17C：Operator Deployment Runbook（`docs/OPERATOR_DEPLOYMENT.md`）
+- Phase 17D：Operator Preflight Validation（`app/core/preflight.py`）
+- Phase 17E：PEP 621 packaging metadata modernization + PyMuPDF locked dependency
+- Phase 17F：GitHub Actions CI（`.github/workflows/ci.yml`）
+- Phase 17G：CI Result Confirmation / Release Checkpoint
+
+**Final regression**（Phase 17H 前）：
+- `poetry check`：All set!
+- `poetry run pytest -q`：726 passed
+- `poetry build`：rex_intelligence_platform-0.1.0 ✅
+- `poetry run rip "說明"`：正常 ✅
+
+**package artifact 版本**（0.1.0）為 packaging metadata，RIP release source of truth 為 git tag / release docs。
 
 **適用場景**：
 - 本機文件整理與安全流程驗證

@@ -2,6 +2,95 @@
 
 ---
 
+## v0.7.5-alpha
+
+**Phase 17A–17H — console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI / CI Result Confirmation / Release Tag Readiness**
+
+---
+
+### Highlights
+
+- **console_scripts entry point** — `rip = "scripts.mock_line:main"`；`poetry run rip "..."` 可替代 `poetry run python scripts/mock_line.py "..."`；向下相容（17A）
+- **Runtime Lock / Concurrency Guard** — `fcntl.flock` advisory lock on `runtime/rip.lock`；防止多 process 同時寫入 runtime state；help / preview 不受鎖影響（17B）
+- **Operator Deployment Runbook** — `docs/OPERATOR_DEPLOYMENT.md`；涵蓋安裝 / 設定 / backup / restore / upgrade / runtime_lock_busy 處理（17C）
+- **Operator Preflight Validation** — `app/core/preflight.py`；safe preflight（low-write）；7 個 check；不取 lock / 不建 JSON state（17D）
+- **Packaging Metadata Modernization** — PEP 621 `[project]` 格式；`poetry check` **All set!**；PyMuPDF 正式納入 locked runtime dependency（17E）
+- **GitHub Actions CI** — `.github/workflows/ci.yml`；push / pull_request to main；Python 3.12 / ubuntu-22.04 / Poetry 2.4.1；726 tests（17F）
+- **CI #1 Run Confirmed** — commit 9c0173c；34s；726 passed；poetry check All set；build 成功（17G）
+- **Release Tag Readiness** — v0.7.5-alpha 文件準備完成；final regression 通過（17H）
+
+---
+
+### Final Regression（v0.7.5-alpha tag 前）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 726 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+
+---
+
+### Package Artifact（v0.7.5-alpha）
+
+**`poetry check` 結果**：**All set!**（Phase 17E PEP 621 migration 後，0 warnings）
+
+**`poetry build` 結果**：成功 ✅
+
+```
+Building rex-intelligence-platform (0.1.0)
+Built rex_intelligence_platform-0.1.0.tar.gz
+Built rex_intelligence_platform-0.1.0-py3-none-any.whl
+```
+
+**注意**：artifact 版本為 `0.1.0`（pyproject.toml packaging version），非 RIP release version v0.7.5-alpha。RIP release source of truth 為 git tag / release docs。
+
+---
+
+### Tagging Instructions（v0.7.5-alpha）
+
+**本 phase 不自動建立 git tag，亦不自動 push。待 Phase 17H commit + push 後，確認 GitHub Actions CI run green，再人工執行：**
+
+```bash
+# 1. 確認 working tree 乾淨
+git status --short          # 輸出應為空
+
+# 2. 確認所有測試通過
+poetry run pytest -q        # 應顯示 726 passed
+
+# 3. 確認 CI run green（GitHub Actions）
+# （確認最新 push 對應的 CI run 狀態）
+
+# 4. 建立本機 annotated tag
+git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"
+
+# 5. 確認 tag
+git show v0.7.5-alpha
+
+# 6. 推送 tag（人工確認後執行）
+git push origin v0.7.5-alpha
+```
+
+> **重要**：push tag 為不可逆操作，請確認以上前置條件全數通過後再執行。
+
+---
+
+### Test Count（v0.7.5-alpha）
+
+| Phase | Tests |
+|-------|-------|
+| 17A（console_scripts entry point） | +3 → 693 |
+| 17B（Runtime Lock / Concurrency Guard） | +16 → 709 |
+| 17C（Operator Deployment Runbook） | +0 → 709（純文件）|
+| 17D（Operator Preflight Validation） | +17 → 726 |
+| 17E（Packaging Metadata Modernization） | +0 → 726 |
+| 17F（GitHub Actions CI） | +0 → 726 |
+| 17G（CI Result Confirmation） | +0 → 726 |
+| 17H（Release Tag Readiness） | +0 → 726（純文件）|
+
+---
+
 ## v0.7.4-alpha
 
 **Phase 16E–17G — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI / CI Result Confirmation**

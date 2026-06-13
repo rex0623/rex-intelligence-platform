@@ -61,13 +61,13 @@ def isolated_approvals(tmp_path, monkeypatch):
 
 
 def test_readme_contains_current_rip_version():
-    """README 應記載目前版本 v0.7.4-alpha。"""
-    assert "v0.7.4-alpha" in _readme()
+    """README 應記載目前版本 v0.7.5-alpha。"""
+    assert "v0.7.5-alpha" in _readme()
 
 
 def test_readme_mentions_release_candidate_notes():
-    """README 應包含 Release Candidate Notes 區塊。"""
-    assert "Release Candidate Notes" in _readme()
+    """README 應包含 Release Checkpoint Notes 區塊。"""
+    assert "Release Checkpoint Notes" in _readme()
 
 
 def test_readme_mentions_local_cli_mock_line_interface():

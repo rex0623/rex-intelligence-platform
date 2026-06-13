@@ -5,6 +5,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.5-alpha] — Phase 17H Release Tag Readiness
+
+本階段為純文件 release readiness 準備。不新增功能、不新增測試、不修改程式碼、不建立 tag。
+v0.7.5-alpha tag 待本階段文件 commit + push 後、確認 GitHub Actions CI run green，再人工建立。
+
+### v0.7.5-alpha 涵蓋範圍
+
+自 `v0.7.4-alpha`（commit 98b4664，Phase 16G）至 HEAD 的 8 commits：
+
+| Commit | 說明 | Phase |
+|--------|------|-------|
+| `72d9426` | feat(cli): add rip console script entry point | 17A |
+| `8ea0b89` | feat(runtime): add operator concurrency guard | 17B |
+| `44d91dc` | chore(git): ignore runtime state directory | 17B |
+| `247c415` | docs(operator): add deployment and recovery runbook | 17C |
+| `11c8d74` | feat(operator): add deployment preflight validation | 17D |
+| `afb5237` | chore(packaging): modernize pyproject metadata | 17E |
+| `9c0173c` | ci: add GitHub Actions release validation | 17F |
+| `c2a980a` | docs(release): record CI checkpoint | 17G |
+
+### Final Regression 結果（Phase 17H 前）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 726 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+
+### Changed
+- `CHANGELOG.md`：本條目（v0.7.5-alpha）。
+- `README.md`：Version banner 更新至 v0.7.5-alpha / Phase 17H；Release Candidate Notes 更新。
+- `docs/PROJECT_STATUS.md`：Phase 17H 列；v0.7.5-alpha tag readiness；v0.7.4-alpha stale checklist 修正。
+- `docs/RELEASE_NOTES.md`：新增 v0.7.5-alpha section；test count 更新。
+
+### v0.7.5-alpha Tag 指令草案（人工確認 CI green 後才執行）
+
+```bash
+# 1. 確認 CI run green（GitHub Actions）
+# 2. 確認 working tree 乾淨
+git status --short
+
+# 3. 建立 annotated tag
+git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"
+
+# 4. 確認 tag
+git show v0.7.5-alpha
+
+# 5. 推送（不可逆，請再次確認後執行）
+git push origin v0.7.5-alpha
+```
+
+### Safety guarantees
+- 未修改任何 application code / workflow / pyproject.toml / poetry.lock。
+- 未建立 tag、未 push tag。
+- 測試數維持 726（零新增、零移除）。
+- v0.7.4-alpha tag 不重打、不 force-update。
+
+---
+
 ## [v0.7.4-alpha] — Phase 17G CI Result Confirmation / Release Checkpoint Notes
 
 本階段為純文件 checkpoint。無程式碼變動、無測試新增、無 workflow 修改、無 dependency 異動。
