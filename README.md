@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 17D — Operator Preflight Validation；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 17E — Packaging Metadata Modernization；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 

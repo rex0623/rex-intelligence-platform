@@ -1,22 +1,25 @@
-[tool.poetry]
+[project]
 name = "rex-intelligence-platform"
 version = "0.1.0"
 description = "Rex Intelligence Platform - LINE based AI OS"
-authors = ["Rex Chen <rex0623@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "app" }, { include = "scripts" }]
+authors = [{ name = "Rex Chen", email = "rex0623@gmail.com" }]
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "fastapi>=0.115.0,<0.116.0",
+    "uvicorn[standard]>=0.34.0,<0.35.0",
+    "pydantic>=2.10.0,<3.0.0",
+    "pydantic-settings>=2.7.0,<3.0.0",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "line-bot-sdk>=3.14.0,<4.0.0",
+    "pymupdf>=1.27.2,<1.28.0",
+]
 
-[tool.poetry.scripts]
+[project.scripts]
 rip = "scripts.mock_line:main"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-fastapi = "^0.115.0"
-uvicorn = { extras = ["standard"], version = "^0.34.0" }
-pydantic = "^2.10.0"
-pydantic-settings = "^2.7.0"
-python-dotenv = "^1.0.1"
-line-bot-sdk = "^3.14.0"
+[tool.poetry]
+packages = [{ include = "app" }, { include = "scripts" }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

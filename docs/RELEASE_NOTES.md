@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–17D — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation**
+**Phase 16E–17E — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization**
 
 ---
 
@@ -24,6 +24,7 @@
 - **Runtime Lock / Concurrency Guard** — `fcntl.flock` advisory lock on `runtime/rip.lock`；防止多 process 同時寫入 runtime state；lock busy 立即回覆提示；help / preview 不受鎖影響（17B）
 - **Operator Deployment Runbook** — `docs/OPERATOR_DEPLOYMENT.md`；涵蓋安裝 / 設定（.env / SAFE_PDF_ROOT / RUNTIME_DIR）/ smoke test / runtime 目錄 / 備份 / 還原 / 升級 / runtime_lock_busy 處理 / Git hygiene（17C）
 - **Operator Preflight Validation** — `app/core/preflight.py`；safe preflight（low-write）；7 個 check（Python 版本 / fcntl / SAFE_PDF_ROOT / RUNTIME_DIR writable / git hygiene / pyproject）；不取 lock / 不建 JSON state；`tests/test_operator_preflight.py`（17 tests）（17D）
+- **Packaging Metadata Modernization** — `pyproject.toml` 遷移至 PEP 621 `[project]` 標準格式；消除所有 6 個 `poetry check` deprecation warnings；`poetry check` 結果：**All set!**；runtime dependencies PEP 508 等價轉換；**PyMuPDF is now declared as a locked runtime dependency for PDF analysis workflows**（`pymupdf>=1.27.2,<1.28.0`，先前僅手動安裝）；package version 維持 0.1.0（17E）
 
 ---
 
@@ -83,9 +84,9 @@
 
 ### Package Artifact（Phase 16G）
 
-**`poetry check` 結果**：通過（有 deprecation warnings，非 errors）
+**`poetry check` 結果**：**All set!**（Phase 17E PEP 621 遷移後，0 warnings）
 
-> Poetry 2.x 建議從 `[tool.poetry]` 遷移至 `[project]` 標準欄位；目前使用 `[tool.poetry]` 為舊格式 warnings，不影響 build 功能。
+> Phase 17E 已完成 PEP 621 migration（`[tool.poetry]` → `[project]`），消除所有 6 個 deprecation warnings。
 
 **`poetry build` 結果**：成功 ✅
 
@@ -161,3 +162,4 @@ git push origin v0.7.4-alpha
 | 17B（Runtime Lock / Concurrency Guard） | +16 → 709 |
 | 17C（Operator Deployment Runbook） | +0 → 709（純文件）|
 | 17D（Operator Preflight Validation） | +17 → 726 |
+| 17E（Packaging Metadata Modernization） | +0 → 726（pyproject.toml 格式遷移；1 個斷言更新，非新增）|

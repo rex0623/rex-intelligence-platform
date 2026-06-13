@@ -134,10 +134,10 @@ def test_pyproject_exists_with_poetry_and_pytest():
 
 
 def test_pyproject_defines_rip_console_script():
-    """pyproject.toml 應定義 rip console_scripts entry point（Phase 17A）。"""
+    """pyproject.toml 應定義 rip console_scripts entry point（Phase 17A；Phase 17E 遷移至 [project.scripts]）。"""
     pyproject = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "[tool.poetry.scripts]" in pyproject, (
-        "pyproject.toml 應含 [tool.poetry.scripts] 區塊"
+    assert "[project.scripts]" in pyproject, (
+        "pyproject.toml 應含 [project.scripts] 區塊（Phase 17E PEP 621 遷移）"
     )
     assert 'rip = "scripts.mock_line:main"' in pyproject, (
         "rip entry point 應指向 scripts.mock_line:main"

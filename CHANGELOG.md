@@ -5,6 +5,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17E Packaging Metadata Modernization
+
+本階段將 `pyproject.toml` 從 `[tool.poetry]` 舊格式遷移至 PEP 621 `[project]` 標準欄位，
+消除 `poetry check` 所有 6 個 deprecation warning；並正式將 `pymupdf` 納入 `[project.dependencies]`，
+確保 fresh install 後 PDF workflow 可正常運作。package version 維持 0.1.0（packaging metadata）；
+RIP release version（v0.7.4-alpha）以文件 / git tag 為準。不修改任何程式邏輯。
+
+### Changed
+- `pyproject.toml`：
+  - 新增 `[project]` section（name / version / description / readme / authors / requires-python / dependencies）。
+  - runtime dependencies 從 `[tool.poetry.dependencies]` 遷移至 `[project.dependencies]`，
+    caret constraints 轉為 PEP 508 等價範圍（例 `^0.115.0` → `>=0.115.0,<0.116.0`）。
+  - **正式新增 `pymupdf>=1.27.2,<1.28.0` 為 runtime dependency**（原為手動安裝，未在 pyproject.toml；
+    fresh install 後 `import fitz` / PDF analysis workflow 會因缺少 fitz 而失敗）。
+  - `[tool.poetry.scripts]` 遷移至 `[project.scripts]`。
+  - 保留 `[tool.poetry]`（packages 宣告）與 `[tool.poetry.group.dev.dependencies]`。
+  - `[build-system]` 不變。
+- `tests/test_cli_smoke.py`：`[tool.poetry.scripts]` 斷言 → `[project.scripts]`（Phase 17E PEP 621 遷移）。
+- `poetry.lock`：新增 pymupdf 1.27.2.3 lock entry；content-hash 更新；既有 6 個套件版本不變。
+- `README.md`：Version banner 更新至 Phase 17E；Known Limitations 補 PEP 621 migration 說明。
+- `docs/PROJECT_STATUS.md`：Phase 17E 加入 Completed Phases；test count 維持 726。
+- `docs/RELEASE_NOTES.md`：Package Artifact 節更新（poetry check now "All set!"）；test count 表更新。
+- `CHANGELOG.md`：本條目。
+
+### poetry check 結果（Phase 17E 後）
+
+```
+All set!
+```
+
+（6 個 deprecation warnings 已全數消除；migration 前為「Poetry 2.x 建議從 [tool.poetry] 遷移」等警告）
+
+### poetry.lock 變動說明
+
+`poetry lock` 新增 pymupdf lock entry（1.27.2.3）；既有 6 個主要 runtime dependency 版本完全不變：
+
+| Package | Version | 異動 |
+|---------|---------|------|
+| pymupdf | 1.27.2.3 | **新增** |
+| fastapi | 0.115.14 | 不變 |
+| line-bot-sdk | 3.23.0 | 不變 |
+| pydantic | 2.13.4 | 不變 |
+| pydantic-settings | 2.14.1 | 不變 |
+| python-dotenv | 1.2.2 | 不變 |
+| uvicorn | 0.34.3 | 不變 |
+
+### Safety guarantees
+- 未修改 scripts/mock_line.py / runtime_lock.py / config.py / preflight.py。
+- 未修改 runtime JSON schema。
+- 未修改任何指令語意或 workflow 行為。
+- `poetry run pytest -q`：726 passed（無新增、無移除測試；`test_cli_smoke.py` 1 個斷言更新）。
+- package version 保持 0.1.0（packaging metadata 與 RIP release version 分離策略不變）。
+
+### Recommended next phase
+- **Phase 17F** — 視需求決定
+
+---
+
 ## [v0.7.4-alpha] — Phase 17D Operator Preflight Validation
 
 本階段新增 `app/core/preflight.py` safe preflight module 與
