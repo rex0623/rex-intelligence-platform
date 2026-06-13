@@ -61,7 +61,7 @@ def test_readme_exists():
 
 def test_readme_documents_version_and_positioning():
     readme = _readme()
-    assert "v0.7.3-alpha" in readme
+    assert "v0.7.4-alpha" in readme
     assert "Rex Intelligence Platform" in readme
     assert "本機文件智慧整理平台" in readme
 

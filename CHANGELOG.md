@@ -5,6 +5,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 16E Release Candidate Stabilization
+
+本階段以 release candidate 穩定化為主：不新增核心功能、不新增 destructive action、
+不改變既有指令語意；補強文件一致性（README / PROJECT_STATUS / CHANGELOG 版本對齊）、
+release readiness checklist、command inventory snapshot、pyproject version strategy 說明、
+release candidate notes、release smoke tests。
+
+### Added
+- `tests/test_release_readiness.py` — 17 個新測試（release readiness 驗收）：
+  - **README 稽核（4）**：v0.7.4-alpha 版本存在、Release Candidate Notes 存在、
+    local CLI / Mock LINE 介面說明、不適用多人 / production 場景記載。
+  - **PROJECT_STATUS checklist（4）**：Release Readiness Checklist 存在、
+    Rename workflow / Move workflow / runtime settings 已完成標記。
+  - **CHANGELOG（1）**：v0.7.4-alpha Phase 16E 段落存在。
+  - **版本策略（1）**：pyproject.toml 版本策略已文件化。
+  - **Runtime / git（1）**：runtime JSON 無 git 追蹤。
+  - **Destructive command 稽核（2）**：無新增 approved list 以外的 destructive 指令；
+    四個 destructive regex 保持 ^…$ 全錨定。
+  - **Help 功能回歸（1）**：說明 / help / /help / 指令說明 仍正常。
+  - **Test file 存在（2）**：test_cli_smoke.py 與 test_end_to_end_workflow_audit.py 存在。
+  - **Command Inventory（3）**：README 含 Command Inventory / 完整指令一覽、
+    Non-destructive / Destructive 分類存在、四個 destructive 指令與多個 non-destructive 均列出。
+
+### Changed
+- `README.md`
+  - 版本推進 v0.7.4-alpha（Phase 16E）。
+  - 新增「完整指令一覽（Command Inventory）」— Non-destructive（8 指令）/
+    Destructive full-match only（4 指令）明確分類。
+  - 新增「Release Candidate Notes」— 目前版本與狀態、適用 / 不適用場景、安全提醒。
+  - 「目前限制」補 pyproject.toml 版本策略說明（方案 A：0.1.0 為 packaging metadata，
+    非 release version source of truth）。
+- `docs/PROJECT_STATUS.md`
+  - 版本推進 v0.7.4-alpha，測試數更新（628 → 648）。
+  - 16E 加入 Completed Phases 表。
+  - 新增「Release Readiness Checklist（v0.7.4-alpha）」— ✅ 18 項已完成、⬜ 5 項待完成。
+  - 新增「Version Strategy（16E 決策，方案 A）」說明區塊。
+  - Capability Snapshot 標題更新至 v0.7.4-alpha。
+  - Safety Rule 58（Command Inventory / RC Notes 靜態文件）新增。
+  - Known Limitations 補 16E release candidate 狀態說明。
+  - Recommended Next Phase 更新為 16F。
+- `tests/test_cli_smoke.py`
+  - `test_readme_documents_version_and_positioning`：版本字串更新為 v0.7.4-alpha。
+
+### Version strategy decision（Task 1，方案 A）
+- **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
+- **Release 版本以 PROJECT_STATUS / CHANGELOG 的 RIP version 為準** — 目前 v0.7.4-alpha。
+- 版本策略已在 README 目前限制區塊與 PROJECT_STATUS Version Strategy 區塊明確記載。
+
+### Safety guarantees
+- 未新增任何 destructive action、未新增任何 Mock LINE 指令、未改變既有指令語意。
+- 四個 destructive regex（確認改名 / 回滾改名 / 確認搬移 / 回滾搬移）仍全數 ^…$ 全錨定（test_release_readiness.py 鎖定驗證）。
+- 所有測試使用 tmp_path / monkeypatch；runtime JSON 持續 gitignored。
+
+### Recommended next phase
+- **Phase 16F — Release Candidate Tagging / Final Regression**
+
+---
+
 ## [v0.7.3-alpha] — Phase 16D Packaging / CLI Smoke Test
 
 本階段以 packaging、README、CLI smoke test、最小可交付檢查為主：

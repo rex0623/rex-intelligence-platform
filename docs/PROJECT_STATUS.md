@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.3-alpha |
-| **Test Count** | 628 passing |
+| **Current Version** | v0.7.4-alpha |
+| **Test Count** | 648 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -41,10 +41,47 @@
 | 16B | Runtime Settings Consolidation | ✅ Complete |
 | 16C | Operator UX / Command Help Text | ✅ Complete |
 | 16D | Packaging / CLI Smoke Test | ✅ Complete |
+| 16E | Release Candidate Stabilization | ✅ Complete |
 
 ---
 
-## Current Capability Snapshot（v0.7.0-alpha）
+## Release Readiness Checklist（v0.7.4-alpha）
+
+- [x] RenamePlan workflow completed
+- [x] Rename safe execution completed
+- [x] Rename rollback preview completed
+- [x] Rename rollback execution completed
+- [x] Rename transaction cleanup completed
+- [x] MovePlan workflow completed
+- [x] Move safe execution completed
+- [x] Move rollback preview completed
+- [x] Move rollback execution completed
+- [x] Move transaction cleanup completed
+- [x] Operator help text completed
+- [x] Runtime settings consolidated
+- [x] CLI smoke tests completed
+- [x] E2E audit tests completed
+- [x] Runtime files gitignored
+- [x] Release readiness checklist completed（16E）
+- [x] Command inventory documented（16E）
+- [x] Version strategy documented（16E）
+- [ ] Formal console_scripts entry point
+- [ ] Packaged release artifact
+- [ ] Production deployment guide
+- [ ] Multi-user concurrency guard
+- [ ] SQLite / DB persistence option
+
+---
+
+## Version Strategy（16E 決策，方案 A）
+
+- **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
+- **Release 版本以 PROJECT_STATUS / CHANGELOG 的 RIP version 為準** — 目前 v0.7.4-alpha。
+- 版本策略已在 README「目前限制」區塊明確記載；pyproject version 對齊留待正式 release 階段（16F+）。
+
+---
+
+## Current Capability Snapshot（v0.7.4-alpha）
 
 **Rename capabilities**：RenamePlan → Approval → Confirm rename（「確認改名」）→ Transaction log → Rollback preview（「預覽回滾改名」）→ Rollback execution（「回滾改名」）→ Log cleanup（`prune_transactions`，14F）
 
@@ -196,6 +233,7 @@ WorkerRequest                                                               │
 55. **Help 指令純文字（16C）** — 「說明」「指令說明」「help」「/help」full match 才觸發；只回覆指令說明文字，不建立 approval、不讀寫 transaction log、不碰任何檔案、不進入 router / planning / execution / rollback 任何路徑（零副作用，測試驗證）。
 56. **錯誤訊息只改文字、不改 reason（16C）** — `humanize_reason()` 在輸出層為 reason code 附中文說明與建議下一步，原始 code 一律保留方便 debug；底層 result reason、bridge gates、once-only guard 行為完全不變；未知 code 安全顯示不 raise。
 57. **下一步提示不改變流程（16C）** — execution 成功回覆附「預覽回滾改名/搬移」「回滾改名/搬移」提示；preview 回覆明示 read-only；核准（「確認 {approval_id}」）回覆明示不會改名/搬移並提示明確執行指令；MovePlan 產生回覆維持 15B 不變式（不直接提示「確認搬移」，改以「指令說明」導引）。
+58. **Command Inventory 與 Release Candidate Notes 靜態文件（16E）** — README 新增「完整指令一覽」（Non-destructive 8 指令 / Destructive full-match only 4 指令）與「Release Candidate Notes」；`tests/test_release_readiness.py` 稽核文件內容、version、checklist、command inventory 分類；未新增任何 destructive action、未改變指令語意。
 
 ---
 
@@ -228,12 +266,16 @@ WorkerRequest                                                               │
 - `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.3-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
 - README operator 文件為靜態維護（16D）：指令清單與安全原則由 `tests/test_cli_smoke.py` 以子字串稽核鎖定，新增指令時需同步更新。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
+- Release candidate 狀態（16E）：不適用於多人同時操作、長期高併發、真正 production daemon；適用於本機文件整理與安全流程驗證。
+- Command Inventory 與 Release Candidate Notes 為靜態維護（16E）：新增指令時需同步更新 README 對應區塊，`tests/test_release_readiness.py` 會稽核關鍵子字串。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 16E — Release Candidate Stabilization**
+**Phase 16F — Release Candidate Tagging / Final Regression**
 
-- 凍結功能面，全面回歸與文件一致性檢查（README / PROJECT_STATUS / CHANGELOG / help text 對齊）。
-- 版本資訊整理（pyproject version 對齊文件版本）、release notes 草稿。
+- 最終全回歸測試（確認所有 648+ tests 通過）。
+- 版本資訊最終對齊確認（pyproject version alignment 若需要）。
+- 正式 git tag v0.7.4-alpha 或 v0.8.0-rc1 candidate 決策。
+- Release notes 最終確認與整理。

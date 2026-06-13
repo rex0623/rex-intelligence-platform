@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.3-alpha**（詳見 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) 與 [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 16E — Release Candidate Stabilization；詳見 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) 與 [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 
@@ -52,6 +52,30 @@ poetry run python scripts/mock_line.py "產生搬移計畫"
 | `預覽回滾搬移 {transaction_id}` | 只預覽，不搬檔案、不改 log |
 | `回滾搬移 {transaction_id}` | **真的回滾搬移** |
 
+### 完整指令一覽（Command Inventory）
+
+**Non-destructive（不會改動任何檔案）**
+
+| 指令 | 說明 |
+|------|------|
+| `說明` / `指令說明` / `help` / `/help` | 顯示指令說明 |
+| `整理檔名` | 產生改名計畫（dry-run） |
+| `分析 PDF 詳細` | 分析 PDF 詳細報告 |
+| `整理資料夾` / `產生搬移計畫` / `分析 PDF 並產生搬移計畫` / `產生資料夾歸檔計畫` | 產生搬移計畫（dry-run） |
+| `確認 {approval_id}` | 核准計畫 + dry-run 報告，不動檔案 |
+| `取消 {approval_id}` | 取消核准請求 |
+| `預覽回滾改名 {transaction_id}` | 只預覽，不改檔案、不改 log |
+| `預覽回滾搬移 {transaction_id}` | 只預覽，不搬檔案、不改 log |
+
+**Destructive — full match 才生效（會真的改動檔案）**
+
+| 指令 | 效果 |
+|------|------|
+| `確認改名 {approval_id}` | **真的改名** |
+| `回滾改名 {transaction_id}` | **真的回滾改名** |
+| `確認搬移 {approval_id}` | **真的搬移** |
+| `回滾搬移 {transaction_id}` | **真的回滾搬移** |
+
 ### 安全原則
 
 - **Planning 指令不會改檔案** — 「整理檔名」「整理資料夾」等只產生計畫。
@@ -73,6 +97,29 @@ poetry run python scripts/mock_line.py "產生搬移計畫"
 - Mock LINE 為本機 CLI 模擬入口（`scripts/mock_line.py`），尚未提供正式 console_scripts entry point。
 - Help text 為靜態維護（新增指令需手動同步 `command_help_text()`）。
 - 絕對路徑仍依既有語意原樣使用，不受 SAFE_PDF_ROOT 錨定限制。
+- **版本策略**：`pyproject.toml` package version（0.1.0）為 packaging metadata，非 release version source of truth；現階段以 `PROJECT_STATUS` / `CHANGELOG` 的 RIP 版本（v0.7.4-alpha）為準。
+
+### Release Candidate Notes
+
+**目前版本**：v0.7.4-alpha（Phase 16E — Release Candidate Stabilization）
+
+**目前狀態**：本機 CLI / Mock LINE operator interface
+
+**適用場景**：
+- 本機文件整理與安全流程驗證
+- 個人工作台 PDF 改名 / 搬移操作
+- 開發者功能測試與 E2E 流程驗證
+
+**不適用場景**：
+- 多人同時操作（無多使用者 / tenant 隔離）
+- 長期高併發任務（JSON persistence，無資料庫，非 production daemon）
+- 未受控資料夾大批次自動操作（每筆 destructive action 需人工確認）
+
+**安全提醒**：
+- Destructive action 需 full match — 指令格式不符不會執行
+- Planning / preview 不會改檔案 — 只有「確認改名」「回滾改名」「確認搬移」「回滾搬移」會真的動檔案
+- Runtime logs 不進 Git — `runtime/` 目錄已 gitignored
+- 建議先在測試資料夾操作，確認計畫正確後再執行 destructive action
 
 ---
 
