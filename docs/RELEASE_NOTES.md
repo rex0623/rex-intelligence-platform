@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–17C — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook**
+**Phase 16E–17D — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation**
 
 ---
 
@@ -23,6 +23,7 @@
 - **console_scripts entry point added** — `rip = "scripts.mock_line:main"`；`poetry run rip "..."` 可替代 `poetry run python scripts/mock_line.py "..."`；舊用法向下相容（17A）
 - **Runtime Lock / Concurrency Guard** — `fcntl.flock` advisory lock on `runtime/rip.lock`；防止多 process 同時寫入 runtime state；lock busy 立即回覆提示；help / preview 不受鎖影響（17B）
 - **Operator Deployment Runbook** — `docs/OPERATOR_DEPLOYMENT.md`；涵蓋安裝 / 設定（.env / SAFE_PDF_ROOT / RUNTIME_DIR）/ smoke test / runtime 目錄 / 備份 / 還原 / 升級 / runtime_lock_busy 處理 / Git hygiene（17C）
+- **Operator Preflight Validation** — `app/core/preflight.py`；safe preflight（low-write）；7 個 check（Python 版本 / fcntl / SAFE_PDF_ROOT / RUNTIME_DIR writable / git hygiene / pyproject）；不取 lock / 不建 JSON state；`tests/test_operator_preflight.py`（17 tests）（17D）
 
 ---
 
@@ -159,3 +160,4 @@ git push origin v0.7.4-alpha
 | 17A（console_scripts entry point） | +3 → 693 |
 | 17B（Runtime Lock / Concurrency Guard） | +16 → 709 |
 | 17C（Operator Deployment Runbook） | +0 → 709（純文件）|
+| 17D（Operator Preflight Validation） | +17 → 726 |

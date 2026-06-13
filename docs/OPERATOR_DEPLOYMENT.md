@@ -355,11 +355,57 @@ echo "runtime_backup_*/" >> .gitignore
 
 ---
 
+## Preflight Validation（Phase 17D）
+
+`app/core/preflight.py` 提供 **safe preflight（low-write）** 驗證，確認 operator 本機環境
+滿足 RIP 執行條件。
+
+### Preflight 檢查項目
+
+| 項目 | 說明 |
+|------|------|
+| `python_version` | Python ≥ 3.12 |
+| `fcntl_available` | `fcntl` 模組可 import（Linux / macOS / WSL2 only） |
+| `safe_pdf_root_exists` | `SAFE_PDF_ROOT` 目錄存在（只回報，**不自動建立**） |
+| `runtime_dir_writable` | `RUNTIME_DIR` 可建立 / 可寫入（**允許 mkdir**，不寫 JSON） |
+| `runtime_not_git_tracked` | `runtime/` 下無 git 追蹤檔案 |
+| `dist_not_git_tracked` | `dist/` 下無 git 追蹤檔案 |
+| `pyproject_console_scripts` | pyproject.toml 含 `rip = "scripts.mock_line:main"` |
+
+### Safe preflight 保證
+
+- **不呼叫** `acquire_runtime_lock()`（不取得 `fcntl` lock，不建立 `rip.lock`）
+- **不建立** `approvals.json` / `rename_transactions.json` / `move_transactions.json`
+- **不修改** 任何 workflow state
+- `SAFE_PDF_ROOT` 不存在時只回報失敗，不自動建立目錄
+- `RUNTIME_DIR` 不存在時允許建立目錄（寫入測試用臨時檔案 `.preflight_write_test` 後立即刪除）
+
+### 執行 Preflight
+
+```python
+# Python 直接執行
+from pathlib import Path
+from app.core.preflight import run_operator_preflight
+
+results = run_operator_preflight()
+for item in results:
+    status = "✅" if item.ok else "❌"
+    print(f"{status} [{item.name}] {item.message}")
+```
+
+```bash
+# 透過 pytest 執行（輸出各項 pass / fail）
+poetry run pytest tests/test_operator_preflight.py -v
+```
+
+---
+
 ## 快速參考
 
 | 情境 | 指令 |
 |------|------|
 | 查看所有可用指令 | `poetry run rip "說明"` |
+| 執行 preflight 驗證 | `poetry run pytest tests/test_operator_preflight.py -v` |
 | 升級前備份 | `cp -rp runtime/ runtime_backup_$(date +%Y%m%d_%H%M%S)/` |
 | 升級 | `git pull && poetry install && poetry run pytest -q` |
 | Lock busy 且無 process 在跑 | `rm runtime/rip.lock && poetry run rip "<指令>"` |

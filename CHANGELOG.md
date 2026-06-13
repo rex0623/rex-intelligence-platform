@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17D Operator Preflight Validation
+
+本階段新增 `app/core/preflight.py` safe preflight module 與
+`tests/test_operator_preflight.py`（17 tests），驗證 operator 本機環境。
+不修改任何程式邏輯、不改 runtime 行為、不改 JSON schema。
+
+### Added
+- `app/core/preflight.py`：`PreflightItem` dataclass + `run_operator_preflight()` +
+  7 個獨立 check function（python_version / fcntl / safe_pdf_root / runtime_dir_writable /
+  runtime_not_git_tracked / dist_not_git_tracked / pyproject_console_scripts）。
+- `tests/test_operator_preflight.py`：17 個測試（module import / Python version pass+fail /
+  fcntl / SAFE_PDF_ROOT 存在 / 不建立目錄 / RUNTIME_DIR 建立 / 無 JSON state /
+  不取 lock / 不建 approvals.json / git 追蹤 / pyproject / integration）。
+
+### Changed
+- `docs/OPERATOR_DEPLOYMENT.md`：新增「Preflight Validation（Phase 17D）」節
+  （7 個 check 說明 / safe preflight 保證 / 執行方式）；快速參考新增 preflight 指令。
+- `README.md`：Version banner 更新至 Phase 17D；安全原則補 preflight 一行。
+- `docs/PROJECT_STATUS.md`：Phase 17D 加入 Completed Phases；測試數 709 → 726。
+- `docs/RELEASE_NOTES.md`：Phase header 更新；test count 更新（+17 → 726）。
+- `CHANGELOG.md`：本條目。
+
+### Safety guarantees
+- `run_operator_preflight()` 不呼叫 `acquire_runtime_lock()`（測試驗證不建立 rip.lock）。
+- 不建立 approvals.json / rename_transactions.json / move_transactions.json（測試驗證）。
+- SAFE_PDF_ROOT 不存在時只回報，不自動建立（測試驗證）。
+- 所有測試使用 tmp_path / 參數 override；runtime 零污染。
+- 未修改 scripts/mock_line.py / runtime_lock.py / config.py。
+
+### Recommended next phase
+- **Phase 17E** — 視需求決定
+
+---
+
 ## [v0.7.4-alpha] — Phase 17C Operator Deployment / Backup / Restore Runbook
 
 本階段新增 `docs/OPERATOR_DEPLOYMENT.md`，涵蓋 operator 安裝、設定、smoke test、runtime 目錄說明、

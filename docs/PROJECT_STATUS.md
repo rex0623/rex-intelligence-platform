@@ -6,7 +6,7 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
-| **Test Count** | 709 passing |
+| **Test Count** | 726 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -47,6 +47,7 @@
 | 17A | console_scripts Entry Point | ✅ Complete |
 | 17B | Runtime Lock / Concurrency Guard | ✅ Complete |
 | 17C | Operator Deployment / Backup / Restore Runbook | ✅ Complete |
+| 17D | Operator Preflight Validation | ✅ Complete |
 
 ---
 
@@ -79,6 +80,7 @@
 - [x] Formal console_scripts entry point（17A）
 - [x] Runtime lock / concurrent access guard（17B）
 - [x] Production deployment guide / Operator Runbook（17C）
+- [x] Operator preflight validation（17D）
 - [ ] Packaged release artifact
 - [ ] SQLite / DB persistence option
 
