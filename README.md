@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 17B — Runtime Lock / Concurrency Guard；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 17C — Operator Deployment Runbook；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 
@@ -96,6 +96,7 @@ poetry run rip "產生搬移計畫"
 - **Concurrent access guard（Phase 17B）** — `fcntl.flock` advisory lock 防止多個 process 同時寫入 runtime state；lock busy 時立即回覆提示，不會等待。
 - **Runtime JSON 不納入 Git** — 均已 gitignored（含 `runtime/rip.lock`）。
 - **相對路徑錨定 SAFE_PDF_ROOT** — path traversal 以 `path_escapes_safe_root` fail-safe 拒絕；絕對路徑依既有語意原樣使用。
+- **Operator Runbook** — 安裝 / 設定 / 備份 / 還原 / 升級 / lock 處理詳見 [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)。
 
 ### Runtime files（本機 runtime state，已 gitignored）
 

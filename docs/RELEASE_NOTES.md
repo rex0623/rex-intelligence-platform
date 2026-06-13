@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–17B — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock**
+**Phase 16E–17C — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock / Operator Runbook**
 
 ---
 
@@ -22,6 +22,7 @@
 - **Tag readiness preparation completed** — Tagging Instructions 文件化、package artifact 建置驗證、pyproject version strategy 最終確認（16G）
 - **console_scripts entry point added** — `rip = "scripts.mock_line:main"`；`poetry run rip "..."` 可替代 `poetry run python scripts/mock_line.py "..."`；舊用法向下相容（17A）
 - **Runtime Lock / Concurrency Guard** — `fcntl.flock` advisory lock on `runtime/rip.lock`；防止多 process 同時寫入 runtime state；lock busy 立即回覆提示；help / preview 不受鎖影響（17B）
+- **Operator Deployment Runbook** — `docs/OPERATOR_DEPLOYMENT.md`；涵蓋安裝 / 設定（.env / SAFE_PDF_ROOT / RUNTIME_DIR）/ smoke test / runtime 目錄 / 備份 / 還原 / 升級 / runtime_lock_busy 處理 / Git hygiene（17C）
 
 ---
 
@@ -72,7 +73,7 @@
 - **console_scripts entry point provided（Phase 17A）** — `poetry install` 後可用 `poetry run rip "…"`；`poetry run python scripts/mock_line.py "…"` 舊用法向下相容保留。
 - **JSON persistence only** — transaction log 為 JSON 檔，無資料庫；大量交易時可後續評估 SQLite。
 - **pyproject.toml version（0.1.0）未對齊 RIP release version（v0.7.4-alpha）** — 方案 A 決策：packaging metadata 與 release version 分離；版本對齊（例如 0.7.4a0）留待正式 release packaging 流程（16H+）。
-- **Not designed for multi-user concurrent production operation** — 無 tenant 隔離、無跨 process 鎖；適用於個人本機文件整理。
+- **Not designed for multi-user concurrent production operation** — 無 tenant 隔離；`fcntl.flock` 只保護同機器上的 process 並發，不支援跨機器；適用於個人本機文件整理。詳見 [docs/OPERATOR_DEPLOYMENT.md](OPERATOR_DEPLOYMENT.md)。
 - **pyproject version is packaging metadata, not RIP release source of truth** — `pyproject.toml` version（0.1.0）為 packaging metadata；release 版本以 PROJECT_STATUS / CHANGELOG 為準（目前 v0.7.4-alpha）。
 - **Help text / command inventory 為靜態維護** — 新增指令時需手動同步 `command_help_text()` 與 README command inventory。
 - **Absolute paths not anchored to SAFE_PDF_ROOT** — 相對路徑有 traversal 防護；絕對路徑依既有語意原樣使用（所有現有測試依賴此行為）。
@@ -157,3 +158,4 @@ git push origin v0.7.4-alpha
 | 16G（Artifact readiness） | +16 → 690 |
 | 17A（console_scripts entry point） | +3 → 693 |
 | 17B（Runtime Lock / Concurrency Guard） | +16 → 709 |
+| 17C（Operator Deployment Runbook） | +0 → 709（純文件）|

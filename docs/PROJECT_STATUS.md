@@ -46,6 +46,7 @@
 | 16G | Git Tagging / Release Artifact Preparation | ✅ Complete |
 | 17A | console_scripts Entry Point | ✅ Complete |
 | 17B | Runtime Lock / Concurrency Guard | ✅ Complete |
+| 17C | Operator Deployment / Backup / Restore Runbook | ✅ Complete |
 
 ---
 
@@ -77,8 +78,8 @@
 - [x] pyproject version strategy final decision confirmed（16G，方案 A）
 - [x] Formal console_scripts entry point（17A）
 - [x] Runtime lock / concurrent access guard（17B）
+- [x] Production deployment guide / Operator Runbook（17C）
 - [ ] Packaged release artifact
-- [ ] Production deployment guide
 - [ ] SQLite / DB persistence option
 
 ---

@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17C Operator Deployment / Backup / Restore Runbook
+
+本階段新增 `docs/OPERATOR_DEPLOYMENT.md`，涵蓋 operator 安裝、設定、smoke test、runtime 目錄說明、
+備份、還原、升級、runtime_lock_busy 處理、Git hygiene。
+純文件異動，不改任何程式、不改 runtime 行為、不改 JSON schema。
+
+### Added
+- `docs/OPERATOR_DEPLOYMENT.md` — Operator 完整 Runbook（安裝 / 設定 / smoke test /
+  runtime 目錄 / 備份 / 還原 / 升級 / runtime_lock_busy / Git hygiene）。
+
+### Changed
+- `README.md`：Version banner 更新至 Phase 17C；安全原則新增 Operator Runbook 參照。
+- `docs/PROJECT_STATUS.md`：Phase 17C 加入 Completed Phases；
+  Release Readiness Checklist 勾選「Production deployment guide」。
+- `docs/RELEASE_NOTES.md`：Phase header 更新至 17C；Highlights 補 Operator Runbook；
+  Known Limitations 更新。
+- `CHANGELOG.md`：本條目。
+
+### Safety guarantees
+- 未修改任何程式（scripts/、app/、tests/ 均無異動）。
+- 未新增任何 Mock LINE 指令、未改變 runtime 行為、未改 JSON schema。
+- 測試數維持 709 passed（無新增 tests）。
+
+### Recommended next phase
+- **Phase 17D** — 視需求決定
+
+---
+
 ## [v0.7.4-alpha] — Phase 17B Runtime Lock / Concurrency Guard
 
 本階段新增 `app/core/runtime_lock.py`（`fcntl.flock` 非阻塞 advisory lock），
