@@ -4,7 +4,7 @@
 
 ## v0.7.4-alpha
 
-**Phase 16E–17A — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point**
+**Phase 16E–17B — Release Candidate Stabilization / Final Regression / Tag Readiness / console_scripts Entry Point / Runtime Lock**
 
 ---
 
@@ -21,6 +21,7 @@
 - **Final regression audit completed** — `tests/test_final_regression_release_candidate.py`；文件一致性、destructive command 不變式、runtime 零污染（16F）
 - **Tag readiness preparation completed** — Tagging Instructions 文件化、package artifact 建置驗證、pyproject version strategy 最終確認（16G）
 - **console_scripts entry point added** — `rip = "scripts.mock_line:main"`；`poetry run rip "..."` 可替代 `poetry run python scripts/mock_line.py "..."`；舊用法向下相容（17A）
+- **Runtime Lock / Concurrency Guard** — `fcntl.flock` advisory lock on `runtime/rip.lock`；防止多 process 同時寫入 runtime state；lock busy 立即回覆提示；help / preview 不受鎖影響（17B）
 
 ---
 
@@ -36,6 +37,7 @@
 | 相對路徑錨定 SAFE_PDF_ROOT | `resolve_under_safe_root()` 防止 path traversal；逃出 root 以 `path_escapes_safe_root` fail-safe 拒絕 |
 | Once-only guard | 同一 approval_id 成功執行後不可重複執行；同一 transaction_id 已全部回滾後不可重複回滾 |
 | Mock LINE 不直接碰 filesystem | 所有 destructive action 一律透過 approval bridge → safe executor（AST 驗證） |
+| Concurrent access guard | `fcntl.flock` on `runtime/rip.lock`；多 process 同時執行時立即回覆 lock_busy，不等待，不損毀 runtime state |
 
 ---
 
@@ -113,7 +115,7 @@ Tag 流程需由人工確認後執行：
 git status --short          # 輸出應為空
 
 # 2. 確認所有測試通過
-poetry run pytest -q        # 應顯示 690+ passed
+poetry run pytest -q        # 應顯示 709+ passed
 
 # 3. 確認版本一致（四份文件均含 v0.7.4-alpha）
 grep "v0.7.4-alpha" README.md docs/PROJECT_STATUS.md CHANGELOG.md docs/RELEASE_NOTES.md
@@ -154,3 +156,4 @@ git push origin v0.7.4-alpha
 | 16F（Final regression） | +26 → 674 |
 | 16G（Artifact readiness） | +16 → 690 |
 | 17A（console_scripts entry point） | +3 → 693 |
+| 17B（Runtime Lock / Concurrency Guard） | +16 → 709 |

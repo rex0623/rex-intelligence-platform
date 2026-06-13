@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17B Runtime Lock / Concurrency Guard
+
+本階段新增 `app/core/runtime_lock.py`（`fcntl.flock` 非阻塞 advisory lock），
+防止多個 operator process 同時執行會修改 runtime state 或實體檔案的操作。
+不新增任何 Mock LINE 指令、不改變指令語意、不修改 command dispatch / regex / full-match 規則。
+
+### Added
+- `app/core/runtime_lock.py`：`RuntimeLockBusy`（RuntimeError）、`acquire_runtime_lock()`
+  context manager（`fcntl.LOCK_EX | LOCK_NB` on `runtime/rip.lock`）。
+- `scripts/mock_line.py`：`_LOCK_BUSY_REPLY` 常數；六個會寫入 runtime state 的指令路徑（確認改名、
+  回滾改名、確認搬移、回滾搬移、planning keywords path、generic router path）以 `acquire_runtime_lock()` 保護。
+- `tests/test_runtime_lock.py`：16 個測試，涵蓋 lock 建立 / 釋放 / busy 時拋例外、_LOCK_BUSY_REPLY 內容、
+  help / preview 在 lock busy 時仍正常回覆、planning / approval / destructive / rollback 在 lock busy 時回傳 runtime_lock_busy。
+
+### Changed
+- `README.md`：Version banner 更新至 Phase 17B；安全原則新增「Concurrent access guard」。
+- `docs/PROJECT_STATUS.md`：Phase 17B 加入 Completed Phases；✅ Multi-user concurrency guard；
+  測試數更新（693 → 709）；Release Readiness Checklist 勾選 concurrency guard。
+- `docs/RELEASE_NOTES.md`：Test Count 表更新（+16 → 709）；Safety Guarantees 新增 runtime lock 一行。
+- `CHANGELOG.md`：本條目。
+
+### Safety guarantees
+- 未新增任何 destructive action、未新增任何 Mock LINE 指令、未改變既有指令語意。
+- `mock_line.py` command dispatch、regex、full-match 規則完全未修改。
+- Preview 指令（預覽回滾改名 / 預覽回滾搬移）維持純讀取，不走 lock 路徑。
+- Help 指令不走 lock 路徑，零 side effects。
+- Transaction log schema / runtime JSON schema / approval ID format 完全不變。
+- Lock file `runtime/rip.lock` 已由 `runtime/` gitignore 覆蓋，不納入 Git。
+- 所有測試使用 tmp_path / monkeypatch；runtime 零污染。
+
+### Recommended next phase
+- **Phase 17C** — 視需求決定（pyproject.toml 現代化 / 功能擴充 / 正式 release）
+
+---
+
 ## [v0.7.4-alpha] — Phase 17A console_scripts Entry Point
 
 本階段新增正式 `rip` console_scripts entry point，使 `poetry run rip "..."` 可替代

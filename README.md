@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.4-alpha**（Phase 17A — console_scripts Entry Point；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.4-alpha**（Phase 17B — Runtime Lock / Concurrency Guard；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 ---
 
@@ -93,7 +93,8 @@ poetry run rip "產生搬移計畫"
 - **Preview 指令不會改檔案、不改 log** — 「預覽回滾改名」「預覽回滾搬移」純讀取（read-only）。
 - **Destructive 指令必須 full match** — 六個執行 / 回滾指令 regex 全數 `^…$` 錨定，格式不符不會執行。
 - **模糊文字不會觸發 destructive action** — 「請幫我確認改名」「回滾一下」等一律不執行。
-- **Runtime JSON 不納入 Git** — 均已 gitignored。
+- **Concurrent access guard（Phase 17B）** — `fcntl.flock` advisory lock 防止多個 process 同時寫入 runtime state；lock busy 時立即回覆提示，不會等待。
+- **Runtime JSON 不納入 Git** — 均已 gitignored（含 `runtime/rip.lock`）。
 - **相對路徑錨定 SAFE_PDF_ROOT** — path traversal 以 `path_escapes_safe_root` fail-safe 拒絕；絕對路徑依既有語意原樣使用。
 
 ### Runtime files（本機 runtime state，已 gitignored）

@@ -6,7 +6,7 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
-| **Test Count** | 693 passing |
+| **Test Count** | 709 passing |
 | **Last Updated** | 2026-06-13 |
 
 ---
@@ -45,6 +45,7 @@
 | 16F | Release Candidate Tagging / Final Regression | ✅ Complete |
 | 16G | Git Tagging / Release Artifact Preparation | ✅ Complete |
 | 17A | console_scripts Entry Point | ✅ Complete |
+| 17B | Runtime Lock / Concurrency Guard | ✅ Complete |
 
 ---
 
@@ -75,9 +76,9 @@
 - [x] Tagging instructions documented（16G）
 - [x] pyproject version strategy final decision confirmed（16G，方案 A）
 - [x] Formal console_scripts entry point（17A）
+- [x] Runtime lock / concurrent access guard（17B）
 - [ ] Packaged release artifact
 - [ ] Production deployment guide
-- [ ] Multi-user concurrency guard
 - [ ] SQLite / DB persistence option
 
 ---

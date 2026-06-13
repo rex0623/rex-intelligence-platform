@@ -30,9 +30,19 @@ from app.folder_intelligence.schemas import MoveExecutionResult, MovePlan
 from app.folder_intelligence.transaction_log import (
     preview_move_rollback_transaction_by_id,
 )
+from app.core.runtime_lock import RuntimeLockBusy, acquire_runtime_lock
 from app.router.ai_router import AIRouter
 from app.schemas.messages import WorkerRequest
 from app.workers.pdf_worker import PDFWorker
+
+# ---------------------------------------------------------------------------
+# Phase 17B — Runtime lock busy reply
+# ---------------------------------------------------------------------------
+
+_LOCK_BUSY_REPLY = (
+    "小雷收到：目前有另一個操作正在執行中，請稍候再試。\n"
+    "- 原因：runtime_lock_busy"
+)
 
 
 def _format_document_summary(inner: dict) -> str:
@@ -995,10 +1005,14 @@ def mock_line_payload(
     # 「產生搬移計畫」「確認改名」）一律不會進入 move 執行路徑。
     confirm_move_match = _CONFIRM_MOVE_PATTERN.match(text.strip())
     if confirm_move_match:
-        return confirm_move(
-            confirm_move_match.group(1),
-            move_transaction_log=move_transaction_log,
-        )
+        try:
+            with acquire_runtime_lock():
+                return confirm_move(
+                    confirm_move_match.group(1),
+                    move_transaction_log=move_transaction_log,
+                )
+        except RuntimeLockBusy:
+            return _LOCK_BUSY_REPLY
 
     # Move rollback preview (Phase 15H): exact「預覽回滾搬移 {transaction_id}」
     # only.  Read-only：不 rollback、不搬移、不寫 log。
@@ -1014,10 +1028,14 @@ def mock_line_payload(
     # log，與「回滾改名」（rename log）完全分離。
     rollback_move_match = _ROLLBACK_MOVE_PATTERN.match(text.strip())
     if rollback_move_match:
-        return rollback_move(
-            rollback_move_match.group(1),
-            move_transaction_log=move_transaction_log,
-        )
+        try:
+            with acquire_runtime_lock():
+                return rollback_move(
+                    rollback_move_match.group(1),
+                    move_transaction_log=move_transaction_log,
+                )
+        except RuntimeLockBusy:
+            return _LOCK_BUSY_REPLY
 
     # Rollback preview (Phase 14D-3A): exact「預覽回滾改名 {transaction_id}」only
     preview_rollback_match = _PREVIEW_ROLLBACK_PATTERN.match(text.strip())
@@ -1030,38 +1048,58 @@ def mock_line_payload(
     # Rollback execution (Phase 14D-3B): exact「回滾改名 {transaction_id}」only
     rollback_rename_match = _ROLLBACK_RENAME_PATTERN.match(text.strip())
     if rollback_rename_match:
-        return rollback_rename(
-            rollback_rename_match.group(1),
-            transaction_log=transaction_log,
-        )
+        try:
+            with acquire_runtime_lock():
+                return rollback_rename(
+                    rollback_rename_match.group(1),
+                    transaction_log=transaction_log,
+                )
+        except RuntimeLockBusy:
+            return _LOCK_BUSY_REPLY
 
     # Explicit confirm rename (Phase 14D-2): exact「確認改名 {approval_id}」only
     confirm_rename_match = _CONFIRM_RENAME_PATTERN.match(text.strip())
     if confirm_rename_match:
-        return confirm_rename(
-            confirm_rename_match.group(1),
-            transaction_log=transaction_log,
-        )
+        try:
+            with acquire_runtime_lock():
+                return confirm_rename(
+                    confirm_rename_match.group(1),
+                    transaction_log=transaction_log,
+                )
+        except RuntimeLockBusy:
+            return _LOCK_BUSY_REPLY
 
     # Move/Rename planning: must be checked before 分析 PDF to handle
     # 分析 PDF 並產生搬移計畫 / 分析 PDF 並產生改名計畫
+    # Writes approvals.json via approval_manager.create_approval() → needs lock.
     if any(kw in text for kw in _MOVE_PLAN_KEYWORDS) or any(
         kw in text for kw in _RENAME_PLAN_KEYWORDS
     ):
-        router = AIRouter()
-        result = asyncio.run(router.route(message=text))
-        worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")
-        return format_mock_response(worker_response)
+        try:
+            with acquire_runtime_lock():
+                router = AIRouter()
+                result = asyncio.run(router.route(message=text))
+                worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")
+                return format_mock_response(worker_response)
+        except RuntimeLockBusy:
+            return _LOCK_BUSY_REPLY
 
+    # 分析 PDF 路徑：純讀取，不寫 runtime state，不需要 lock。
     if "分析 PDF 詳細" in text or "分析pdf詳細" in text.lower():
         return _analyze_pdfs_detail()
     if "分析 PDF" in text or "分析pdf" in text.lower():
         return _analyze_pdfs_direct()
 
-    router = AIRouter()
-    result = asyncio.run(router.route(message=text))
-    worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")
-    return format_mock_response(worker_response)
+    # Generic router（確認 / 取消 / 電費單 / 其他）：
+    # 可能呼叫 approval_manager.approve() / reject() / create_approval() → 需要 lock。
+    try:
+        with acquire_runtime_lock():
+            router = AIRouter()
+            result = asyncio.run(router.route(message=text))
+            worker_response = result.get("worker_response", "我還不確定你的需求，可以再說清楚一點嗎？")
+            return format_mock_response(worker_response)
+    except RuntimeLockBusy:
+        return _LOCK_BUSY_REPLY
 
 
 def main() -> None:
