@@ -7,7 +7,7 @@
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.4-alpha |
 | **Test Count** | 726 passing |
-| **Last Updated** | 2026-06-13（Phase 17F）|
+| **Last Updated** | 2026-06-13（Phase 17G）|
 
 ---
 
@@ -50,6 +50,7 @@
 | 17D | Operator Preflight Validation | ✅ Complete |
 | 17E | Packaging Metadata Modernization（PEP 621）+ PyMuPDF dependency lock | ✅ Complete |
 | 17F | GitHub Actions CI / Release Validation | ✅ Complete |
+| 17G | CI Result Confirmation / Release Checkpoint Notes | ✅ Complete |
 
 ---
 
@@ -83,6 +84,7 @@
 - [x] Runtime lock / concurrent access guard（17B）
 - [x] Production deployment guide / Operator Runbook（17C）
 - [x] Operator preflight validation（17D）
+- [x] GitHub Actions CI pipeline green（17F；CI #1 commit 9c0173c，726 passed，poetry check All set，build 成功）
 - [ ] Packaged release artifact
 - [ ] SQLite / DB persistence option
 
@@ -93,7 +95,7 @@
 - **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
 - **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — 目前 v0.7.4-alpha。
 - **`poetry build` 產生的 artifact 版本為 0.1.0**（來自 pyproject.toml），非 RIP release version；artifact 名稱 `rex_intelligence_platform-0.1.0.tar.gz`。
-- 版本對齊（例如 0.7.4a0）留待正式 release packaging（16H+）；`poetry check` 有 deprecation warnings（`[tool.poetry]` 遷移），但非 errors，不影響目前 build。
+- 版本對齊（例如 0.7.4a0）留待正式 release packaging（16H+）；`poetry check`：**All set!**（Phase 17E PEP 621 migration 後，deprecation warnings 已全數消除）。
 
 ---
 
@@ -110,9 +112,10 @@
 - [x] Tagging instructions documented（RELEASE_NOTES Tagging Instructions，16G）
 - [x] Package artifact built（dist/，gitignored，未 commit；poetry build 成功，16G）
 - [x] Working tree clean before tag（git status --short 為空確認）
+- [x] Production deployment guide completed（17C，`docs/OPERATOR_DEPLOYMENT.md`）
+- [x] CI pipeline green（17F；CI #1 commit 9c0173c，34s，726 passed）
 - [ ] Git tag created（人工執行：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"`）
 - [ ] Tag pushed（人工執行：`git push origin v0.7.4-alpha`）
-- [ ] Production deployment guide completed
 - [ ] pyproject version aligned（選做：0.1.0 → 0.7.4a0，留待 16H+）
 
 ---
@@ -299,23 +302,24 @@ WorkerRequest                                                               │
 - 「產生搬移計畫」的回覆仍不直接提示「確認搬移」指令（15B 測試不變式）；16C 起改以「指令說明」導引，且核准後的 dry-run 報告會明確提示「確認搬移 {approval_id}」。
 - Help text 為靜態維護文字（16C）：新增指令時需手動同步 `command_help_text()`，無自動由 regex 清單產生。
 - `rip` console_scripts entry point 已提供（17A）：`poetry install` 後可用 `poetry run rip "…"`；`poetry run python scripts/mock_line.py "…"` 舊用法向下相容保留。
-- `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.3-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
+- `pyproject.toml` 的 package version（0.1.0）與文件版本（v0.7.4-alpha）未同步（16D 記錄）：版本演進目前以 CHANGELOG / PROJECT_STATUS 為準，packaging version 留待正式 release 階段對齊。
 - README operator 文件為靜態維護（16D）：指令清單與安全原則由 `tests/test_cli_smoke.py` 以子字串稽核鎖定，新增指令時需同步更新。
 - Move once-only guard 沿用 14E 語意：部分成功即標記 executed，失敗候選無法以同一 approval 重試。
 - Release candidate 狀態（16E）：不適用於多人同時操作、長期高併發、真正 production daemon；適用於本機文件整理與安全流程驗證。
 - Command Inventory 與 Release Candidate Notes 為靜態維護（16E）：新增指令時需同步更新 README 對應區塊，`tests/test_release_readiness.py` 會稽核關鍵子字串。
 - RELEASE_NOTES.md 為靜態維護（16F）：新增指令或版本更新時需同步；`tests/test_final_regression_release_candidate.py` 稽核內容存在與關鍵子字串。
 - Tag Readiness Checklist（16F–16G）：Git tag 與 push 尚未執行，留待人工確認後執行（詳見 RELEASE_NOTES Tagging Instructions）。
-- Package artifact（16G）：`dist/` 已 gitignored；artifact 版本為 0.1.0（pyproject packaging version），非 RIP release version；`poetry check` 有 deprecation warnings 但不影響 build。
+- Package artifact（16G）：`dist/` 已 gitignored；artifact 版本為 0.1.0（pyproject packaging version），非 RIP release version；`poetry check`：All set!（Phase 17E PEP 621 migration 後 packaging metadata warnings 已消除）。
 
 ---
 
 ## Recommended Next Phase
 
-**Phase 17B** — 視需求決定（pyproject.toml 現代化 / 功能擴充 / 正式 release）
+**Phase 17H** — TBD（視需求決定）
 
 可選方向：
-- `pyproject.toml` 現代化：從 `[tool.poetry]` 遷移至 `[project]` 標準格式（解決 `poetry check` deprecation warnings）。
-- pyproject version 對齊：0.1.0 → 0.7.4a0（PEP 440）。
 - 人工建立 git tag：`git tag -a v0.7.4-alpha -m "RIP v0.7.4-alpha"` && `git push origin v0.7.4-alpha`。
-- 功能擴充：multi-user 支援、SQLite persistence、production deployment guide。
+- pyproject version 對齊：0.1.0 → 0.7.4a0（PEP 440）。
+- 功能擴充：multi-user 支援、SQLite persistence。
+
+（Phase 17B–17G 已完成：Runtime Lock / Runbook / Preflight / PEP 621 / PyMuPDF lock / GitHub Actions CI / CI Result Confirmation）

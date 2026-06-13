@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.4-alpha] — Phase 17G CI Result Confirmation / Release Checkpoint Notes
+
+本階段為純文件 checkpoint。無程式碼變動、無測試新增、無 workflow 修改、無 dependency 異動。
+
+### CI #1 Run 確認
+
+| 項目 | 結果 |
+|------|------|
+| Commit | 9c0173c |
+| Runner | ubuntu-22.04 / Python 3.12 / Poetry 2.4.1 |
+| Duration | 34s |
+| poetry check | All set! |
+| pytest | 726 passed |
+| poetry build | 成功（rex_intelligence_platform-0.1.0）|
+
+GitHub Actions CI 首次在 clean environment 完整驗證：
+- PEP 621 `[project]` 格式正確（poetry check All set）
+- PyMuPDF（pymupdf 1.27.2.3）可在 ubuntu-22.04 正常安裝與 import
+- `poetry run rip "說明"` console_scripts entry point 可用
+- packaging artifact 0.1.0 可正常 build
+
+### Changed
+- `CHANGELOG.md`：本條目。
+- `README.md`：Version banner 更新至 Phase 17G。
+- `docs/PROJECT_STATUS.md`：Phase 17G 加入 Completed Phases；CI pipeline checklist 更新；stale 內容修正。
+- `docs/RELEASE_NOTES.md`：Phase header 更新；Highlights 補 CI run 確認；test count 表更新。
+
+### Stale 修正清單（PROJECT_STATUS.md）
+- `[ ] Production deployment guide completed` → `[x]`（17C 已完成 OPERATOR_DEPLOYMENT.md）
+- Version Strategy 節：`poetry check 有 deprecation warnings` → `poetry check: All set!`
+- Known Limitations：`v0.7.3-alpha` → `v0.7.4-alpha`；`poetry check warnings` 說明更新
+- Recommended Next Phase：`Phase 17B` → `Phase 17H（TBD）`
+
+### Safety guarantees
+- 未修改任何 application code / workflow / runtime JSON schema。
+- `.github/workflows/ci.yml` / `pyproject.toml` / `poetry.lock` 未異動。
+- 測試數維持 726（零新增、零移除）。
+
+### Recommended next phase
+- **Phase 17H** — 視需求決定
+
+---
+
 ## [v0.7.4-alpha] — Phase 17F GitHub Actions CI / Release Validation
 
 本階段新增 `.github/workflows/ci.yml`，在 push / pull_request to main 時自動執行
