@@ -315,11 +315,11 @@ def test_project_status_has_tag_readiness_checklist():
     assert "Tag Readiness Checklist" in _project_status()
 
 
-def test_project_status_git_tag_not_yet_created():
-    """PROJECT_STATUS Tag Readiness 中「Git tag created」應標記為未完成（[ ]）。"""
+def test_project_status_git_tag_confirmed():
+    """PROJECT_STATUS Tag Readiness 中「Git tag created」應標記為已完成（[x]）。（Phase 17I：v0.7.5-alpha tag 已建立並 push）"""
     status = _project_status()
-    assert "[ ] Git tag created" in status, (
-        "PROJECT_STATUS 中 git tag 項目應為 [ ]（尚未建立）"
+    assert "[x] Git tag created" in status, (
+        "PROJECT_STATUS 中 git tag 項目應為 [x]（v0.7.5-alpha 已建立，Phase 17I）"
     )
 
 

@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.5-alpha**（Phase 17H — Release Tag Readiness；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.5-alpha**（Phase 17I — Tag Confirmed；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,11 +117,11 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.7.5-alpha（Phase 17H — Release Tag Readiness）
+**目前版本**：v0.7.5-alpha（Phase 17I — Tag Confirmed）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
-**v0.7.4-alpha**（commit 98b4664）已建立並 push 至 origin。
+**v0.7.5-alpha tag 已建立並 push 至 origin**（commit d96f657，Phase 17I）。
 
 **v0.7.5-alpha** 為 Phase 17A–17G 累積工作（8 commits since v0.7.4-alpha），包含：
 - Phase 17A：`rip` console_scripts entry point

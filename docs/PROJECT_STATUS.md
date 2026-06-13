@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.5-alpha（準備中）|
+| **Current Version** | v0.7.5-alpha（已發布，tag d96f657）|
 | **Test Count** | 726 passing |
-| **Last Updated** | 2026-06-13（Phase 17H）|
+| **Last Updated** | 2026-06-13（Phase 17I）|
 
 ---
 
@@ -52,6 +52,7 @@
 | 17F | GitHub Actions CI / Release Validation | ✅ Complete |
 | 17G | CI Result Confirmation / Release Checkpoint Notes | ✅ Complete |
 | 17H | Release Tag Readiness / v0.7.5-alpha Preparation | ✅ Complete |
+| 17I | v0.7.5-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -94,7 +95,7 @@
 ## Version Strategy（16E 決策，16G 最終確認，方案 A）
 
 - **pyproject.toml version（0.1.0）維持不變** — 僅為 packaging metadata，非 release version source of truth。
-- **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — 目前準備 v0.7.5-alpha（v0.7.4-alpha tag 已建立並 push）。
+- **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — v0.7.5-alpha 已發布（tag d96f657，Phase 17I）。
 - **`poetry build` 產生的 artifact 版本為 0.1.0**（來自 pyproject.toml），非 RIP release version；artifact 名稱 `rex_intelligence_platform-0.1.0.tar.gz`。
 - 版本對齊（例如 0.7.4a0）留待正式 release packaging（16H+）；`poetry check`：**All set!**（Phase 17E PEP 621 migration 後，deprecation warnings 已全數消除）。
 
@@ -128,8 +129,9 @@
 - [x] PROJECT_STATUS updated（Phase 17H、v0.7.5-alpha）
 - [x] Runtime files gitignored（git ls-files runtime/ 應為空）
 - [x] dist/ artifacts gitignored（git ls-files dist/ 應為空）
-- [ ] Git tag created（v0.7.5-alpha — 人工執行：`git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"`）
-- [ ] Tag pushed（v0.7.5-alpha — 人工執行：`git push origin v0.7.5-alpha`）
+- [x] Git tag created（v0.7.5-alpha — commit d96f657，Phase 17I）
+- [x] Tag pushed（v0.7.5-alpha — `git push origin v0.7.5-alpha`，Phase 17I）
+- [x] v0.7.5-alpha tag dereferences to d96f657（`git ls-remote --tags origin v0.7.5-alpha^{}` 驗證）
 - [ ] pyproject version aligned（選做：0.1.0 → 0.7.5a0，留待後續）
 
 ---
@@ -329,12 +331,12 @@ WorkerRequest                                                               │
 
 ## Recommended Next Phase
 
-**Phase 17I 或 Phase 18A** — TBD（視需求決定）
+**Phase 18A — SQLite Persistence Reconnaissance** 或 **Phase 17J — Post-release Operator Notes**（TBD，視需求決定）
 
-可選方向：
-- 人工建立並 push v0.7.5-alpha tag（確認 CI green 後）：
-  `git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"` && `git push origin v0.7.5-alpha`。
+v0.7.5-alpha 已正式發布（Phase 17I tag confirmed）。可選方向：
+- **Phase 18A**：SQLite persistence 評估與概念驗證（取代 JSON persistence；transaction log / approval store 入手）。
+- **Phase 17J**：Post-release operator notes / known limitations 更新，或補充 multi-user 警告文件。
 - pyproject version 對齊：0.1.0 → 0.7.5a0（PEP 440，選做）。
 - 功能擴充：multi-user 支援、SQLite persistence。
 
-（Phase 17A–17H 已完成：console_scripts / Runtime Lock / Runbook / Preflight / PEP 621 / PyMuPDF lock / GitHub Actions CI / CI Checkpoint / Release Tag Readiness）
+（Phase 17A–17I 已完成：console_scripts / Runtime Lock / Runbook / Preflight / PEP 621 / PyMuPDF lock / GitHub Actions CI / CI Checkpoint / Release Tag Readiness / Tag Confirmation）

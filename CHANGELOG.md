@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.5-alpha] — Phase 17I Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.7.5-alpha tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 項目 | 結果 |
+|------|------|
+| tag | `v0.7.5-alpha` |
+| commit | `d96f657` |
+| remote tag pushed | ✅ yes |
+| working tree | clean |
+
+### Changed
+- `CHANGELOG.md`：本條目（Phase 17I）。
+- `docs/PROJECT_STATUS.md`：Phase 17I 列；v0.7.5-alpha tag readiness checklist 全數完成。
+- `docs/RELEASE_NOTES.md`：v0.7.5-alpha section 補充 tag confirmed 資訊；Test Count 新增 Phase 17I。
+- `README.md`：Phase banner 更新至 Phase 17I；Release Checkpoint Notes 更新。
+
+### Safety guarantees
+- 未修改任何 application code / workflow / pyproject.toml / poetry.lock。
+- 未建立新 tag（v0.7.5-alpha 已於 Phase 17H 後人工建立並 push）。
+- 測試數維持 726（零新增、零移除）。
+
+---
+
 ## [v0.7.5-alpha] — Phase 17H Release Tag Readiness
 
 本階段為純文件 release readiness 準備。不新增功能、不新增測試、不修改程式碼、不建立 tag。

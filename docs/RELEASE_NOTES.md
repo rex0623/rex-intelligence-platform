@@ -4,7 +4,7 @@
 
 ## v0.7.5-alpha
 
-**Phase 17A–17H — console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI / CI Result Confirmation / Release Tag Readiness**
+**Phase 17A–17I — console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI / CI Result Confirmation / Release Tag Readiness / Tag Confirmation**
 
 ---
 
@@ -18,6 +18,18 @@
 - **GitHub Actions CI** — `.github/workflows/ci.yml`；push / pull_request to main；Python 3.12 / ubuntu-22.04 / Poetry 2.4.1；726 tests（17F）
 - **CI #1 Run Confirmed** — commit 9c0173c；34s；726 passed；poetry check All set；build 成功（17G）
 - **Release Tag Readiness** — v0.7.5-alpha 文件準備完成；final regression 通過（17H）
+- **Tag Confirmed** — v0.7.5-alpha tag 建立並 push 至 origin；commit d96f657；working tree clean（17I）
+
+---
+
+### Tag Confirmed（Phase 17I）
+
+| 項目 | 結果 |
+|------|------|
+| tag | `v0.7.5-alpha` |
+| commit | `d96f657` |
+| remote tag pushed | ✅ yes |
+| working tree | clean |
 
 ---
 
@@ -48,31 +60,31 @@ Built rex_intelligence_platform-0.1.0-py3-none-any.whl
 
 ---
 
-### Tagging Instructions（v0.7.5-alpha）
+### Tagging Instructions（v0.7.5-alpha）— ✅ Completed（Phase 17I）
 
-**本 phase 不自動建立 git tag，亦不自動 push。待 Phase 17H commit + push 後，確認 GitHub Actions CI run green，再人工執行：**
+**以下指令已於 Phase 17I 人工執行完成。**
 
 ```bash
 # 1. 確認 working tree 乾淨
-git status --short          # 輸出應為空
+git status --short          # ✅ 輸出為空
 
 # 2. 確認所有測試通過
-poetry run pytest -q        # 應顯示 726 passed
+poetry run pytest -q        # ✅ 726 passed
 
 # 3. 確認 CI run green（GitHub Actions）
-# （確認最新 push 對應的 CI run 狀態）
+# ✅ CI #1 commit 9c0173c，34s，726 passed
 
 # 4. 建立本機 annotated tag
-git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"
+git tag -a v0.7.5-alpha -m "RIP v0.7.5-alpha"   # ✅ 已執行
 
 # 5. 確認 tag
-git show v0.7.5-alpha
+git show v0.7.5-alpha                            # ✅ tag 指向 d96f657
 
-# 6. 推送 tag（人工確認後執行）
-git push origin v0.7.5-alpha
+# 6. 推送 tag
+git push origin v0.7.5-alpha                    # ✅ 已 push
 ```
 
-> **重要**：push tag 為不可逆操作，請確認以上前置條件全數通過後再執行。
+> tag `v0.7.5-alpha` dereferences to commit `d96f657`（`git ls-remote --tags origin v0.7.5-alpha^{}` 驗證）。
 
 ---
 
@@ -88,6 +100,7 @@ git push origin v0.7.5-alpha
 | 17F（GitHub Actions CI） | +0 → 726 |
 | 17G（CI Result Confirmation） | +0 → 726 |
 | 17H（Release Tag Readiness） | +0 → 726（純文件）|
+| 17I（Tag Confirmation） | +0 → 726（純文件 tag confirmation）|
 
 ---
 
