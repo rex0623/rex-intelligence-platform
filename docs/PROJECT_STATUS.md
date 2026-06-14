@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19G）|
+| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19H operator docs）|
 | **Test Count** | 816 passing（+51 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19G）|
+| **Last Updated** | 2026-06-14（Phase 19H）|
 
 ---
 
@@ -66,6 +66,7 @@
 | 19E | SQLite Migration / Prune Reconnaissance | ✅ Complete |
 | 19F | Release Checkpoint v0.7.7-alpha | ✅ Complete / Ready |
 | 19G | v0.7.7-alpha Tag Confirmation | ✅ Complete |
+| 19H | Operator Docs for Experimental SQLite Backend | ✅ Complete |
 
 ---
 
@@ -91,10 +92,10 @@
 - [x] v0.7.7-alpha Git tag created（annotated tag，tag object `80d234676bdacbc8b5dafefa427f59289e471b81`，Phase 19G）
 - [x] v0.7.7-alpha tag pushed to origin（Phase 19G）
 - [x] v0.7.7-alpha tag dereferences to `86c3b9b`（`git ls-remote --tags origin v0.7.7-alpha^{}` 驗證，Phase 19G）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 更新至 Phase 19H（TRANSACTION_LOG_BACKEND 說明、SQLite backup、no-migration warning、WSL2 note、快速參考 SQLite 條目）
 
 ### Recommended Next Phase
 
-- **Phase 19H** — Operator Docs for Experimental SQLite Backend（更新 `docs/OPERATOR_DEPLOYMENT.md`：TRANSACTION_LOG_BACKEND 說明、no migration warning、SQLite backup 指令）
 - **Phase 19I** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`，JSON → SQLite one-shot migration，~19 tests）
 - **Phase 19J** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
 

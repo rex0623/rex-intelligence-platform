@@ -1,16 +1,19 @@
 # RIP Operator Deployment Runbook
 
-Rex Intelligence Platform (RIP) v0.7.4-alpha
+Rex Intelligence Platform (RIP) v0.7.7-alpha（Phase 19H — Operator Docs for Experimental SQLite Backend）
 
 ---
 
 ## 概覽
 
-RIP 是一個**本機 CLI operator tool**，不是 web server、不需要 Docker、不需要資料庫。
-Operator 透過 `poetry run rip "指令"` 在本機終端機操作，所有 runtime state 以 JSON 檔案
-存放於 `runtime/` 目錄，所有檔案操作錨定在 `SAFE_PDF_ROOT` 指定的目錄下。
+RIP 是一個**本機 CLI operator tool**，不是 web server、不需要 Docker。
+Operator 透過 `poetry run rip "指令"` 在本機終端機操作，所有 runtime state 存放於 `runtime/` 目錄，
+所有檔案操作錨定在 `SAFE_PDF_ROOT` 指定的目錄下。
 
-本文涵蓋：安裝、設定、smoke test、runtime 目錄說明、備份、還原、升級、lock 處理、Git hygiene。
+**預設 persistence backend**：JSON 檔案（production-safe，v0.7.7-alpha 行為與舊版完全相同）。
+**Experimental**：`TRANSACTION_LOG_BACKEND=sqlite` 可選啟用 SQLite transaction log backend（rename / move logs only）——詳見「[Experimental SQLite Transaction Log Backend](#experimental-sqlite-transaction-log-backend)」。
+
+本文涵蓋：安裝、設定、smoke test、runtime 目錄說明、備份、還原、升級、lock 處理、SQLite backend 說明、Git hygiene。
 
 ---
 
@@ -77,6 +80,12 @@ SAFE_PDF_ROOT=/Users/operator/Documents/pdf_inbox
 # 一般不需更動；僅在需要將 runtime 存放到 repo 外時才設定
 # RUNTIME_DIR=/path/to/external/runtime
 
+# Transaction log persistence backend（Phase 19D，v0.7.7-alpha）
+# "json"   → JSON flat-file backend（預設，production-safe，不建立 rip.db）
+# "sqlite" → Experimental SQLite backend（僅影響 rename/move transaction logs；
+#             ⚠️ 切換前請閱讀「Experimental SQLite Transaction Log Backend」說明）
+# TRANSACTION_LOG_BACKEND=json
+
 # =====================================================
 # 以下欄位在 CLI 模式下不使用，可不設定
 # =====================================================
@@ -96,10 +105,12 @@ SAFE_PDF_ROOT=/Users/operator/Documents/pdf_inbox
 ### RUNTIME_DIR 說明
 
 - 存放 `approvals.json`、`rename_transactions.json`、`move_transactions.json`、`rip.lock`。
+- 若啟用 `TRANSACTION_LOG_BACKEND=sqlite`，也會包含 `rip.db`（及 WAL mode 可能產生的 `rip.db-wal` / `rip.db-shm`）。
 - 預設為 `<repo>/runtime`，通常不需改動。
 - **如需放到 repo 外**（例如共享磁碟或另一個 partition）：設定 `RUNTIME_DIR=/path/to/runtime`。
 - **每個 RIP deployment 應使用獨立的 `RUNTIME_DIR`**，不建議多個專案共用同一 runtime 目錄——
   不同專案的 approval ID / transaction ID 不互通，共用目錄會造成狀態混淆。
+- **WSL2 注意**：若使用 `TRANSACTION_LOG_BACKEND=sqlite`，建議 `RUNTIME_DIR` 放在 Linux filesystem（例如 WSL home 底下的 repo `runtime/`）。`/mnt/c` 或 Windows DrvFs/NTFS 路徑可能造成 WAL mode 不穩定。
 
 ---
 
@@ -133,10 +144,15 @@ poetry run python scripts/mock_line.py "說明"
 ```
 runtime/
 ├── approvals.json              # Approval store（改名 / 搬移計畫的核准狀態）
-├── rename_transactions.json    # Rename transaction log（已執行的改名紀錄）
-├── move_transactions.json      # Move transaction log（已執行的搬移紀錄）
-└── rip.lock                    # Concurrency lock（OS 管理，見下方說明）
+├── rename_transactions.json    # Rename transaction log（已執行的改名紀錄，json backend）
+├── move_transactions.json      # Move transaction log（已執行的搬移紀錄，json backend）
+├── rip.lock                    # Concurrency lock（OS 管理，見下方說明）
+├── rip.db                      # SQLite transaction log DB（僅 TRANSACTION_LOG_BACKEND=sqlite 時建立）
+├── rip.db-wal                  # SQLite WAL 日誌（WAL mode 時自動產生，rip.db 存在時可能出現）
+└── rip.db-shm                  # SQLite shared-memory 索引（WAL mode 時自動產生）
 ```
+
+> **預設（json backend）只有前三個 JSON 檔與 rip.lock**。`rip.db` / `rip.db-wal` / `rip.db-shm` 只在 `TRANSACTION_LOG_BACKEND=sqlite` 時才會出現。
 
 ### approvals.json
 
@@ -164,6 +180,15 @@ runtime/
   不在 rip.lock 檔案內容裡。
 - Process 正常結束或意外 crash 時，OS 自動釋放 lock（fd 關閉 → lock 解除）。
 - **一般不需要手動處理 rip.lock**（見下方「runtime_lock_busy 處理」）。
+
+### rip.db / rip.db-wal / rip.db-shm
+
+- **只在 `TRANSACTION_LOG_BACKEND=sqlite` 時才會建立**。預設 json backend 下永不出現。
+- `rip.db`：SQLite transaction log DB，儲存 rename / move transaction 紀錄。
+- `rip.db-wal`：WAL（Write-Ahead Log）日誌檔，SQLite WAL mode 下自動產生。
+- `rip.db-shm`：WAL shared-memory 索引，WAL mode 下自動產生。
+- 備份時需同時處理 wal / shm，建議使用 `sqlite3 .backup` 指令（見下方「備份」）。
+- `rip.lock` 不取代 `rip.db`；兩者用途不同（見「[runtime lock 與 SQLite 的關係](#runtime-lock-與-sqlite-的關係)」）。
 
 ---
 
@@ -198,9 +223,35 @@ python -m json.tool runtime/rename_transactions.json > /dev/null && echo "OK"
 python -m json.tool runtime/move_transactions.json > /dev/null && echo "OK"
 ```
 
+### 備份 SQLite DB（若使用 sqlite backend）
+
+若 `TRANSACTION_LOG_BACKEND=sqlite`，請使用 SQLite hot backup 指令，而非直接 `cp`：
+
+```bash
+# 建議：online hot backup（WAL-safe，不需要停止 RIP process）
+sqlite3 runtime/rip.db ".backup runtime/rip_backup_$(date +%Y%m%d_%H%M%S).db"
+
+# 若要手動 cp（需確認無 RIP process 正在執行）
+cp runtime/rip.db     runtime/rip.db.bak
+cp runtime/rip.db-wal runtime/rip.db-wal.bak 2>/dev/null || true
+cp runtime/rip.db-shm runtime/rip.db-shm.bak 2>/dev/null || true
+```
+
+> 直接 `cp rip.db` 而不處理 WAL 可能產生不一致的備份。優先使用 `sqlite3 .backup`。
+
+### 驗證 SQLite DB 完整性
+
+```bash
+sqlite3 runtime/rip.db "PRAGMA integrity_check;"
+# 預期輸出：ok
+
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM rename_transactions;"
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM move_transactions;"
+```
+
 ### 備份 PDF 原始檔案
 
-**重要**：runtime JSON 檔案**不包含 PDF 原始檔案的內容**，只記錄路徑與狀態。
+**重要**：runtime 檔案（JSON 或 SQLite）**不包含 PDF 原始檔案的內容**，只記錄路徑與狀態。
 在執行大量改名 / 搬移前，除了備份 `runtime/`，也請：
 
 - 確認 `SAFE_PDF_ROOT` 對應目錄下的原始 PDF 已有外部備份（Time Machine / rsync / cloud storage 等）；
@@ -214,6 +265,8 @@ python -m json.tool runtime/move_transactions.json > /dev/null && echo "OK"
 ---
 
 ## 還原
+
+### 還原 JSON backup（json backend，預設）
 
 ```bash
 # 1. 確認沒有 RIP process 正在執行
@@ -232,6 +285,29 @@ cp runtime_backup_YYYYMMDD_HHMMSS/move_transactions.json    runtime/move_transac
 python -m json.tool runtime/approvals.json > /dev/null && echo "approvals OK"
 python -m json.tool runtime/rename_transactions.json > /dev/null && echo "rename_tx OK"
 python -m json.tool runtime/move_transactions.json > /dev/null && echo "move_tx OK"
+
+# 5. 恢復操作
+poetry run rip "說明"
+```
+
+### 還原 SQLite DB backup（sqlite backend）
+
+```bash
+# 1. 確認沒有 RIP process 正在執行
+ps aux | grep -E "rip|mock_line"
+
+# 2. 保留目前 DB 供診斷（可選）
+cp runtime/rip.db runtime/rip.db.corrupt 2>/dev/null || true
+
+# 3. 還原備份
+cp runtime/rip_backup_YYYYMMDD_HHMMSS.db runtime/rip.db
+# 刪除舊的 WAL/SHM（避免還原的 DB 與舊 WAL 不一致）
+rm -f runtime/rip.db-wal runtime/rip.db-shm
+
+# 4. 驗證還原後 DB 完整性
+sqlite3 runtime/rip.db "PRAGMA integrity_check;"  # 預期：ok
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM rename_transactions;"
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM move_transactions;"
 
 # 5. 恢復操作
 poetry run rip "說明"
@@ -264,8 +340,8 @@ poetry run rip "說明"
 # 7. 恢復操作
 ```
 
-> 升級後若有 runtime JSON schema 變更，CHANGELOG.md 中會有明確說明。
-> v0.7.4-alpha 的三個 JSON schema 在 Phase 17C 前後無異動。
+> 升級後若有 runtime JSON schema 或 SQLite schema 變更，CHANGELOG.md 中會有明確說明。
+> v0.7.7-alpha 的三個 JSON schema（approvals / rename_transactions / move_transactions）格式不變。
 
 ---
 
@@ -310,6 +386,110 @@ poetry run rip "<原本的指令>"
 - **絕對不可在確認有 RIP process 仍在執行時刪除 rip.lock**——
   強制刪除會破壞正在進行的 destructive action 的並發保護，可能導致 runtime state 損毀。
 - 只有在確認「沒有任何 RIP process 仍在持續 busy」的前提下，才可刪除 `runtime/rip.lock` 後重試。
+
+---
+
+## Experimental SQLite Transaction Log Backend
+
+> **Status**：Experimental（v0.7.7-alpha）。JSON backend 仍為預設。此 section 說明如何啟用、限制、備份與切換回 JSON。
+
+### 啟用方式
+
+在 `.env` 中加入：
+
+```bash
+TRANSACTION_LOG_BACKEND=sqlite
+```
+
+或臨時覆寫（單次指令）：
+
+```bash
+TRANSACTION_LOG_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
+```
+
+切換後，rename / move transaction log 會寫入 `runtime/rip.db`（SQLite DB）。**approvals.json 不受影響**。
+
+### 影響範圍
+
+| 功能 | json backend（預設） | sqlite backend（experimental） |
+|------|---------------------|-------------------------------|
+| Approval store（approvals.json） | JSON 檔案 | 不變，仍 JSON 檔案 |
+| Rename transaction log | rename_transactions.json | runtime/rip.db |
+| Move transaction log | move_transactions.json | runtime/rip.db |
+| Planning / Help 指令 | 不受影響 | 不受影響 |
+| Destructive command regex | 不變 | 不變 |
+| Runtime lock（rip.lock） | 保留 | 保留 |
+
+### ⚠️ 重要：目前沒有 migration script
+
+**切換到 sqlite backend 前，請先閱讀此節。**
+
+- 目前**沒有** JSON → SQLite migration script（預計 Phase 19I 實作）。
+- 若已有 `rename_transactions.json` / `move_transactions.json` 歷史紀錄，切換到 sqlite 後：
+  - 舊 JSON transaction history **在 SQLite backend 下完全不可見**。
+  - `預覽回滾改名 <tx_id>` → 找不到切換前的 JSON transaction，回覆 `transaction_not_found`。
+  - `回滾改名 <tx_id>` → 同上，找不到，**無法回滾切換前的改名**。
+  - `預覽回滾搬移 <tx_id>` / `回滾搬移 <tx_id>` → 同理。
+- **這不是資料刪除**：JSON 檔案仍完整保留於 `runtime/`。
+- **切回 json backend 後，舊 JSON history 立即恢復可用**（見「[Fallback to JSON](#fallback-to-json)」）。
+
+**建議**：若環境中已有重要的 JSON transaction history（例如有尚未回滾的 `success` action），**暫時不要切換到 sqlite**，等待 migration script 完成（Phase 19I）。
+
+### ⚠️ SQLite prune_transactions 尚未實作
+
+- SQLite backend 的 `prune_transactions()` 目前 raise `NotImplementedError`。
+- `mock_line` operator commands 目前**沒有 prune 指令**，日常操作（確認 / 預覽 / 回滾）完全不受影響。
+- 若需要清理 SQLite transaction log，目前只能手動操作 DB 或切換回 json backend 後使用 JSON prune API。
+- SQLite prune 實作預計留至後續 phase。
+
+### Backup（SQLite backend）
+
+```bash
+# 建議：online hot backup（WAL-safe）
+sqlite3 runtime/rip.db ".backup runtime/rip_backup_$(date +%Y%m%d_%H%M%S).db"
+
+# 驗證備份
+sqlite3 runtime/rip_backup_YYYYMMDD_HHMMSS.db "PRAGMA integrity_check;"
+```
+
+詳細備份與 WAL 說明見上方「[備份 SQLite DB](#備份-sqlite-db若使用-sqlite-backend)」。
+
+### Fallback to JSON
+
+若 SQLite backend 有問題，隨時可切回 json：
+
+```bash
+# 方式 A：在 .env 改回 json（或移除設定）
+TRANSACTION_LOG_BACKEND=json
+# 方式 B：直接刪除 .env 中的該行（未設定時預設為 json）
+```
+
+- `runtime/rip.db` **不需要刪除**（切回 json 後 RIP 不會讀取它）。
+- 舊 JSON history（`rename_transactions.json` / `move_transactions.json`）立即恢復可用。
+- 若要完全重建 SQLite DB（例如 DB 損壞），確認無 RIP process 後：
+
+```bash
+rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
+# 下次啟用 sqlite backend 時，schema 會自動重建（initialize_sqlite_schema）
+```
+
+### runtime lock 與 SQLite 的關係
+
+| 機制 | 層次 | 用途 |
+|------|------|------|
+| `runtime/rip.lock`（fcntl.flock） | RIP operator workflow 層 | 防止多個 RIP process 同時執行 destructive action |
+| SQLite WAL mode | SQLite DB 層 | 提供 DB 層讀寫並發安全（允許多 reader / 單 writer） |
+
+- 兩者**不互相取代**，同時存在。
+- `rip.lock` 保護整個 operator workflow（從 mock_line 指令到 filesystem rename/move）。
+- SQLite WAL 保護 DB 檔案層的讀寫一致性。
+- Destructive commands 仍由 `rip.lock` 全程保護，SQLite backend 不改變此行為。
+
+### WSL2 / Filesystem 注意事項
+
+- SQLite WAL mode 在 `/mnt/c` 或 Windows DrvFs/NTFS 路徑可能出現 locking 問題（已知 SQLite 限制）。
+- **建議**：`RUNTIME_DIR` 放在 Linux filesystem（WSL home 底下的 repo `runtime/`）。
+- 若必須放在 `/mnt/c`，請在正式使用前測試 backup / restore / concurrent behavior。
 
 ---
 
@@ -406,8 +586,13 @@ poetry run pytest tests/test_operator_preflight.py -v
 |------|------|
 | 查看所有可用指令 | `poetry run rip "說明"` |
 | 執行 preflight 驗證 | `poetry run pytest tests/test_operator_preflight.py -v` |
-| 升級前備份 | `cp -rp runtime/ runtime_backup_$(date +%Y%m%d_%H%M%S)/` |
+| 升級前備份（json backend） | `cp -rp runtime/ runtime_backup_$(date +%Y%m%d_%H%M%S)/` |
+| 升級前備份（sqlite backend） | `sqlite3 runtime/rip.db ".backup runtime/rip_backup_$(date +%Y%m%d_%H%M%S).db"` |
 | 升級 | `git pull && poetry install && poetry run pytest -q` |
 | Lock busy 且無 process 在跑 | `rm runtime/rip.lock && poetry run rip "<指令>"` |
 | 確認 runtime 未進 Git | `git ls-files runtime/` |
 | 驗證 JSON 完整性 | `python -m json.tool runtime/approvals.json` |
+| 驗證 SQLite DB 完整性 | `sqlite3 runtime/rip.db "PRAGMA integrity_check;"` |
+| 啟用 SQLite backend | `.env` 中加入 `TRANSACTION_LOG_BACKEND=sqlite` |
+| 切回 JSON backend | `.env` 中改為 `TRANSACTION_LOG_BACKEND=json` 或刪除該行 |
+| 重建損壞的 SQLite DB | `rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm` |

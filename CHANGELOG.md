@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 19H Operator Docs for Experimental SQLite Backend
+
+本階段更新 `docs/OPERATOR_DEPLOYMENT.md`，補充 experimental SQLite transaction log backend 的 operator 說明。
+不修改任何 application code、不做 migration、不做 prune implementation。
+
+### Changed
+
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
+  - 文件版本更新至 v0.7.7-alpha（Phase 19H）
+  - 概覽補充 optional SQLite backend 說明與文件連結
+  - `.env` 範例新增 `TRANSACTION_LOG_BACKEND` 設定（含警告注釋）
+  - `RUNTIME_DIR 說明` 新增 `rip.db` / `rip.db-wal` / `rip.db-shm`、WSL2 注意事項
+  - `runtime/ 目錄說明` tree 補充 `rip.db` / `rip.db-wal` / `rip.db-shm`、sqlite-only 說明
+  - 新增 `rip.db / rip.db-wal / rip.db-shm` subsection
+  - 備份：新增 SQLite hot backup（`sqlite3 .backup`）、WAL 注意事項、DB integrity check
+  - 還原：新增 SQLite restore 流程（保留損壞 DB + restore + WAL 清除 + integrity check）
+  - 升級：更新注釋版本
+  - 新增 `## Experimental SQLite Transaction Log Backend` section：
+    - 啟用方式（`.env` / 臨時覆寫）
+    - 影響範圍表（json vs sqlite）
+    - ⚠️ No migration warning（舊 JSON history 不可見、操作影響、保留 JSON 說明）
+    - ⚠️ SQLite prune_transactions 尚未實作說明
+    - Backup / Fallback to JSON / runtime lock 與 SQLite 關係 / WSL2 注意
+  - 快速參考：新增 sqlite backup / integrity check / 啟用 / 切回 / 重建 DB 條目
+
+### Not Changed
+
+- 不修改 application code / tests / pyproject.toml / poetry.lock / ci.yml
+- 不做 migration script
+- 不實作 SQLite prune
+- 不修改 `TRANSACTION_LOG_BACKEND` 預設值（仍為 "json"）
+- 不建立 runtime/rip.db
+- 不建立 tag
+
+---
+
 ## [v0.7.7-alpha] — Phase 19G Tag Confirmation
 
 本階段為純文件 tag confirmation。v0.7.7-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
