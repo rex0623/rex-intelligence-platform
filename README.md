@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.6-alpha**（Phase 19B — Experimental SQLite Backend；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.6-alpha**（Phase 19D — Optional SQLite Backend Integration；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,7 +117,7 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.7.6-alpha（Phase 18H — Tag Confirmed）
+**目前版本**：v0.7.6-alpha（Phase 19D — Optional SQLite Backend Integration）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
@@ -126,13 +126,14 @@ poetry run rip "產生搬移計畫"
 - Phase 18C：`read_json_log` / `write_json_log` / `ensure_utc_aware` shared helpers 提取（`app/core/json_log_io.py`）
 - Phase 18E：`RenameTransactionLogProtocol` / `MoveTransactionLogProtocol` 型別協議定義（`app/core/transaction_log_protocol.py`）
 
-**JSON backend 仍是 default / 唯一 backend**：不導入 SQLite，不建立 `runtime/rip.db`，runtime JSON schema 不變。
-
-**SQLite optional backend**：已完成三階段設計偵察（18A / 18D / 18F），實作延後至未來 v0.8.0-alpha candidate 或後續 Phase。
+**Post-tag 開發進度（Phase 19B / 19D）**：
+- Phase 19B：`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog` SQLite backend 實作（`app/core/sqlite_transaction_log.py`）
+- Phase 19D：`TRANSACTION_LOG_BACKEND` 旗標接入 production runtime；`app/core/transaction_log_factory.py` factory；`default_move_transaction_log()` 與三個 mock_line rename 實例化改用 factory 路由
+- **JSON backend 仍是 default / production path**（`TRANSACTION_LOG_BACKEND` 預設 "json"）；不建立 `runtime/rip.db` 除非主動設定
 
 **Final regression**（Phase 18G 前）：
 - `poetry check`：All set!
-- `poetry run pytest -q`：765 passed（+39 since v0.7.5-alpha）
+- `poetry run pytest -q`：816 passed（+51 since v0.7.6-alpha tag）
 - `poetry build`：rex_intelligence_platform-0.1.0 ✅
 - `poetry run rip "說明"`：正常 ✅
 

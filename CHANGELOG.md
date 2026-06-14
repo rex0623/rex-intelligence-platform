@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 19D Optional SQLite Transaction Log Backend Integration
+
+本階段將 SQLite backend 接入 production runtime，透過 `TRANSACTION_LOG_BACKEND` 設定旗標選擇後端。
+JSON 仍是預設值，SQLite 為 experimental opt-in。不修改任何現有 JSON 行為，不做 migration。
+
+### Added
+
+- **`app/core/config.py`**（修改）：
+  - `Settings.TRANSACTION_LOG_BACKEND: Literal["json", "sqlite"] = "json"` — 後端選擇旗標（預設 "json"）
+  - `get_sqlite_db_path()` — 回傳 `runtime/rip.db` Path（只算路徑，不建立檔案）
+- **`app/core/transaction_log_factory.py`**（新增）：
+  - `make_rename_transaction_log()` — 依 `TRANSACTION_LOG_BACKEND` 回傳 rename log backend
+  - `make_move_transaction_log()` — 依 `TRANSACTION_LOG_BACKEND` 回傳 move log backend
+  - 本機 import 設計：backend="json" 時不 import SQLite module
+- **`app/folder_intelligence/approval_bridge.py`**（修改）：
+  - `default_move_transaction_log()` 改用 `make_move_transaction_log()` 路由
+- **`scripts/mock_line.py`**（修改）：
+  - 三個 rename log 實例化改用 `make_rename_transaction_log()`
+- **`tests/test_transaction_log_factory.py`**（新增）：22 tests（794 → 816）
+
+### Not Changed
+
+- JSON backend 仍是 default / production path（`TRANSACTION_LOG_BACKEND` 預設 "json"）
+- 不修改 `ApprovalManager` / `JsonApprovalStore`
+- 不修改 runtime lock / destructive command regex
+- 不做 migration script / SQLite prune
+- 不實作 `ApprovalStoreProtocol` / `SqliteApprovalStore`
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不建立 runtime/rip.db（除非主動設定 `TRANSACTION_LOG_BACKEND=sqlite`）
+
+---
+
 ## [Unreleased] — Phase 19B Experimental SQLite Transaction Log Backend
 
 本階段新增 SQLite optional backend 的最小可行實作，驗證 Phase 18E Protocol 合約。

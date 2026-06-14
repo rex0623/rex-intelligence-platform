@@ -12,7 +12,7 @@ import re
 import uuid
 
 from app.approvals.manager import approval_manager
-from app.core.config import get_rename_transaction_log_path
+from app.core.transaction_log_factory import make_rename_transaction_log
 from app.filename.approval_bridge import execute_approved_rename_plan
 from app.filename.executor import rollback_transaction_by_id
 from app.filename.schemas import RenamePlan
@@ -445,7 +445,7 @@ def confirm_rename(
     plan.status = "approved"
 
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
+        transaction_log = make_rename_transaction_log()
 
     result = execute_approved_rename_plan(plan, transaction_log=transaction_log)
 
@@ -878,7 +878,7 @@ def preview_rollback(
     back, never renames files, never writes to the transaction log.
     """
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
+        transaction_log = make_rename_transaction_log()
 
     preview = preview_rollback_transaction(transaction_id, transaction_log)
     if preview is None:
@@ -930,7 +930,7 @@ def rollback_rename(
     this module never renames files itself.
     """
     if transaction_log is None:
-        transaction_log = RenameTransactionLog(get_rename_transaction_log_path())
+        transaction_log = make_rename_transaction_log()
 
     # Once-only guard (Phase 14E)：先以 read-only preview 判斷狀態，
     # 沒有可回滾 action 時完全不進入 rollback 執行路徑（不動檔案、不寫 log）。

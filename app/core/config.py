@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # Runtime artifacts (Phase 16B — consolidated; all gitignored)
     RUNTIME_DIR: str = str(Path(__file__).resolve().parents[2] / "runtime")
 
+    # Persistence backend (Phase 19D — optional; default json)
+    # "json"   → JSON flat-file backend (default, production-safe)
+    # "sqlite" → Experimental SQLite backend; no migration yet; prune not supported
+    TRANSACTION_LOG_BACKEND: Literal["json", "sqlite"] = "json"
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -99,6 +104,16 @@ def get_rename_transaction_log_path() -> Path:
 def get_move_transaction_log_path() -> Path:
     """Default move transaction log: runtime/move_transactions.json。"""
     return get_runtime_dir() / "move_transactions.json"
+
+
+def get_sqlite_db_path() -> Path:
+    """Default SQLite database path: runtime/rip.db（gitignored）。
+
+    Returns a Path only — does NOT create the file or parent directories.
+    The file is created on first use by initialize_sqlite_schema().
+    Only called when TRANSACTION_LOG_BACKEND == "sqlite".
+    """
+    return get_runtime_dir() / "rip.db"
 
 
 def get_safe_pdf_root() -> Path:

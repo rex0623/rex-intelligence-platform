@@ -32,7 +32,7 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from app.core.config import get_move_transaction_log_path
+from app.core.transaction_log_factory import make_move_transaction_log
 from app.core.transaction_log_protocol import MoveTransactionLogProtocol
 from app.folder_intelligence.executor import execute_move_plan
 from app.folder_intelligence.schemas import (
@@ -40,7 +40,6 @@ from app.folder_intelligence.schemas import (
     MoveFileResult,
     MovePlan,
 )
-from app.folder_intelligence.transaction_log import MoveTransactionLog
 
 
 # ---------------------------------------------------------------------------
@@ -206,11 +205,12 @@ def execute_approved_move_by_approval_id(
     return result
 
 
-def default_move_transaction_log() -> MoveTransactionLog:
-    """Return a MoveTransactionLog at the default runtime path.
+def default_move_transaction_log() -> MoveTransactionLogProtocol:
+    """Return the active move transaction log backend per TRANSACTION_LOG_BACKEND.
 
-    預設路徑由 settings 取得（16B）：runtime/move_transactions.json
-    （已列入 .gitignore）。測試以 monkeypatch settings.RUNTIME_DIR
-    或注入 tmp_path log，不可污染 runtime/。
+    Phase 19D：改用 transaction_log_factory.make_move_transaction_log()。
+    - backend="json"（預設）→ MoveTransactionLog(runtime/move_transactions.json)
+    - backend="sqlite"（experimental）→ SqliteMoveTransactionLog(runtime/rip.db)
+    測試以 monkeypatch settings.RUNTIME_DIR / TRANSACTION_LOG_BACKEND 隔離。
     """
-    return MoveTransactionLog(get_move_transaction_log_path())
+    return make_move_transaction_log()

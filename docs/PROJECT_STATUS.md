@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.6-alpha（tag confirmed；Phase 19B in progress）|
-| **Test Count** | 794 passing（+29 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19B）|
+| **Current Version** | v0.7.6-alpha（tag confirmed；Phase 19D in progress）|
+| **Test Count** | 816 passing（+51 since v0.7.6-alpha tag）|
+| **Last Updated** | 2026-06-14（Phase 19D）|
 
 ---
 
@@ -62,6 +62,7 @@
 | 18G | Release Checkpoint v0.7.6-alpha | ✅ Complete / Ready |
 | 18H | v0.7.6-alpha Tag Confirmation | ✅ Complete |
 | 19B | Experimental SQLite Transaction Log Backend | ✅ Complete |
+| 19D | Optional SQLite Transaction Log Backend Integration | ✅ Complete |
 
 ---
 

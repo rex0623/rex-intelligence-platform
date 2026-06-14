@@ -105,7 +105,8 @@ def test_default_rename_log_uses_settings(tmp_path, monkeypatch):
     import inspect
 
     source = inspect.getsource(mock_line_module)
-    assert "get_rename_transaction_log_path" in source
+    # Phase 19D：mock_line 改用 factory 路由，不再直接呼叫 get_rename_transaction_log_path
+    assert "make_rename_transaction_log" in source
     assert '"runtime"' not in source and "'runtime'" not in source
 
 
