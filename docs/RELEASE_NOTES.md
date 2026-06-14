@@ -2,6 +2,74 @@
 
 ---
 
+## v0.7.6-alpha
+
+**Phase 18B–18G — Persistence Refactors Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.7.6-alpha 收斂 Phase 18B / 18C / 18E 三個 persistence refactor 工作至一個正式 release checkpoint，確認 JSON backend 穩定、所有架構重構已 green CI，並為未來 SQLite optional backend 鋪好型別接縫（Protocol）。
+
+---
+
+### Highlights
+
+- **`JsonApprovalStore`（Phase 18B）** — `app/approvals/store.py`：stateless JSON I/O helper，從 `ApprovalManager` 提取 `load` / `save` static method；`approvals.json` schema / `self.store_path` / `self._store` 不變；所有 monkeypatch 測試零改動。
+- **Shared JSON transaction log I/O（Phase 18C）** — `app/core/json_log_io.py`：`read_json_log` / `write_json_log` / `ensure_utc_aware` 三個 module-level helper，提取 `RenameTransactionLog` / `MoveTransactionLog` 的重複 JSON 邏輯；Move prune 的 corrupt JSON early return 保留；AST 安全測試全數通過。
+- **Transaction log Protocols（Phase 18E）** — `app/core/transaction_log_protocol.py`：`RenameTransactionLogProtocol` / `MoveTransactionLogProtocol` 兩個 `@runtime_checkable` structural Protocol（PEP 544）；executor / approval_bridge 型別標注更新；`prune_transactions()` 不納入 Protocol（Rename / Move signature 發散）。
+- **SQLite Reconnaissance（Phase 18A / 18D / 18F）** — 三個純偵察 phase（no commit）：SQLite persistence option 設計完成，建議 Route A（transaction logs only），實作延後至 v0.8.0-alpha。
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.5-alpha | 726 |
+| Phase 18B | 737（+11） |
+| Phase 18C | 757（+20） |
+| Phase 18E | 765（+8） |
+| **v0.7.6-alpha** | **765** |
+
+---
+
+### Final Regression（v0.7.6-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 765 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | #7 green（before checkpoint） |
+
+---
+
+### Non-Goals（v0.7.6-alpha）
+
+- 不導入 SQLite backend
+- 不建立 `runtime/rip.db`
+- 不新增 `TRANSACTION_LOG_BACKEND` / `APPROVAL_BACKEND` flag
+- 不做 migration script
+- 不修改 runtime lock 行為
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 destructive command regex
+- 不修改 `approvals.json` / `rename_transactions.json` / `move_transactions.json` schema
+
+---
+
+### Commits Since v0.7.5-alpha
+
+| Commit | Phase | 說明 |
+|--------|-------|------|
+| `47a4128` | 18B | refactor(approvals): extract JSON approval store |
+| `31c1037` | 18C | refactor(transactions): extract shared JSON log IO |
+| `c5434ff` | 18E | refactor(transactions): define transaction log protocols |
+
+---
+
 ## Post-v0.7.5-alpha Development
 
 ### Phase 18E — Transaction Log Protocol Definition（2026-06-14）

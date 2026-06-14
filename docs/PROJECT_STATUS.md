@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.5-alpha（已發布，tag d96f657）|
-| **Test Count** | 765 passing（+8 Phase 18E）|
-| **Last Updated** | 2026-06-14（Phase 18E）|
+| **Current Version** | v0.7.6-alpha（readiness，tag pending）|
+| **Test Count** | 765 passing（+39 since v0.7.5-alpha）|
+| **Last Updated** | 2026-06-14（Phase 18G）|
 
 ---
 
@@ -58,6 +58,41 @@
 | 18C | Shared JSON Transaction Log I/O Extraction | ✅ Complete |
 | 18D | Transaction Log Protocol / SQLite Option Reconnaissance | ✅ Complete |
 | 18E | Transaction Log Protocol Definition | ✅ Complete |
+| 18F | SQLite Backend Design / Migration Reconnaissance | ✅ Complete |
+| 18G | Release Checkpoint v0.7.6-alpha | ✅ Complete / Ready |
+
+---
+
+## Release Readiness Checklist（v0.7.6-alpha）
+
+- [x] poetry check = All set!
+- [x] pytest = 765 passed（726 at v0.7.5-alpha → 765，+39）
+- [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
+- [x] poetry run rip "說明" success
+- [x] GitHub Actions CI #7 success（before release checkpoint）
+- [x] Phase 18B persisted in main（refactor(approvals): extract JSON approval store，47a4128）
+- [x] Phase 18C persisted in main（refactor(transactions): extract shared JSON log IO，31c1037）
+- [x] Phase 18E persisted in main（refactor(transactions): define transaction log protocols，c5434ff）
+- [x] JSON backend remains default / only backend
+- [x] No SQLite backend introduced
+- [x] No runtime/rip.db introduced
+- [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
+- [x] No pyproject.toml / poetry.lock changes
+- [x] No .github/workflows/ci.yml changes
+- [x] No destructive command regex changes
+- [x] working tree clean
+- [ ] v0.7.6-alpha Git tag created（annotated tag，tag 建立後勾選）
+- [ ] v0.7.6-alpha tag pushed to origin
+
+### Recommended Next Phase
+
+- **Phase 18H / Phase 19A**：SQLite Backend Implementation（`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog`，滿足現有 Protocol，default 仍 JSON）
+- **或 Phase 19A**：其他功能週期（v0.8.0-alpha candidate）
+- **SQLite optional backend** 已完成三階段設計偵察（18A / 18D / 18F），可直接進入實作；建議先從 transaction logs 開始（Route A），approval SQLite 延後
+
+### SQLite / DB Persistence
+
+- [ ] SQLite / DB persistence option — **deferred**（Phase 18F reconnaissance 完成；實作留待 v0.8.0-alpha candidate 或後續 Phase）
 
 ---
 
@@ -103,6 +138,26 @@
 - **Release 版本以 PROJECT_STATUS / CHANGELOG / README / RELEASE_NOTES 的 RIP version 為準** — v0.7.5-alpha 已發布（tag d96f657，Phase 17I）。
 - **`poetry build` 產生的 artifact 版本為 0.1.0**（來自 pyproject.toml），非 RIP release version；artifact 名稱 `rex_intelligence_platform-0.1.0.tar.gz`。
 - 版本對齊（例如 0.7.4a0）留待正式 release packaging（16H+）；`poetry check`：**All set!**（Phase 17E PEP 621 migration 後，deprecation warnings 已全數消除）。
+
+---
+
+## Tag Readiness Checklist（v0.7.6-alpha）
+
+- [x] Phase 18B / 18C / 18E 所有工作已 commit（3 commits since v0.7.5-alpha）
+- [x] Final regression passed locally（Phase 18G 前）
+  - poetry check: All set!
+  - poetry run pytest -q: 765 passed
+  - poetry build: rex_intelligence_platform-0.1.0 ✅
+  - poetry run rip "說明": 正常 ✅
+- [x] GitHub Actions CI #7 green（before checkpoint）
+- [x] CHANGELOG updated（v0.7.6-alpha Phase 18G 條目 + 18B/18C/18E 標記更新）
+- [x] README updated（v0.7.6-alpha banner + Release Checkpoint Notes）
+- [x] RELEASE_NOTES updated（v0.7.6-alpha section）
+- [x] PROJECT_STATUS updated（Phase 18D/18F/18G + v0.7.6-alpha checklist）
+- [x] Runtime files gitignored（git ls-files runtime/ 應為空）
+- [x] dist/ artifacts gitignored（git ls-files dist/ 應為空）
+- [ ] v0.7.6-alpha annotated tag created（`git tag -a v0.7.6-alpha -m "..."` — 待 push + CI green 後建立）
+- [ ] Tag pushed（`git push origin v0.7.6-alpha` — 待 operator 執行）
 
 ---
 

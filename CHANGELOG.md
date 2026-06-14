@@ -5,7 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 18E Transaction Log Protocol Definition
+## [v0.7.6-alpha] — Phase 18G Release Checkpoint
+
+本階段為純文件 release checkpoint。收斂 Phase 18B / 18C / 18E 的 persistence refactor 工作，無新功能、無 SQLite 導入、不修改任何 application code。
+
+### Release Delta（since v0.7.5-alpha）
+
+| Commit | Phase | 說明 |
+|--------|-------|------|
+| `47a4128` | 18B | refactor(approvals): extract JSON approval store |
+| `31c1037` | 18C | refactor(transactions): extract shared JSON log IO |
+| `c5434ff` | 18E | refactor(transactions): define transaction log protocols |
+
+### Highlights
+- **Phase 18B**：`JsonApprovalStore` stateless I/O helper 從 `ApprovalManager` 提取；`approvals.json` schema / `self.store_path` / `self._store` 不變。
+- **Phase 18C**：`read_json_log` / `write_json_log` / `ensure_utc_aware` 三個 module-level helper 從兩個 transaction log 的重複程式碼提取；`rename_transactions.json` / `move_transactions.json` schema 不變。
+- **Phase 18E**：`RenameTransactionLogProtocol` / `MoveTransactionLogProtocol` 兩個 `@runtime_checkable` structural Protocol（PEP 544）；executor / approval_bridge 型別標注更新；JSON backend 仍是唯一 backend。
+- **Reconnaissance only（no commit）**：Phase 18A（SQLite Persistence Recon）、Phase 18D（Transaction Log Protocol / SQLite Design）、Phase 18F（SQLite Backend / Migration Design）。
+
+### Final Regression（v0.7.6-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 765 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+
+### Safety guarantees
+- 不導入 SQLite，不建立 `runtime/rip.db`，不新增 backend flag。
+- `approvals.json` / `rename_transactions.json` / `move_transactions.json` schema 不變。
+- `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml` / runtime lock 不變。
+- Destructive command regex 不變。
+- 測試數：726（v0.7.5-alpha）→ 765（v0.7.6-alpha，+39）。
+
+---
+
+## [v0.7.6-alpha] — Phase 18E Transaction Log Protocol Definition
 
 ### Added
 - `app/core/transaction_log_protocol.py`：新增兩個 `@runtime_checkable` structural Protocol：
@@ -29,7 +65,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 18C Shared JSON Transaction Log I/O Extraction
+## [v0.7.6-alpha] — Phase 18C Shared JSON Transaction Log I/O Extraction
 
 ### Added
 - `app/core/json_log_io.py`：新增三個 module-level helper functions：
@@ -54,7 +90,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 18B Approval JSON Store Extraction
+## [v0.7.6-alpha] — Phase 18B Approval JSON Store Extraction
 
 ### Added
 - `app/approvals/store.py`：新增 `JsonApprovalStore` stateless I/O helper，提供 `load(store_path)` 與 `save(store_path, data)` 兩個 static method。
