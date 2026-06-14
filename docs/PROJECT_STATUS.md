@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.6-alpha（readiness，tag pending）|
+| **Current Version** | v0.7.6-alpha（tag confirmed）|
 | **Test Count** | 765 passing（+39 since v0.7.5-alpha）|
-| **Last Updated** | 2026-06-14（Phase 18G）|
+| **Last Updated** | 2026-06-14（Phase 18H）|
 
 ---
 
@@ -60,6 +60,7 @@
 | 18E | Transaction Log Protocol Definition | ✅ Complete |
 | 18F | SQLite Backend Design / Migration Reconnaissance | ✅ Complete |
 | 18G | Release Checkpoint v0.7.6-alpha | ✅ Complete / Ready |
+| 18H | v0.7.6-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -81,14 +82,14 @@
 - [x] No .github/workflows/ci.yml changes
 - [x] No destructive command regex changes
 - [x] working tree clean
-- [ ] v0.7.6-alpha Git tag created（annotated tag，tag 建立後勾選）
-- [ ] v0.7.6-alpha tag pushed to origin
+- [x] v0.7.6-alpha Git tag created（annotated tag，tag object 55d560580433d4026609d33fdd87765a76a73d22，Phase 18H）
+- [x] v0.7.6-alpha tag pushed to origin（Phase 18H）
+- [x] v0.7.6-alpha tag dereferences to 8299b9f（`git ls-remote --tags origin v0.7.6-alpha^{}` 驗證，Phase 18H）
 
 ### Recommended Next Phase
 
-- **Phase 18H / Phase 19A**：SQLite Backend Implementation（`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog`，滿足現有 Protocol，default 仍 JSON）
-- **或 Phase 19A**：其他功能週期（v0.8.0-alpha candidate）
-- **SQLite optional backend** 已完成三階段設計偵察（18A / 18D / 18F），可直接進入實作；建議先從 transaction logs 開始（Route A），approval SQLite 延後
+- **Phase 19A**：SQLite Optional Backend Reconnaissance / SQLite Transaction Log Backend Planning（`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog`，滿足現有 Protocol，default 仍 JSON，待 v0.8.0-alpha candidate）
+- **SQLite optional backend** 已完成三階段設計偵察（18A / 18D / 18F），SQLite 尚未實作，建議從 transaction logs 開始（Route A）
 
 ### SQLite / DB Persistence
 
@@ -156,8 +157,8 @@
 - [x] PROJECT_STATUS updated（Phase 18D/18F/18G + v0.7.6-alpha checklist）
 - [x] Runtime files gitignored（git ls-files runtime/ 應為空）
 - [x] dist/ artifacts gitignored（git ls-files dist/ 應為空）
-- [ ] v0.7.6-alpha annotated tag created（`git tag -a v0.7.6-alpha -m "..."` — 待 push + CI green 後建立）
-- [ ] Tag pushed（`git push origin v0.7.6-alpha` — 待 operator 執行）
+- [x] v0.7.6-alpha annotated tag created（tag object 55d560580433d4026609d33fdd87765a76a73d22，Phase 18H）
+- [x] Tag pushed（`git push origin v0.7.6-alpha`，Phase 18H）
 
 ---
 

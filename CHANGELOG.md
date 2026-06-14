@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.6-alpha] — Phase 18H Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.7.6-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.7.6-alpha` |
+| tag object | `55d560580433d4026609d33fdd87765a76a73d22` |
+| target commit | `8299b9f3cbb3b184671cd885d32ddd8e1d3f8acb` |
+| remote tag pushed | ✅ yes |
+
+### Changed Files（Phase 18H）
+
+- `CHANGELOG.md`：Phase 18H 條目新增。
+- `docs/PROJECT_STATUS.md`：Phase 18H 列；Tag Readiness Checklist 全數完成（[x]）。
+- `docs/RELEASE_NOTES.md`：v0.7.6-alpha section 補 Tag Confirmation；Test Count 新增 Phase 18H。
+- `README.md`：banner 更新至 Phase 18H；Release Checkpoint Notes 標注 tag confirmed。
+
+---
+
 ## [v0.7.6-alpha] — Phase 18G Release Checkpoint
 
 本階段為純文件 release checkpoint。收斂 Phase 18B / 18C / 18E 的 persistence refactor 工作，無新功能、無 SQLite 導入、不修改任何 application code。
