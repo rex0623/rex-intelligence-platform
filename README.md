@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.6-alpha**（Phase 19D — Optional SQLite Backend Integration；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.7-alpha readiness**（Phase 19F — Release Checkpoint；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,21 +117,21 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.7.6-alpha（Phase 19D — Optional SQLite Backend Integration）
+**目前版本**：v0.7.7-alpha readiness（Phase 19F — Release Checkpoint）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
-**v0.7.6-alpha** 收斂 Phase 18B / 18C / 18E 的 persistence refactor 工作（3 commits since v0.7.5-alpha），包含：
-- Phase 18B：`JsonApprovalStore` stateless I/O helper 提取（`app/approvals/store.py`）
-- Phase 18C：`read_json_log` / `write_json_log` / `ensure_utc_aware` shared helpers 提取（`app/core/json_log_io.py`）
-- Phase 18E：`RenameTransactionLogProtocol` / `MoveTransactionLogProtocol` 型別協議定義（`app/core/transaction_log_protocol.py`）
-
-**Post-tag 開發進度（Phase 19B / 19D）**：
+**v0.7.7-alpha** 收斂 Phase 19B / 19D 的 optional SQLite transaction log backend 工作，包含：
 - Phase 19B：`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog` SQLite backend 實作（`app/core/sqlite_transaction_log.py`）
 - Phase 19D：`TRANSACTION_LOG_BACKEND` 旗標接入 production runtime；`app/core/transaction_log_factory.py` factory；`default_move_transaction_log()` 與三個 mock_line rename 實例化改用 factory 路由
-- **JSON backend 仍是 default / production path**（`TRANSACTION_LOG_BACKEND` 預設 "json"）；不建立 `runtime/rip.db` 除非主動設定
 
-**Final regression**（Phase 18G 前）：
+**SQLite backend 重要說明**：
+- `TRANSACTION_LOG_BACKEND=json`（預設）→ JSON flat-file backend，production-safe，行為與 v0.7.6-alpha 完全相同
+- `TRANSACTION_LOG_BACKEND=sqlite`（experimental opt-in）→ SQLite backend，不建立 `runtime/rip.db` 除非主動設定
+- **現有 JSON transaction 歷史不會自動 migrate**：切換到 sqlite 後，舊 JSON history 在 SQLite backend 下不可見（rollback / preview 查不到舊 transaction）；Migration 延後至 Phase 19H
+- `prune_transactions()` 在 SQLite backend 下 raise `NotImplementedError`；SQLite prune 延後至 Phase 19I
+
+**Final regression**（Phase 19F）：
 - `poetry check`：All set!
 - `poetry run pytest -q`：816 passed（+51 since v0.7.6-alpha tag）
 - `poetry build`：rex_intelligence_platform-0.1.0 ✅

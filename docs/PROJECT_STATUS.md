@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.6-alpha（tag confirmed；Phase 19D in progress）|
+| **Current Version** | v0.7.7-alpha readiness（Phase 19F Release Checkpoint）|
 | **Test Count** | 816 passing（+51 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19D）|
+| **Last Updated** | 2026-06-14（Phase 19F）|
 
 ---
 
@@ -63,6 +63,38 @@
 | 18H | v0.7.6-alpha Tag Confirmation | ✅ Complete |
 | 19B | Experimental SQLite Transaction Log Backend | ✅ Complete |
 | 19D | Optional SQLite Transaction Log Backend Integration | ✅ Complete |
+| 19E | SQLite Migration / Prune Reconnaissance | ✅ Complete |
+| 19F | Release Checkpoint v0.7.7-alpha | ✅ Ready |
+
+---
+
+## Release Readiness Checklist（v0.7.7-alpha）
+
+- [x] poetry check = All set!
+- [x] pytest = 816 passed（765 at v0.7.6-alpha tag → 816，+51）
+- [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
+- [x] poetry run rip "說明" success
+- [x] GitHub Actions CI #11 success（before release checkpoint）
+- [x] Phase 19B persisted in main（`app/core/sqlite_transaction_log.py` + 29 tests）
+- [x] Phase 19D persisted in main（`app/core/transaction_log_factory.py` + TRANSACTION_LOG_BACKEND + 22 tests）
+- [x] JSON backend remains default（`TRANSACTION_LOG_BACKEND` 預設 "json"）
+- [x] SQLite backend remains optional / experimental（只有明確設定才啟用）
+- [x] No migration script introduced（JSON → SQLite history migration 延後 Phase 19H）
+- [x] No SQLite prune implementation（`prune_transactions()` raise NotImplementedError；延後 Phase 19I）
+- [x] No Approval SQLite backend（`ApprovalManager` / `JsonApprovalStore` 不變）
+- [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
+- [x] No pyproject.toml / poetry.lock changes
+- [x] No .github/workflows/ci.yml changes
+- [x] No destructive command regex changes
+- [x] working tree clean（待 Phase 19F doc commit）
+- [ ] v0.7.7-alpha Git tag created
+- [ ] v0.7.7-alpha tag pushed to origin
+
+### Recommended Next Phase
+
+- **Phase 19G** — Operator Docs for Experimental SQLite Backend（更新 `docs/OPERATOR_DEPLOYMENT.md`：TRANSACTION_LOG_BACKEND 說明、no migration warning、SQLite backup 指令）
+- **Phase 19H** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`，JSON → SQLite one-shot migration，~19 tests）
+- **Phase 19I** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
 
 ---
 

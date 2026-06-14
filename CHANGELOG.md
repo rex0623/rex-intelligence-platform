@@ -5,12 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 19D Optional SQLite Transaction Log Backend Integration
+## [v0.7.7-alpha] — Phase 19F Release Checkpoint
 
-本階段將 SQLite backend 接入 production runtime，透過 `TRANSACTION_LOG_BACKEND` 設定旗標選擇後端。
-JSON 仍是預設值，SQLite 為 experimental opt-in。不修改任何現有 JSON 行為，不做 migration。
+本 release checkpoint 收斂 Phase 19B（Experimental SQLite Backend）與 Phase 19D（Optional Backend Factory / TRANSACTION_LOG_BACKEND integration）兩個 phase 的工作。
+JSON backend 仍為預設值，SQLite 為 experimental opt-in。不做 migration、不做 prune、不改 default。
 
-### Added
+### Added（Phase 19B）
+
+- **`app/core/sqlite_transaction_log.py`**（新增）：
+  - `initialize_sqlite_schema(db_path)` — idempotent schema DDL（5 tables + 2 indexes）
+  - `SqliteRenameTransactionLog` — 滿足 `RenameTransactionLogProtocol`（Phase 18E）
+  - `SqliteMoveTransactionLog` — 滿足 `MoveTransactionLogProtocol`（Phase 18E）
+  - connection helper（`_open_connection` / `_connection` context manager）
+  - PRAGMA：journal_mode=WAL / foreign_keys=ON / busy_timeout=5000
+  - ON DELETE CASCADE / status CHECK constraint / AUTOINCREMENT action order
+  - Uses Python stdlib sqlite3 only（no SQLAlchemy, no new pyproject.toml dependencies）
+- **`tests/test_sqlite_transaction_log.py`**（新增）：29 tests（765 → 794）
+
+### Added（Phase 19D）
 
 - **`app/core/config.py`**（修改）：
   - `Settings.TRANSACTION_LOG_BACKEND: Literal["json", "sqlite"] = "json"` — 後端選擇旗標（預設 "json"）
@@ -25,45 +37,26 @@ JSON 仍是預設值，SQLite 為 experimental opt-in。不修改任何現有 JS
   - 三個 rename log 實例化改用 `make_rename_transaction_log()`
 - **`tests/test_transaction_log_factory.py`**（新增）：22 tests（794 → 816）
 
+### Test Delta（v0.7.6-alpha → v0.7.7-alpha）
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.6-alpha | 765 |
+| Phase 19B | 794（+29）|
+| Phase 19D | 816（+22）|
+| **v0.7.7-alpha** | **816** |
+
 ### Not Changed
 
 - JSON backend 仍是 default / production path（`TRANSACTION_LOG_BACKEND` 預設 "json"）
 - 不修改 `ApprovalManager` / `JsonApprovalStore`
 - 不修改 runtime lock / destructive command regex
-- 不做 migration script / SQLite prune
+- 不做 migration script（JSON → SQLite 歷史 migration 延後至 Phase 19H）
+- 不實作 `prune_transactions`（SQLite backend 明確 raise NotImplementedError；延後至 Phase 19I）
 - 不實作 `ApprovalStoreProtocol` / `SqliteApprovalStore`
 - 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
 - 不建立 runtime/rip.db（除非主動設定 `TRANSACTION_LOG_BACKEND=sqlite`）
-
----
-
-## [Unreleased] — Phase 19B Experimental SQLite Transaction Log Backend
-
-本階段新增 SQLite optional backend 的最小可行實作，驗證 Phase 18E Protocol 合約。
-不接 default runtime、不新增 backend flag、不修改任何現有 application code。
-
-### Added
-
-- **`app/core/sqlite_transaction_log.py`**（新增）：
-  - `initialize_sqlite_schema(db_path)` — idempotent schema DDL（5 tables + 2 indexes）
-  - `SqliteRenameTransactionLog` — 滿足 `RenameTransactionLogProtocol`（Phase 18E）
-  - `SqliteMoveTransactionLog` — 滿足 `MoveTransactionLogProtocol`（Phase 18E）
-  - connection helper（`_open_connection` / `_connection` context manager）
-  - PRAGMA：journal_mode=WAL / foreign_keys=ON / busy_timeout=5000
-  - ON DELETE CASCADE / status CHECK constraint / AUTOINCREMENT action order
-  - Uses Python stdlib sqlite3 only（no SQLAlchemy, no new pyproject.toml dependencies）
-- **`tests/test_sqlite_transaction_log.py`**（新增）：29 tests（765 → 794）
-
-### Not Changed
-
-- JSON backend 仍是 default / production path
-- 不新增 TRANSACTION_LOG_BACKEND / APPROVAL_BACKEND flag
-- 不修改 config.py / settings.py
-- 不修改任何現有 executor / approval_bridge
-- 不修改 runtime lock / destructive command regex
-- 不做 migration script
-- 不實作 `prune_transactions`（SQLite backend 明確 raise NotImplementedError）
-- 不建立 runtime/rip.db
+- 不修改 runtime JSON schema（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
 
 ---
 

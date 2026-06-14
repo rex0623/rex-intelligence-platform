@@ -2,6 +2,90 @@
 
 ---
 
+## v0.7.7-alpha
+
+**Phase 19B–19D — Optional SQLite Transaction Log Backend Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.7.7-alpha 收斂 Phase 19B（Experimental SQLite Transaction Log Backend）與 Phase 19D（Optional Backend Factory / TRANSACTION_LOG_BACKEND Integration）兩個 phase 的工作，確認 optional SQLite backend 可正確選擇、JSON backend 預設行為完全不變，並為後續 migration / prune 實作建立穩定基準。
+
+---
+
+### Highlights
+
+- **Experimental SQLite Transaction Log Backend（Phase 19B）** — `app/core/sqlite_transaction_log.py`：`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog` 兩個 class 滿足 Phase 18E 定義的 `@runtime_checkable` Protocol（PEP 544 structural subtyping）；5 tables + 2 indexes DDL；WAL / foreign keys / busy timeout PRAGMA；ON DELETE CASCADE；AUTOINCREMENT action 順序保留；Python stdlib sqlite3 only（無新 dependency）；`prune_transactions()` 明確 raise `NotImplementedError`（experimental 限制）。
+- **Optional Backend Factory + TRANSACTION_LOG_BACKEND（Phase 19D）** — `app/core/config.py` 新增 `TRANSACTION_LOG_BACKEND: Literal["json", "sqlite"] = "json"`（預設 "json"）與 `get_sqlite_db_path()`；新增 `app/core/transaction_log_factory.py`（`make_rename_transaction_log()` / `make_move_transaction_log()`）；本機 import 設計確保 backend="json" 時不 import SQLite module；`app/folder_intelligence/approval_bridge.py` `default_move_transaction_log()` 改用 factory 路由；`scripts/mock_line.py` 三個 rename log 實例化改用 `make_rename_transaction_log()`。
+- **JSON backend 完全不變（v0.7.6-alpha → v0.7.7-alpha 升級影響為零）** — `TRANSACTION_LOG_BACKEND` 預設 "json"；不建立 `runtime/rip.db`；`rename_transactions.json` / `move_transactions.json` schema 不變；所有現有 operator 操作行為與 v0.7.6-alpha 完全相同。
+
+---
+
+### SQLite Backend 重要限制（v0.7.7-alpha）
+
+| 限制 | 說明 |
+|------|------|
+| No migration | 切換到 `sqlite` 後，現有 JSON transaction history 完全不可見（`預覽回滾改名` / `回滾改名` 等查不到舊 transaction）；migration script 延後至 Phase 19H |
+| No SQLite prune | `prune_transactions()` 在 SQLite backend raise `NotImplementedError`；延後至 Phase 19I |
+| No Approval SQLite | `ApprovalManager` / `JsonApprovalStore` 不變，approval 仍存 JSON |
+| Experimental only | 不建議在有歷史資料的環境切換 sqlite，除非接受歷史不可見 |
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.6-alpha | 765 |
+| Phase 19B | 794（+29）|
+| Phase 19D | 816（+22）|
+| **v0.7.7-alpha** | **816** |
+
+---
+
+### Final Regression（v0.7.7-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 816 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | #11 green（before checkpoint）|
+
+---
+
+### Non-Goals（v0.7.7-alpha）
+
+- 不做 migration script（JSON → SQLite；延後至 Phase 19H）
+- 不實作 SQLite prune_transactions（延後至 Phase 19I）
+- 不導入 `ApprovalStoreProtocol` / `SqliteApprovalStore`
+- 不更新 `docs/OPERATOR_DEPLOYMENT.md`（延後至 Phase 19G）
+- 不切換 default backend 至 sqlite
+- 不修改 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema
+
+---
+
+### Commits Since v0.7.6-alpha
+
+| Commit | Phase | 說明 |
+|--------|-------|------|
+| `（Phase 19B commit）` | 19B | feat(transactions): add experimental SQLite transaction log backend |
+| `26c47d5` | 19D | feat(transactions): add optional SQLite backend factory |
+
+---
+
+### Recommended Next
+
+- **Phase 19G** — Operator Docs for Experimental SQLite Backend
+- **Phase 19H** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`）
+- **Phase 19I** — SQLite Prune Implementation
+
+---
+
 ## v0.7.6-alpha
 
 **Phase 18B–18G — Persistence Refactors Release Checkpoint**
