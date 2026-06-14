@@ -6,8 +6,8 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.5-alpha（已發布，tag d96f657）|
-| **Test Count** | 726 passing |
-| **Last Updated** | 2026-06-13（Phase 17I）|
+| **Test Count** | 737 passing（+11 Phase 18B）|
+| **Last Updated** | 2026-06-14（Phase 18B）|
 
 ---
 
@@ -53,6 +53,8 @@
 | 17G | CI Result Confirmation / Release Checkpoint Notes | ✅ Complete |
 | 17H | Release Tag Readiness / v0.7.5-alpha Preparation | ✅ Complete |
 | 17I | v0.7.5-alpha Tag Confirmation | ✅ Complete |
+| 18A | SQLite Persistence Reconnaissance | ✅ Complete |
+| 18B | Approval JSON Store Extraction | ✅ Complete |
 
 ---
 

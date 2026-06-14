@@ -1,12 +1,12 @@
 """File-backed approval manager."""
 
-import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
 from app.approvals.schemas import Approval
+from app.approvals.store import JsonApprovalStore
 from app.core.config import get_approval_store_path
 from app.core.logger import get_logger
 
@@ -25,27 +25,10 @@ class ApprovalManager:
         self._load_store()
 
     def _load_store(self) -> None:
-        if not self.store_path.exists():
-            self._store = {}
-            return
-
-        try:
-            raw = json.loads(self.store_path.read_text(encoding="utf-8"))
-            self._store = {
-                item["approval_id"]: Approval.model_validate(item) for item in raw
-            }
-        except Exception:
-            logger.warning(
-                "Failed to load approval store, starting with empty store",
-                exc_info=True,
-            )
-            self._store = {}
+        self._store = JsonApprovalStore.load(self.store_path)
 
     def _save_store(self) -> None:
-        data = [approval.model_dump(mode="json") for approval in self._store.values()]
-        self.store_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        JsonApprovalStore.save(self.store_path, self._store)
 
     def create_approval(self, workflow_plan: dict, ttl_minutes: int = 60) -> Approval:
         approval_id = str(uuid.uuid4())

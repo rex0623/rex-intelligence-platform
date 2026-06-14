@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 18B Approval JSON Store Extraction
+
+### Added
+- `app/approvals/store.py`：新增 `JsonApprovalStore` stateless I/O helper，提供 `load(store_path)` 與 `save(store_path, data)` 兩個 static method。
+- `tests/test_approval_store.py`：11 個新測試，覆蓋 load/save/roundtrip/schema/corrupted/mark_executed payload 保留。
+
+### Changed
+- `app/approvals/manager.py`：`_load_store` 和 `_save_store` 委派給 `JsonApprovalStore`；移除內嵌 JSON I/O 邏輯；`self.store_path` 和 `self._store` 屬性不變。
+- `app/approvals/__init__.py`：新增 `JsonApprovalStore` 至 `__all__`。
+
+### Safety guarantees
+- `approvals.json` schema 不變（array of approval dicts）。
+- `self.store_path` 和 `self._store` 仍為 `ApprovalManager` 的普通 instance 屬性，現有 monkeypatch 測試零改動。
+- 不導入 SQLite，不建立任何 DB 檔案。
+- `rename_transactions.json` / `move_transactions.json` schema 及對應 log 類別不變。
+- `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml` / runtime lock 不變。
+- 測試數：726 → 737（+11）。
+
+---
+
 ## [v0.7.5-alpha] — Phase 17I Tag Confirmation
 
 本階段為純文件 tag confirmation。v0.7.5-alpha tag 已建立並 push 至 origin，無程式碼變動、無測試新增。

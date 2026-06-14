@@ -2,6 +2,19 @@
 
 ---
 
+## Post-v0.7.5-alpha Development
+
+### Phase 18B — Approval JSON Store Extraction（2026-06-14）
+
+- **新增 `JsonApprovalStore`**（`app/approvals/store.py`）：stateless JSON I/O helper，提供 `load(store_path)` 與 `save(store_path, data)` static method，將 ApprovalManager 的 JSON 序列化邏輯集中至單一模組。
+- **`ApprovalManager` 委派重構**：`_load_store` / `_save_store` 改為委派 `JsonApprovalStore`；`self.store_path` 和 `self._store` 屬性不變，所有現有 monkeypatch 測試零改動。
+- **approvals.json schema 不變**：仍為 array of approval dicts；payload 內 `execution_status` / `executed_at` / `execution_transaction_id` 保留。
+- **新增 11 個測試**（`tests/test_approval_store.py`）：726 → 737 passing。
+- **不導入 SQLite**；`rename_transactions.json` / `move_transactions.json` 及對應 transaction log 類別不變。
+- Phase 18A（Reconnaissance）→ Phase 18B（JSON Store Extraction）→ Phase 18C（Protocol + SQLite，未來）。
+
+---
+
 ## v0.7.5-alpha
 
 **Phase 17A–17I — console_scripts Entry Point / Runtime Lock / Operator Runbook / Preflight Validation / Packaging Metadata Modernization / GitHub Actions CI / CI Result Confirmation / Release Tag Readiness / Tag Confirmation**
