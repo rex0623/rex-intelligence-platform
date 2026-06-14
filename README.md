@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.7-alpha readiness**（Phase 19F — Release Checkpoint；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
+> **目前版本：v0.7.7-alpha**（Phase 19G — Tag Confirmed；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,7 +117,7 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.7.7-alpha readiness（Phase 19F — Release Checkpoint）
+**目前版本**：v0.7.7-alpha（Phase 19G — Tag Confirmed）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 

@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.7-alpha] — Phase 19G Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.7.7-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.7.7-alpha` |
+| tag object | `80d234676bdacbc8b5dafefa427f59289e471b81` |
+| target commit | `86c3b9b3d938b574c5d5bdcda4519604476d0733` |
+| remote tag pushed | ✅ yes |
+
+### Changed Files（Phase 19G）
+
+- `CHANGELOG.md`：Phase 19G 條目新增。
+- `docs/PROJECT_STATUS.md`：Phase 19G 列；Tag Readiness Checklist 全數完成（[x]）。
+- `docs/RELEASE_NOTES.md`：v0.7.7-alpha section 補 Tag Confirmation；Test Count 新增 Phase 19G。
+- `README.md`：banner 更新至 Phase 19G；Release Checkpoint Notes 標注 tag confirmed。
+
+---
+
 ## [v0.7.7-alpha] — Phase 19F Release Checkpoint
 
 本 release checkpoint 收斂 Phase 19B（Experimental SQLite Backend）與 Phase 19D（Optional Backend Factory / TRANSACTION_LOG_BACKEND integration）兩個 phase 的工作。

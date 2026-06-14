@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.7-alpha readiness（Phase 19F Release Checkpoint）|
+| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19G）|
 | **Test Count** | 816 passing（+51 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19F）|
+| **Last Updated** | 2026-06-14（Phase 19G）|
 
 ---
 
@@ -64,7 +64,8 @@
 | 19B | Experimental SQLite Transaction Log Backend | ✅ Complete |
 | 19D | Optional SQLite Transaction Log Backend Integration | ✅ Complete |
 | 19E | SQLite Migration / Prune Reconnaissance | ✅ Complete |
-| 19F | Release Checkpoint v0.7.7-alpha | ✅ Ready |
+| 19F | Release Checkpoint v0.7.7-alpha | ✅ Complete / Ready |
+| 19G | v0.7.7-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -86,15 +87,16 @@
 - [x] No pyproject.toml / poetry.lock changes
 - [x] No .github/workflows/ci.yml changes
 - [x] No destructive command regex changes
-- [x] working tree clean（待 Phase 19F doc commit）
-- [ ] v0.7.7-alpha Git tag created
-- [ ] v0.7.7-alpha tag pushed to origin
+- [x] working tree clean
+- [x] v0.7.7-alpha Git tag created（annotated tag，tag object `80d234676bdacbc8b5dafefa427f59289e471b81`，Phase 19G）
+- [x] v0.7.7-alpha tag pushed to origin（Phase 19G）
+- [x] v0.7.7-alpha tag dereferences to `86c3b9b`（`git ls-remote --tags origin v0.7.7-alpha^{}` 驗證，Phase 19G）
 
 ### Recommended Next Phase
 
-- **Phase 19G** — Operator Docs for Experimental SQLite Backend（更新 `docs/OPERATOR_DEPLOYMENT.md`：TRANSACTION_LOG_BACKEND 說明、no migration warning、SQLite backup 指令）
-- **Phase 19H** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`，JSON → SQLite one-shot migration，~19 tests）
-- **Phase 19I** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
+- **Phase 19H** — Operator Docs for Experimental SQLite Backend（更新 `docs/OPERATOR_DEPLOYMENT.md`：TRANSACTION_LOG_BACKEND 說明、no migration warning、SQLite backup 指令）
+- **Phase 19I** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`，JSON → SQLite one-shot migration，~19 tests）
+- **Phase 19J** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
 
 ---
 
