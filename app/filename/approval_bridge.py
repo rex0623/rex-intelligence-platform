@@ -26,7 +26,7 @@ from app.filename.schemas import (
     RenameExecutionResult,
     RenameFileResult,
 )
-from app.filename.transaction_log import RenameTransactionLog
+from app.core.transaction_log_protocol import RenameTransactionLogProtocol
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ def _reject(plan: RenamePlan, reason: str) -> RenameExecutionResult:
 
 def execute_approved_rename_plan(
     plan: RenamePlan,
-    transaction_log: Optional[RenameTransactionLog] = None,
+    transaction_log: Optional[RenameTransactionLogProtocol] = None,
 ) -> RenameExecutionResult:
     """Execute an approved, validated RenamePlan via the Safe Rename Executor.
 
@@ -101,7 +101,7 @@ def execute_approved_rename_plan(
 def execute_approved_rename_by_plan_id(
     plan_id: str,
     plan_loader: Callable[[str], Optional[RenamePlan]],
-    transaction_log: Optional[RenameTransactionLog] = None,
+    transaction_log: Optional[RenameTransactionLogProtocol] = None,
 ) -> RenameExecutionResult:
     """Load a RenamePlan by id via *plan_loader*, then execute it through
     execute_approved_rename_plan().

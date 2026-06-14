@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 18E Transaction Log Protocol Definition
+
+### Added
+- `app/core/transaction_log_protocol.py`：新增兩個 `@runtime_checkable` structural Protocol：
+  - `RenameTransactionLogProtocol`：`save_transaction` / `load_transaction` / `list_transactions` / `update_transaction` / `mark_transaction_actions`（各方法簽名與現有 JSON 實作完全相符）
+  - `MoveTransactionLogProtocol`：同構，使用 `MoveTransaction` / `MoveTransactionAction` 型別
+- `tests/test_transaction_log_protocol.py`：8 個新測試，覆蓋 isinstance / prune 排除 / callable / no-sqlite / runtime_checkable。
+
+### Changed
+- `app/filename/executor.py`：`execute_rename_plan` 與 `rollback_transaction_by_id` 的 `transaction_log` 參數型別改為 `RenameTransactionLogProtocol`；runtime 行為完全不變。
+- `app/filename/approval_bridge.py`：`execute_approved_rename_plan` 與 `execute_approved_rename_by_plan_id` 的 `transaction_log` 參數型別同上。
+- `app/folder_intelligence/executor.py`：`execute_move_plan` 與 `rollback_move_transaction_by_id` 的 `transaction_log` 參數型別改為 `MoveTransactionLogProtocol`。
+- `app/folder_intelligence/approval_bridge.py`：`execute_approved_move_plan` 與 `execute_approved_move_by_approval_id` 的 `transaction_log` 參數型別同上；`default_move_transaction_log()` 仍回傳 `MoveTransactionLog`。
+
+### Safety guarantees
+- `prune_transactions()` 不納入 Protocol：Rename / Move 的 signature 發散（max_transactions/max_age_days vs older_than_days/dry_run），不強制統一。
+- `rename_transactions.json` / `move_transactions.json` schema 不變（`{"transactions": [...]}` wrapper）。
+- JSON backend 仍是唯一 backend；runtime 行為、constructor API、`self._log_path` 屬性、prune 行為全數不變。
+- 不導入 SQLite，不建立 DB 檔案，不修改 runtime lock，不修改 pyproject.toml / poetry.lock。
+- `from __future__ import annotations` + `TYPE_CHECKING` 避免循環 import（`transaction_log_protocol` → `folder_intelligence.schemas` → `__init__` → `approval_bridge` → `transaction_log_protocol`）；`isinstance()` 行為不受影響。
+- 測試數：757 → 765（+8）。
+
+---
+
 ## [Unreleased] — Phase 18C Shared JSON Transaction Log I/O Extraction
 
 ### Added

@@ -33,6 +33,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from app.core.config import get_move_transaction_log_path
+from app.core.transaction_log_protocol import MoveTransactionLogProtocol
 from app.folder_intelligence.executor import execute_move_plan
 from app.folder_intelligence.schemas import (
     MoveExecutionResult,
@@ -117,7 +118,7 @@ def _restore_move_plan(payload: dict) -> Optional[MovePlan]:
 
 def execute_approved_move_plan(
     approval_payload: dict,
-    transaction_log: Optional[MoveTransactionLog] = None,
+    transaction_log: Optional[MoveTransactionLogProtocol] = None,
 ) -> MoveExecutionResult:
     """Restore a MovePlan from *approval_payload* and execute it.
 
@@ -157,7 +158,7 @@ def execute_approved_move_plan(
 def execute_approved_move_by_approval_id(
     approval_id: str,
     approval_manager,
-    transaction_log: Optional[MoveTransactionLog] = None,
+    transaction_log: Optional[MoveTransactionLogProtocol] = None,
 ) -> MoveExecutionResult:
     """Load an approval by id and execute its MovePlan through the bridge.
 

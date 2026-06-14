@@ -32,7 +32,7 @@ from app.filename.schemas import (
     RenameTransaction,
     RenameTransactionAction,
 )
-from app.filename.transaction_log import RenameTransactionLog
+from app.core.transaction_log_protocol import RenameTransactionLogProtocol
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def _risk_for(plan: RenamePlan, original_filename: str) -> str | None:
 
 def execute_rename_plan(
     plan: RenamePlan,
-    transaction_log: RenameTransactionLog | None = None,
+    transaction_log: RenameTransactionLogProtocol | None = None,
 ) -> RenameExecutionResult:
     """Execute an approved, validated RenamePlan by actually renaming files.
 
@@ -370,7 +370,7 @@ def rollback_rename_transaction(transaction: RenameTransaction) -> RenameExecuti
 
 def rollback_transaction_by_id(
     transaction_id: str,
-    transaction_log: RenameTransactionLog,
+    transaction_log: RenameTransactionLogProtocol,
 ) -> RenameExecutionResult:
     """Load a persisted transaction and rollback all successful actions.
 

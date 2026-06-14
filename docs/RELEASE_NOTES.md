@@ -4,6 +4,19 @@
 
 ## Post-v0.7.5-alpha Development
 
+### Phase 18E — Transaction Log Protocol Definition（2026-06-14）
+
+- **新增 `app/core/transaction_log_protocol.py`**：兩個 `@runtime_checkable` structural Protocol（PEP 544）：`RenameTransactionLogProtocol` / `MoveTransactionLogProtocol`，各含 5 個方法（`save_transaction` / `load_transaction` / `list_transactions` / `update_transaction` / `mark_transaction_actions`）。
+- **executor / approval_bridge 型別標注更新**：4 個檔案（`app/filename/executor.py`、`app/filename/approval_bridge.py`、`app/folder_intelligence/executor.py`、`app/folder_intelligence/approval_bridge.py`）的 `transaction_log` 參數型別改為對應的 Protocol；runtime 行為完全不變。
+- **prune_transactions() 不納入 Protocol**：Rename / Move 的 prune signature 發散（参數名、回傳型別均不同），不強制統一，保留各自 concrete class 的 prune API。
+- **`rename_transactions.json` / `move_transactions.json` schema 不變**：`{"transactions": [...]}` wrapper；transaction_id / plan_id / created_at / actions 欄位不變。
+- **JSON backend 仍是唯一 backend**；不導入 SQLite，不建立 DB 檔案，不修改 runtime lock、pyproject.toml、poetry.lock。
+- **循環 import 處理**：`transaction_log_protocol.py` 使用 `from __future__ import annotations` + `TYPE_CHECKING` guard，避免 `folder_intelligence.__init__` → `approval_bridge` → `transaction_log_protocol` 循環；`isinstance()` 行為完全不受影響。
+- **新增 8 個測試**（`tests/test_transaction_log_protocol.py`）：757 → 765 passing。
+- Phase 18D（Protocol / SQLite Reconnaissance）→ Phase 18E（Protocol Definition）→ Phase 18F（SQLite backend，未來）。
+
+---
+
 ### Phase 18C — Shared JSON Transaction Log I/O Extraction（2026-06-14）
 
 - **新增 `app/core/json_log_io.py`**：`read_json_log` / `write_json_log` / `ensure_utc_aware` 三個 module-level helper function，提取 `RenameTransactionLog` 和 `MoveTransactionLog` 中完全相同的 JSON I/O 邏輯（byte-for-byte duplicate）。

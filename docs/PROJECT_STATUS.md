@@ -6,8 +6,8 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.5-alpha（已發布，tag d96f657）|
-| **Test Count** | 757 passing（+20 Phase 18C）|
-| **Last Updated** | 2026-06-14（Phase 18C）|
+| **Test Count** | 765 passing（+8 Phase 18E）|
+| **Last Updated** | 2026-06-14（Phase 18E）|
 
 ---
 
@@ -56,6 +56,8 @@
 | 18A | SQLite Persistence Reconnaissance | ✅ Complete |
 | 18B | Approval JSON Store Extraction | ✅ Complete |
 | 18C | Shared JSON Transaction Log I/O Extraction | ✅ Complete |
+| 18D | Transaction Log Protocol / SQLite Option Reconnaissance | ✅ Complete |
+| 18E | Transaction Log Protocol Definition | ✅ Complete |
 
 ---
 

@@ -41,7 +41,7 @@ from app.folder_intelligence.schemas import (
     MoveTransaction,
     MoveTransactionAction,
 )
-from app.folder_intelligence.transaction_log import MoveTransactionLog
+from app.core.transaction_log_protocol import MoveTransactionLogProtocol
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ def _risk_for(plan: MovePlan, original_filename: str) -> str | None:
 
 def execute_move_plan(
     plan: MovePlan,
-    transaction_log: MoveTransactionLog | None = None,
+    transaction_log: MoveTransactionLogProtocol | None = None,
 ) -> MoveExecutionResult:
     """Execute an approved, validated MovePlan by actually moving files.
 
@@ -344,7 +344,7 @@ def rollback_move_transaction(transaction: MoveTransaction) -> MoveExecutionResu
 
 def rollback_move_transaction_by_id(
     transaction_id: str,
-    transaction_log: MoveTransactionLog,
+    transaction_log: MoveTransactionLogProtocol,
 ) -> MoveExecutionResult:
     """Load a persisted transaction and rollback all successful actions.
 
