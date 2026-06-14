@@ -18,6 +18,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from app.core.json_log_io import read_json_log, write_json_log
 from app.folder_intelligence.schemas import (
     MoveRollbackPreview,
     MoveRollbackPreviewAction,
@@ -37,24 +38,11 @@ class MoveTransactionLog:
 
     def _read(self) -> dict:
         """Return parsed log dict.  Returns empty structure on any error."""
-        if not self._log_path.exists():
-            return {"transactions": []}
-        try:
-            raw = self._log_path.read_text(encoding="utf-8")
-            data = json.loads(raw)
-            if not isinstance(data, dict) or "transactions" not in data:
-                return {"transactions": []}
-            return data
-        except (json.JSONDecodeError, OSError):
-            return {"transactions": []}
+        return read_json_log(self._log_path)
 
     def _write(self, data: dict) -> None:
         """Write log dict to file, creating parent dirs as needed."""
-        self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        self._log_path.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        write_json_log(self._log_path, data)
 
     def _upsert(self, transaction: MoveTransaction) -> None:
         """Insert or replace a transaction entry by transaction_id."""

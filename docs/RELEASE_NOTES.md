@@ -4,6 +4,19 @@
 
 ## Post-v0.7.5-alpha Development
 
+### Phase 18C — Shared JSON Transaction Log I/O Extraction（2026-06-14）
+
+- **新增 `app/core/json_log_io.py`**：`read_json_log` / `write_json_log` / `ensure_utc_aware` 三個 module-level helper function，提取 `RenameTransactionLog` 和 `MoveTransactionLog` 中完全相同的 JSON I/O 邏輯（byte-for-byte duplicate）。
+- **`RenameTransactionLog._read()` / `_write()` 委派重構**：改為 thin wrapper，移除內嵌 JSON I/O 邏輯；`self._log_path` 屬性不變，現有 `._log_path.read_bytes()` 等測試存取繼續有效。
+- **`MoveTransactionLog._read()` / `_write()` 同上**：Move prune 的整檔 corrupt JSON 特殊 early return（`corrupted_count=1`, `dry_run` 保留, 不覆寫原檔）保留不變。
+- **`rename_transactions.json` / `move_transactions.json` schema 不變**：`{"transactions": [...]}` wrapper；transaction_id / plan_id / actions 欄位不變。
+- **prune 行為完全不變**：rename prune（max_transactions / max_age_days）；move prune（older_than_days / dry_run / protected / retained / corrupted 三態）；rollback safety（success action 永不被 prune）。
+- **AST 安全測試全通過**：move prune 不呼叫 rename/move/replace/mkdir 的限制繼續有效。
+- **新增 20 個測試**（`tests/test_json_log_io.py`）：737 → 757 passing。
+- Phase 18B（Approval JSON Store）→ Phase 18C（Transaction Log I/O）→ Phase 18D（Protocol + SQLite，未來）。
+
+---
+
 ### Phase 18B — Approval JSON Store Extraction（2026-06-14）
 
 - **新增 `JsonApprovalStore`**（`app/approvals/store.py`）：stateless JSON I/O helper，提供 `load(store_path)` 與 `save(store_path, data)` static method，將 ApprovalManager 的 JSON 序列化邏輯集中至單一模組。

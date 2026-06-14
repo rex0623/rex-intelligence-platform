@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 18C Shared JSON Transaction Log I/O Extraction
+
+### Added
+- `app/core/json_log_io.py`：新增三個 module-level helper functions：
+  - `read_json_log(log_path)` — 安全讀取 `{"transactions": [...]}` JSON log；不存在 / 損毀 / 結構錯誤時回傳空結構，不 raise
+  - `write_json_log(log_path, data)` — 寫入 JSON log，自動建立 parent directory，UTF-8 + ensure_ascii=False + indent=2
+  - `ensure_utc_aware(dt)` — naive datetime 補 UTC；已 aware 的原樣回傳
+- `tests/test_json_log_io.py`：20 個新測試，覆蓋 read/write/roundtrip/ensure_utc_aware/delegate 整合。
+
+### Changed
+- `app/filename/transaction_log.py`：`RenameTransactionLog._read()` 和 `_write()` 改為 thin wrapper，委派 `read_json_log` / `write_json_log`；移除重複的 JSON I/O 邏輯；移除不再需要的 `import json`。
+- `app/folder_intelligence/transaction_log.py`：`MoveTransactionLog._read()` 和 `_write()` 同上。Move prune 的整檔 corrupt JSON 特殊 early return 邏輯保留，不受影響。
+
+### Safety guarantees
+- `rename_transactions.json` / `move_transactions.json` schema 不變（`{"transactions": [...]}` wrapper）。
+- `RenameTransactionLog(log_path)` / `MoveTransactionLog(log_path)` constructor API 不變。
+- `self._log_path` 仍為各 log class 的普通 Path instance 屬性（現有測試的 `._log_path.read_bytes()` 等存取繼續有效）。
+- `prune_transactions()` 的 signature / 行為 / result schema 不變（rename: max_transactions/max_age_days；move: older_than_days/dry_run）。
+- rollback safety（success action 永不被 prune）不變。
+- 不導入 SQLite，不建立 DB 檔案，不修改 runtime lock。
+- AST 安全測試（move prune 不可呼叫 rename/move/replace/mkdir）全數通過。
+- 測試數：737 → 757（+20）。
+
+---
+
 ## [Unreleased] — Phase 18B Approval JSON Store Extraction
 
 ### Added
