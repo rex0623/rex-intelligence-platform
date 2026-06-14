@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19H operator docs）|
-| **Test Count** | 816 passing（+51 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19H）|
+| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19J SQLite migration script）|
+| **Test Count** | 855 passing（+90 since v0.7.6-alpha tag）|
+| **Last Updated** | 2026-06-14（Phase 19J）|
 
 ---
 
@@ -67,6 +67,7 @@
 | 19F | Release Checkpoint v0.7.7-alpha | ✅ Complete / Ready |
 | 19G | v0.7.7-alpha Tag Confirmation | ✅ Complete |
 | 19H | Operator Docs for Experimental SQLite Backend | ✅ Complete |
+| 19J | SQLite Transaction Log Migration Script | ✅ Complete |
 
 ---
 
@@ -93,11 +94,15 @@
 - [x] v0.7.7-alpha tag pushed to origin（Phase 19G）
 - [x] v0.7.7-alpha tag dereferences to `86c3b9b`（`git ls-remote --tags origin v0.7.7-alpha^{}` 驗證，Phase 19G）
 - [x] `docs/OPERATOR_DEPLOYMENT.md` 更新至 Phase 19H（TRANSACTION_LOG_BACKEND 說明、SQLite backup、no-migration warning、WSL2 note、快速參考 SQLite 條目）
+- [x] `app/core/transaction_log_migration.py` 新增（Phase 19J migration library；39 tests）
+- [x] `scripts/migrate_transaction_logs.py` 新增（Phase 19J CLI wrapper）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 新增 migration section（Phase 19J）
+- [x] pytest = 855 passed（816 + 39 from Phase 19J）
 
 ### Recommended Next Phase
 
-- **Phase 19I** — SQLite Migration Script（`scripts/migrate_transaction_logs.py`，JSON → SQLite one-shot migration，~19 tests）
-- **Phase 19J** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
+- **Phase 19K** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
+- **Phase 19L** — Release Checkpoint v0.7.8-alpha（收斂 Phase 19B / 19D / 19H / 19J / 19K）
 
 ---
 

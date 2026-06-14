@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 19J SQLite Transaction Log Migration Script
+
+本階段新增 JSON → SQLite transaction log migration library 與 CLI wrapper。
+不修改 TRANSACTION_LOG_BACKEND 預設值、不做 SQLite prune、不做 Approval SQLite migration。
+
+### Added
+
+- **`app/core/transaction_log_migration.py`**（新增）：
+  - `MigrationResult` dataclass（`source_path / kind / dry_run / migrated_count / already_present_count / corrupted_count / skipped_count / missing_source / errors / warnings`）
+  - `_load_json_strict(path)` — 嚴格 JSON read；明確區分 `file_not_found` / `corrupt_json` / `invalid_structure`（不使用 `read_json_log()`）
+  - `migrate_rename_transactions(rename_json_path, db_path, *, dry_run=True, fail_on_corrupt=False) → MigrationResult`
+  - `migrate_move_transactions(move_json_path, db_path, *, dry_run=True, fail_on_corrupt=False) → MigrationResult`
+  - `migrate_all(source_json_dir, db_path, *, dry_run=True, backup=False, rename=True, move=True, fail_on_corrupt=False) → dict`
+  - Idempotency：`transaction_id` 已存在時 skip（already_present_count++），不覆蓋
+  - Validation：使用 Pydantic `model_validate()` 驗證每筆 entry；非法 status / 缺失欄位 → corrupted_count++
+  - JSON 原檔永遠不修改（read-only on JSON side）
+  - 不使用 `shutil`（符合 AST safety test 限制）
+- **`scripts/migrate_transaction_logs.py`**（新增）：
+  - `argparse` CLI：`--dry-run`（預設）/ `--apply` / `--backup` / `--source-json-dir` / `--db-path` / `--rename-only` / `--move-only` / `--fail-on-corrupt` / `--json-report`
+  - `--apply` 取得 `acquire_runtime_lock()`；lock busy → exit 1
+  - Backup（`--backup --apply`）：JSON 備份用 `.bak_YYYYMMDD_HHMMSS` 後綴；DB 備份用 `sqlite3.backup()`（WAL-safe）
+  - Exit codes：0 success / 1 lock busy / 2 corrupt + fail_on_corrupt / 3 unexpected error
+- **`tests/test_transaction_log_migration.py`**（新增）：39 tests（816 → 855）
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：新增 `## JSON → SQLite Migration（Phase 19J）` section；快速參考新增 migration 條目
+
+### Not Changed
+
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- 不修改 `app/core/runtime_lock.py` / `config.py` / `transaction_log_factory.py` / `sqlite_transaction_log.py`
+- 不修改 `scripts/mock_line.py` / destructive command regex
+- 不做 SQLite prune implementation
+- 不做 Approval SQLite migration / backend
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不建立 tag
+
+---
+
 ## [Unreleased] — Phase 19H Operator Docs for Experimental SQLite Backend
 
 本階段更新 `docs/OPERATOR_DEPLOYMENT.md`，補充 experimental SQLite transaction log backend 的 operator 說明。

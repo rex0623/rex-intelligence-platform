@@ -493,6 +493,153 @@ rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
 
 ---
 
+## JSON → SQLite Migration（Phase 19J）
+
+> **Status**：Available（v0.7.7-alpha Phase 19J）。這是一次性的手動工具，不會自動執行。
+
+### 何時需要 migration
+
+當您決定將 `TRANSACTION_LOG_BACKEND` 切換到 `sqlite`，且希望過去的 JSON transaction history（`rename_transactions.json` / `move_transactions.json`）也能在 SQLite backend 下可見時，才需要執行 migration。
+
+若您只是測試 SQLite backend，且不需要舊 JSON history，可以直接切換 `TRANSACTION_LOG_BACKEND=sqlite`，不需要 migration。
+
+**Migration 前請注意**：
+
+- `approvals.json` **不在** migration scope，approval store 仍使用 JSON
+- SQLite prune（`prune_transactions()`）**尚未實作**，migration 後 SQLite 沒有 prune 功能
+- Approval SQLite backend **尚未實作**
+
+### Migration 前備份（必做）
+
+```bash
+# 備份整個 runtime/ 目錄
+cp -rp runtime/ runtime_backup_$(date +%Y%m%d_%H%M%S)/
+
+# 確認 RIP 沒有其他 process 在執行
+ps aux | grep -E "rip|mock_line" | grep -v grep
+```
+
+### Step 1：Dry-run 預覽（不寫入任何資料）
+
+```bash
+poetry run python scripts/migrate_transaction_logs.py --dry-run
+```
+
+預設行為即為 dry-run；不加 `--apply` 不會寫入 DB。
+
+範例輸出：
+
+```
+RIP transaction log migration — DRY-RUN
+  source dir : runtime
+  db path    : runtime/rip.db
+  [rename] DRY-RUN: migrated=3  already_present=0  corrupted=0  skipped=0
+  [move]   DRY-RUN: migrated=5  already_present=0  corrupted=0  skipped=0
+
+(Dry-run: no changes written. Use --apply to perform migration.)
+```
+
+若 `rename_transactions.json` / `move_transactions.json` 不存在：
+
+```
+  [rename] DRY-RUN: source not found — skipped (runtime/rename_transactions.json)
+```
+
+這是正常行為（沒有要 migrate 的資料）。
+
+### Step 2：執行 migration（--apply --backup）
+
+```bash
+poetry run python scripts/migrate_transaction_logs.py --apply --backup
+```
+
+`--apply` 才會真正寫入 SQLite DB；`--backup` 會在寫入前備份 JSON source files 與現有 `rip.db`。
+
+**重要**：`--apply` 會取得 runtime lock（`rip.lock`），期間無法同時執行其他 RIP 指令。
+
+### 指定 source / db path（進階）
+
+```bash
+# 使用非預設路徑
+poetry run python scripts/migrate_transaction_logs.py \
+    --dry-run \
+    --source-json-dir runtime \
+    --db-path runtime/rip.db
+```
+
+### 只 migrate rename 或 move
+
+```bash
+# 只 migrate rename_transactions.json
+poetry run python scripts/migrate_transaction_logs.py --apply --rename-only
+
+# 只 migrate move_transactions.json
+poetry run python scripts/migrate_transaction_logs.py --apply --move-only
+```
+
+### Step 3：驗證 migration 結果
+
+```bash
+# 驗證 SQLite DB 完整性
+sqlite3 runtime/rip.db "PRAGMA integrity_check;"
+# 預期輸出：ok
+
+# 確認 transaction 筆數
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM rename_transactions;"
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM move_transactions;"
+```
+
+### Step 4：切換到 SQLite backend
+
+```bash
+# 在 .env 加入（或修改）
+TRANSACTION_LOG_BACKEND=sqlite
+```
+
+驗證：
+
+```bash
+poetry run rip "說明"
+# 確認正常回覆
+```
+
+### Rollback to JSON
+
+若切換後遇到問題，可隨時切回 JSON：
+
+```bash
+# 在 .env 改回（或移除該行）
+TRANSACTION_LOG_BACKEND=json
+```
+
+切回後：
+
+- `rename_transactions.json` / `move_transactions.json` 的 JSON history 立即恢復可用
+- `runtime/rip.db` 不需要刪除（JSON backend 不讀取它）
+- 切換後新執行的 transaction 將再次寫入 JSON 檔
+
+### Migration 安全保證
+
+| 保證 | 說明 |
+|------|------|
+| JSON 原檔不被修改 | migration 對 JSON 側為純讀取，不刪除、不覆寫、不 rename |
+| `approvals.json` 不受影響 | migration 完全不讀寫 approval store |
+| Idempotent | 重複執行 migration 安全；已存在的 transaction 計入 already_present，不重複寫入 |
+| Dry-run 預設 | 不加 `--apply` 不會建立或修改 `rip.db` |
+| Runtime lock | `--apply` 期間持有 lock，防止與 `確認改名` / `確認搬移` 等指令 race |
+| Corrupt entry 不擴散 | 單筆 corrupt transaction 只 skip 該筆，不影響其他 entry 的 migration |
+
+### Exit codes
+
+| Code | 情況 |
+|------|------|
+| 0 | 成功（dry-run 或 apply，包括 nothing to migrate） |
+| 1 | Runtime lock busy |
+| 2 | Corrupt source file / entry 且使用 `--fail-on-corrupt` |
+| 3 | Unexpected DB / migration error |
+
+---
+
 ## Git Hygiene
 
 ### runtime/ 目錄不進 Git
@@ -596,3 +743,6 @@ poetry run pytest tests/test_operator_preflight.py -v
 | 啟用 SQLite backend | `.env` 中加入 `TRANSACTION_LOG_BACKEND=sqlite` |
 | 切回 JSON backend | `.env` 中改為 `TRANSACTION_LOG_BACKEND=json` 或刪除該行 |
 | 重建損壞的 SQLite DB | `rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm` |
+| Migration dry-run | `poetry run python scripts/migrate_transaction_logs.py --dry-run` |
+| Migration 執行 | `poetry run python scripts/migrate_transaction_logs.py --apply --backup` |
+| Migration JSON report | `poetry run python scripts/migrate_transaction_logs.py --dry-run --json-report` |
