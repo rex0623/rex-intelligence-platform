@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 19B Experimental SQLite Transaction Log Backend
+
+本階段新增 SQLite optional backend 的最小可行實作，驗證 Phase 18E Protocol 合約。
+不接 default runtime、不新增 backend flag、不修改任何現有 application code。
+
+### Added
+
+- **`app/core/sqlite_transaction_log.py`**（新增）：
+  - `initialize_sqlite_schema(db_path)` — idempotent schema DDL（5 tables + 2 indexes）
+  - `SqliteRenameTransactionLog` — 滿足 `RenameTransactionLogProtocol`（Phase 18E）
+  - `SqliteMoveTransactionLog` — 滿足 `MoveTransactionLogProtocol`（Phase 18E）
+  - connection helper（`_open_connection` / `_connection` context manager）
+  - PRAGMA：journal_mode=WAL / foreign_keys=ON / busy_timeout=5000
+  - ON DELETE CASCADE / status CHECK constraint / AUTOINCREMENT action order
+  - Uses Python stdlib sqlite3 only（no SQLAlchemy, no new pyproject.toml dependencies）
+- **`tests/test_sqlite_transaction_log.py`**（新增）：29 tests（765 → 794）
+
+### Not Changed
+
+- JSON backend 仍是 default / production path
+- 不新增 TRANSACTION_LOG_BACKEND / APPROVAL_BACKEND flag
+- 不修改 config.py / settings.py
+- 不修改任何現有 executor / approval_bridge
+- 不修改 runtime lock / destructive command regex
+- 不做 migration script
+- 不實作 `prune_transactions`（SQLite backend 明確 raise NotImplementedError）
+- 不建立 runtime/rip.db
+
+---
+
 ## [v0.7.6-alpha] — Phase 18H Tag Confirmation
 
 本階段為純文件 tag confirmation。v0.7.6-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
