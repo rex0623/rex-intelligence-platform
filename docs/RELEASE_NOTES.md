@@ -52,7 +52,7 @@ v0.7.8-alpha 收斂 Phase 19H（Operator Docs for Experimental SQLite Backend）
 | `poetry run pytest -q` | 878 passed |
 | `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
 | `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
-| GitHub Actions CI | #17（pending — Release Checkpoint Prepared）|
+| GitHub Actions CI | #17 green ✅ |
 
 ---
 
@@ -66,9 +66,14 @@ v0.7.8-alpha 收斂 Phase 19H（Operator Docs for Experimental SQLite Backend）
 
 ---
 
-### Tag Status（v0.7.8-alpha）
+### Tag Confirmation（Phase 19N）
 
-Release Checkpoint Prepared — tag 尚未建立。等待 GitHub Actions CI #17 green 後建立 annotated tag。
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.7.8-alpha` |
+| tag object | `de579e736bad263c03cd68761f879793ae180cee` |
+| target commit | `d1201c45dea4124e7a9f9e91006fef6c6cd553d3` |
+| remote tag pushed | ✅ yes |
 
 ---
 

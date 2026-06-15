@@ -9,7 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 本 release checkpoint 收斂 Phase 19H（Operator Docs）、Phase 19J（SQLite Migration Script）、Phase 19L（SQLite Prune Implementation）三個 phase 的工作。
 JSON backend 仍為預設值（`TRANSACTION_LOG_BACKEND=json`）；SQLite 為 experimental opt-in。
-不修改 JSON backend / Protocol / schemas / config / CI / destructive regex。Release Checkpoint Prepared（tag 尚未建立）。
+不修改 JSON backend / Protocol / schemas / config / CI / destructive regex。Tag Confirmed（Phase 19N）。
 
 ### Added（Phase 19L）
 

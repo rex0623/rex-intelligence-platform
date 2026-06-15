@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.8-alpha（Release Checkpoint Prepared；Phase 19L SQLite prune；Phase 19J migration script）|
+| **Current Version** | v0.7.8-alpha（tag confirmed；Phase 19N；Phase 19L SQLite prune；Phase 19J migration script）|
 | **Test Count** | 878 passing（+113 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-15（Phase 19M）|
+| **Last Updated** | 2026-06-15（Phase 19N）|
 
 ---
 
@@ -71,6 +71,7 @@
 | 19K | SQLite Prune Reconnaissance | ✅ Complete |
 | 19L | SQLite prune_transactions() Implementation | ✅ Complete |
 | 19M | Release Checkpoint v0.7.8-alpha | ✅ Complete（Docs Ready）|
+| 19N | v0.7.8-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -80,7 +81,7 @@
 - [x] pytest = 878 passed（816 at v0.7.7-alpha tag → 878，+62）
 - [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
 - [x] poetry run rip "說明" success
-- [ ] GitHub Actions CI #17 green（pending — Release Checkpoint Prepared）
+- [x] GitHub Actions CI #17 green ✅
 - [x] JSON backend remains default（`TRANSACTION_LOG_BACKEND` 預設 "json"）
 - [x] SQLite backend remains optional / experimental（只有明確設定才啟用）
 - [x] `docs/OPERATOR_DEPLOYMENT.md` 更新至 Phase 19H（TRANSACTION_LOG_BACKEND 說明、SQLite backup、no-migration warning、WSL2 note、快速參考 SQLite 條目）
@@ -98,12 +99,13 @@
 - [x] No destructive command regex changes
 - [x] working tree clean
 - [x] v0.7.7-alpha Git tag created（annotated tag，tag object `80d234676bdacbc8b5dafefa427f59289e471b81`，Phase 19G）
-- [ ] v0.7.8-alpha Git tag — pending CI green
+- [x] v0.7.8-alpha Git tag created（annotated tag，tag object `de579e736bad263c03cd68761f879793ae180cee`，Phase 19N）
+- [x] v0.7.8-alpha tag pushed to origin（Phase 19N）
+- [x] v0.7.8-alpha tag dereferences to `d1201c4`（`git ls-remote --tags origin v0.7.8-alpha^{}` 驗證，Phase 19N）
 
 ### Recommended Next Phase
 
-- **Phase 19N** — v0.7.8-alpha Tag Confirmation（等待 CI #17 green 後建立 annotated tag）
-- **Phase 20** — Approval SQLite Backend（`SqliteApprovalStore` 實作）
+- **Phase 20** — Approval SQLite Backend Reconnaissance（`SqliteApprovalStore` 設計分析）
 
 ---
 
