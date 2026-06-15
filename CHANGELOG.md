@@ -7,6 +7,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added（Phase 20E）
+
+- **`app/core/approval_migration.py`**（新增）：
+  - `ApprovalMigrationResult` dataclass（`source_path / kind="approval" / dry_run / migrated_count / already_present_count / corrupted_count / skipped_count / missing_source / errors / warnings`，含 `has_errors` / `total_in_source` property）
+  - `_load_approvals_strict(path)` — 嚴格 JSON read；明確區分 `file_not_found` / `corrupt_json` / `invalid_structure`（approvals.json 為 flat array，非 dict wrapper）
+  - `migrate_approvals(approvals_json_path, db_path, *, dry_run=True, fail_on_corrupt=False) → ApprovalMigrationResult`
+  - Idempotency：`INSERT OR IGNORE` by `approval_id` PRIMARY KEY；`cursor.rowcount == 1` → migrated；`0` → already_present
+  - dry_run=True：不建立 rip.db，不呼叫 initialize_sqlite_schema()，不修改 approvals.json
+  - fail_on_corrupt=False：corrupt entry 只 skip（warnings），其他有效 approval 照常處理
+  - Backup 由 caller 負責（CLI 處理）；approvals.json 原檔永遠 read-only
+  - 只用 stdlib（json, sqlite3, dataclasses）+ app internal import，不需要新 pyproject.toml 相依
+- **`scripts/migrate_approvals.py`**（新增）：
+  - `--dry-run`（預設）/ `--apply`（互斥）
+  - `--backup`：apply 前備份 approvals.json + rip.db（使用 `_backup_file` from `transaction_log_migration`；DB 用 sqlite3.backup WAL-safe）
+  - `--source-json-path PATH`：預設 RUNTIME_DIR/approvals.json
+  - `--db-path PATH`：預設 runtime/rip.db
+  - `--fail-on-corrupt`：corrupt entry → exit code 2
+  - `--json-report`：machine-readable JSON 輸出
+  - `--apply` 期間 acquire_runtime_lock()；lock busy → exit 1；dry-run 不需要 lock
+  - Migration 成功後仍需手動設定 `APPROVAL_STORE_BACKEND=sqlite`（不自動切換）
+  - Exit codes：0 成功 / 1 lock busy / 2 corrupt + fail-on-corrupt / 3 unexpected error
+- **`tests/test_approval_migration.py`**（新增）：+30 tests（908 → 938）
+  - `_load_approvals_strict`：file_not_found / corrupt_json / invalid_structure / valid list
+  - dry-run：不建立 rip.db / 不改 mtime / missing source / migrated_count
+  - apply：write to SQLite / idempotency / empty array / mtime not changed
+  - apply corrupt：skip + fail_on_corrupt=False / has_errors + fail_on_corrupt=True
+  - round-trip：payload=None / expires_at=None / unicode payload / all 4 status values
+  - backup：approvals.json bak / db bak（sqlite3.backup）/ dry-run no bak
+  - runtime lock：apply acquires / dry-run doesn't need
+  - CLI：--source-json-path / --db-path / --json-report / --fail-on-corrupt exit 2 / importable
+  - safety：mtime not changed / JSON backend not affected / no pyproject dependency
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
+  - 新增「Approval JSON → SQLite Migration」section（dry-run / apply / backup / verify / rollback / safety table / exit codes）
+  - 更新「Experimental SQLite Approval Store Backend」⚠️ warning（移除「尚無 migration script」，改為指引使用 scripts/migrate_approvals.py）
+  - 快速參考表補上 approval migration 操作列
+
+### Not Changed（Phase 20E）
+
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- 不修改 `SqliteApprovalStore`（save/load 語意不變；migration 使用 raw SQL）
+- 不修改 `JsonApprovalStore`、`ApprovalManager`、`Approval` schema
+- 不修改 `transaction_log_migration.py`（只 import `_backup_file`）
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改任何 destructive command regex / Mock LINE 指令
+
+---
+
 ### Added（Phase 20B）
 
 - **`app/core/approval_manager_factory.py`**（新增）：

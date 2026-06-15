@@ -1,6 +1,6 @@
 # RIP Operator Deployment Runbook
 
-Rex Intelligence Platform (RIP) v0.7.8-alpha（Phase 20C — Operator Docs for Experimental SQLite Backends）
+Rex Intelligence Platform (RIP) v0.7.8-alpha（Phase 20E — Approval JSON → SQLite Migration）
 
 ---
 
@@ -548,19 +548,24 @@ APPROVAL_STORE_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
 | Runtime lock（rip.lock） | 保留 | 保留 |
 | approvals.json 檔案 | 讀寫 | 不讀不寫（檔案保留，可隨時 fallback） |
 
-### ⚠️ 重要：目前沒有 approvals.json → SQLite migration script
+### ⚠️ 切換前須知：請先執行 migration
 
 **切換到 `APPROVAL_STORE_BACKEND=sqlite` 前，請先閱讀此節。**
 
-- 目前**沒有** `approvals.json` → SQLite migration script（Transaction log migration 已於 Phase 19J 完成，但 approval migration 尚未實作）。
-- 若已有 `approvals.json` 歷史紀錄，切換到 sqlite 後：
-  - 舊 JSON approval history **在 SQLite backend 下完全不可見**。
+若已有 `approvals.json` 歷史紀錄，**切換前應先執行 migration**（見「[Approval JSON → SQLite Migration](#approval-json--sqlite-migration)」）：
+
+- 若未執行 migration 直接切換，舊 JSON approval history **在 SQLite backend 下完全不可見**。
   - `確認 <id>` / `確認改名 <id>` / `確認搬移 <id>` → 找不到切換前的 JSON approval，回覆 `approval not found`。
   - `取消 <id>` → 同上，找不到，**無法操作切換前的 approval**。
-- **這不是資料刪除**：`approvals.json` 仍完整保留於 `runtime/`。
+- **這不是資料刪除**：`approvals.json` 仍完整保留於 `runtime/`。Migration 對 JSON 側為純讀取。
 - **切回 json backend 後，舊 JSON approval history 立即恢復可用**（見「[Fallback to JSON（Approval）](#fallback-to-json-approval)」）。
 
-**建議**：若環境中有尚未執行（status=pending）或尚未完成（status=approved）的 approval，**暫時不要切換到 sqlite**，等待 migration script 完成（未排期）。
+**建議流程**：若環境中有尚未執行（status=pending）或尚未完成（status=approved）的 approval：
+1. 先執行 `scripts/migrate_approvals.py --apply --backup`
+2. 確認 migration 成功（migrated_count 正確）
+3. 再設定 `APPROVAL_STORE_BACKEND=sqlite`
+
+Migration 不會自動切換 `APPROVAL_STORE_BACKEND`；需手動設定。
 
 ### Backup（SQLite approval backend）
 
@@ -609,6 +614,137 @@ APPROVAL_STORE_BACKEND=sqlite
 - 兩者共用同一個 `runtime/rip.db`（三個 tables：`rename_transactions` / `move_transactions` / `approvals`）。
 - Schema 初始化 idempotent，順序不影響結果。
 - 備份一份 `rip.db` 即涵蓋全部 SQLite-backed state。
+
+---
+
+## Approval JSON → SQLite Migration
+
+> **Status**：Available（v0.7.8-alpha Phase 20E）。這是一次性的手動工具，不會自動執行。
+> Migration 對 `approvals.json` 側為純讀取，不修改、不刪除、不 rename。
+> Migration 不會自動切換 `APPROVAL_STORE_BACKEND`；需手動設定。
+
+### 何時需要 migration
+
+當您決定將 `APPROVAL_STORE_BACKEND` 切換到 `sqlite`，且希望過去的 `approvals.json` 歷史紀錄（尚未執行的 pending / approved approval）也能在 SQLite backend 下可用時。
+
+若您只是測試 SQLite approval backend，且不需要舊 JSON history，可以直接切換 `APPROVAL_STORE_BACKEND=sqlite`，不需要 migration。
+
+### Migration 前備份（必做）
+
+```bash
+# 備份整個 runtime/ 目錄
+cp -rp runtime/ runtime_backup_$(date +%Y%m%d_%H%M%S)/
+
+# 確認 RIP 沒有其他 process 在執行
+ps aux | grep -E "rip|mock_line" | grep -v grep
+```
+
+### Step 1：Dry-run 預覽（不寫入任何資料）
+
+```bash
+poetry run python scripts/migrate_approvals.py --dry-run
+```
+
+預設行為即為 dry-run；不加 `--apply` 不會寫入 DB，不建立 `rip.db`。
+
+範例輸出：
+
+```
+RIP approval store migration — DRY-RUN
+  source : runtime/approvals.json
+  db path: runtime/rip.db
+  [approval] DRY-RUN: migrated=3  already_present=0  corrupted=0  skipped=0
+
+(Dry-run: no changes written. Use --apply to perform migration.)
+```
+
+若 `approvals.json` 不存在：
+
+```
+  [approval] DRY-RUN: source not found — skipped (runtime/approvals.json)
+```
+
+這是正常行為（沒有要 migrate 的資料）。
+
+### Step 2：執行 migration（--apply --backup）
+
+```bash
+poetry run python scripts/migrate_approvals.py --apply --backup
+```
+
+`--apply` 才會真正寫入 SQLite DB；`--backup` 會在寫入前備份 `approvals.json` 與現有 `rip.db`。
+
+**重要**：`--apply` 會取得 runtime lock（`rip.lock`），期間無法同時執行其他 RIP 指令。
+
+### 指定 source / db path（進階）
+
+```bash
+poetry run python scripts/migrate_approvals.py \
+    --dry-run \
+    --source-json-path runtime/approvals.json \
+    --db-path runtime/rip.db
+```
+
+### Step 3：驗證 migration 結果
+
+```bash
+# 驗證 SQLite DB 完整性
+sqlite3 runtime/rip.db "PRAGMA integrity_check;"
+# 預期輸出：ok
+
+# 確認 approval 筆數
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM approvals;"
+```
+
+### Step 4：切換到 SQLite approval backend
+
+```bash
+# 在 .env 加入（或修改）
+APPROVAL_STORE_BACKEND=sqlite
+```
+
+驗證：
+
+```bash
+poetry run rip "說明"
+# 確認正常回覆
+```
+
+### Rollback to JSON
+
+若切換後遇到問題，可隨時切回 JSON：
+
+```bash
+# 在 .env 改回（或移除該行）
+APPROVAL_STORE_BACKEND=json
+```
+
+切回後：
+
+- `approvals.json` 的 JSON history 立即恢復可用
+- `runtime/rip.db` 不需要刪除（JSON backend 不讀取 approvals table）
+- 切換後新執行的 approval 將再次寫入 `approvals.json`
+
+### Migration 安全保證
+
+| 保證 | 說明 |
+|------|------|
+| approvals.json 不被修改 | migration 對 JSON 側為純讀取，不刪除、不覆寫、不 rename |
+| transaction logs 不受影響 | migration 完全不讀寫 rename/move transaction logs |
+| Idempotent | 重複執行 migration 安全；已存在的 approval 計入 already_present，不重複寫入（INSERT OR IGNORE） |
+| Dry-run 預設 | 不加 `--apply` 不會建立或修改 `rip.db` |
+| Runtime lock | `--apply` 期間持有 lock，防止與 `確認改名` / `確認搬移` 等指令 race |
+| Corrupt entry 不擴散 | 單筆 corrupt approval 只 skip 該筆，不影響其他 entry 的 migration |
+| APPROVAL_STORE_BACKEND 不自動切換 | migration 成功後仍需手動設定 `APPROVAL_STORE_BACKEND=sqlite` |
+
+### Exit codes
+
+| Code | 情況 |
+|------|------|
+| 0 | 成功（dry-run 或 apply，包括 nothing to migrate） |
+| 1 | Runtime lock busy |
+| 2 | Corrupt source file / entry 且使用 `--fail-on-corrupt` |
+| 3 | Unexpected CLI / runtime error |
 
 ---
 
@@ -867,4 +1003,7 @@ poetry run pytest tests/test_operator_preflight.py -v
 | 驗證 approvals table（sqlite backend）| `sqlite3 runtime/rip.db "SELECT COUNT(*) FROM approvals;"` |
 | Migration dry-run（transaction log only）| `poetry run python scripts/migrate_transaction_logs.py --dry-run` |
 | Migration 執行（transaction log only）| `poetry run python scripts/migrate_transaction_logs.py --apply --backup` |
-| Migration JSON report | `poetry run python scripts/migrate_transaction_logs.py --dry-run --json-report` |
+| Migration JSON report（tx log）| `poetry run python scripts/migrate_transaction_logs.py --dry-run --json-report` |
+| Approval migration dry-run | `poetry run python scripts/migrate_approvals.py --dry-run` |
+| Approval migration 執行 | `poetry run python scripts/migrate_approvals.py --apply --backup` |
+| Approval migration JSON report | `poetry run python scripts/migrate_approvals.py --dry-run --json-report` |
