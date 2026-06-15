@@ -1,6 +1,6 @@
 # RIP Operator Deployment Runbook
 
-Rex Intelligence Platform (RIP) v0.7.7-alpha（Phase 19H — Operator Docs for Experimental SQLite Backend）
+Rex Intelligence Platform (RIP) v0.7.8-alpha（Phase 20C — Operator Docs for Experimental SQLite Backends）
 
 ---
 
@@ -10,8 +10,13 @@ RIP 是一個**本機 CLI operator tool**，不是 web server、不需要 Docker
 Operator 透過 `poetry run rip "指令"` 在本機終端機操作，所有 runtime state 存放於 `runtime/` 目錄，
 所有檔案操作錨定在 `SAFE_PDF_ROOT` 指定的目錄下。
 
-**預設 persistence backend**：JSON 檔案（production-safe，v0.7.7-alpha 行為與舊版完全相同）。
-**Experimental**：`TRANSACTION_LOG_BACKEND=sqlite` 可選啟用 SQLite transaction log backend（rename / move logs only）——詳見「[Experimental SQLite Transaction Log Backend](#experimental-sqlite-transaction-log-backend)」。
+**預設 persistence backend**：JSON 檔案（production-safe，v0.7.8-alpha 行為與舊版完全相同）。
+**Experimental（兩個獨立設定）**：
+
+- `TRANSACTION_LOG_BACKEND=sqlite`：可選啟用 SQLite transaction log backend（rename / move logs）——詳見「[Experimental SQLite Transaction Log Backend](#experimental-sqlite-transaction-log-backend)」。
+- `APPROVAL_STORE_BACKEND=sqlite`：可選啟用 SQLite approval store backend（approvals）——詳見「[Experimental SQLite Approval Store Backend](#experimental-sqlite-approval-store-backend)」。
+
+兩者**互相獨立**，可分別啟用或停用。兩者均使用同一個 `runtime/rip.db` 檔案（不同 table 共存）。
 
 本文涵蓋：安裝、設定、smoke test、runtime 目錄說明、備份、還原、升級、lock 處理、SQLite backend 說明、Git hygiene。
 
@@ -86,6 +91,14 @@ SAFE_PDF_ROOT=/Users/operator/Documents/pdf_inbox
 #             ⚠️ 切換前請閱讀「Experimental SQLite Transaction Log Backend」說明）
 # TRANSACTION_LOG_BACKEND=json
 
+# Approval store persistence backend（Phase 20A/20B，v0.7.8-alpha）
+# "json"   → JSON flat-file backend（預設，production-safe；approvals 寫入 approvals.json）
+# "sqlite" → Experimental SQLite backend（approvals 寫入 runtime/rip.db 的 approvals table；
+#             與 TRANSACTION_LOG_BACKEND 獨立設定；
+#             ⚠️ 目前尚無 approvals.json → SQLite migration script；
+#             ⚠️ 切換前請閱讀「Experimental SQLite Approval Store Backend」說明）
+# APPROVAL_STORE_BACKEND=json
+
 # =====================================================
 # 以下欄位在 CLI 模式下不使用，可不設定
 # =====================================================
@@ -105,12 +118,12 @@ SAFE_PDF_ROOT=/Users/operator/Documents/pdf_inbox
 ### RUNTIME_DIR 說明
 
 - 存放 `approvals.json`、`rename_transactions.json`、`move_transactions.json`、`rip.lock`。
-- 若啟用 `TRANSACTION_LOG_BACKEND=sqlite`，也會包含 `rip.db`（及 WAL mode 可能產生的 `rip.db-wal` / `rip.db-shm`）。
+- 若啟用 `TRANSACTION_LOG_BACKEND=sqlite` 或 `APPROVAL_STORE_BACKEND=sqlite`（任一或兩者），也會包含 `rip.db`（及 WAL mode 可能產生的 `rip.db-wal` / `rip.db-shm`）。兩個 experimental backend 共用同一個 `rip.db` 檔案，tables 共存。
 - 預設為 `<repo>/runtime`，通常不需改動。
 - **如需放到 repo 外**（例如共享磁碟或另一個 partition）：設定 `RUNTIME_DIR=/path/to/runtime`。
 - **每個 RIP deployment 應使用獨立的 `RUNTIME_DIR`**，不建議多個專案共用同一 runtime 目錄——
   不同專案的 approval ID / transaction ID 不互通，共用目錄會造成狀態混淆。
-- **WSL2 注意**：若使用 `TRANSACTION_LOG_BACKEND=sqlite`，建議 `RUNTIME_DIR` 放在 Linux filesystem（例如 WSL home 底下的 repo `runtime/`）。`/mnt/c` 或 Windows DrvFs/NTFS 路徑可能造成 WAL mode 不穩定。
+- **WSL2 注意**：若使用 `TRANSACTION_LOG_BACKEND=sqlite` 或 `APPROVAL_STORE_BACKEND=sqlite`，建議 `RUNTIME_DIR` 放在 Linux filesystem（例如 WSL home 底下的 repo `runtime/`）。`/mnt/c` 或 Windows DrvFs/NTFS 路徑可能造成 WAL mode 不穩定。
 
 ---
 
@@ -143,16 +156,20 @@ poetry run python scripts/mock_line.py "說明"
 
 ```
 runtime/
-├── approvals.json              # Approval store（改名 / 搬移計畫的核准狀態）
-├── rename_transactions.json    # Rename transaction log（已執行的改名紀錄，json backend）
-├── move_transactions.json      # Move transaction log（已執行的搬移紀錄，json backend）
+├── approvals.json              # Approval store（APPROVAL_STORE_BACKEND=json 時使用，預設）
+├── rename_transactions.json    # Rename transaction log（TRANSACTION_LOG_BACKEND=json 時使用，預設）
+├── move_transactions.json      # Move transaction log（TRANSACTION_LOG_BACKEND=json 時使用，預設）
 ├── rip.lock                    # Concurrency lock（OS 管理，見下方說明）
-├── rip.db                      # SQLite transaction log DB（僅 TRANSACTION_LOG_BACKEND=sqlite 時建立）
+├── rip.db                      # SQLite DB（TRANSACTION_LOG_BACKEND=sqlite 或 APPROVAL_STORE_BACKEND=sqlite 時建立）
+│                               #   包含：rename_transactions / move_transactions / approvals tables（共存）
 ├── rip.db-wal                  # SQLite WAL 日誌（WAL mode 時自動產生，rip.db 存在時可能出現）
 └── rip.db-shm                  # SQLite shared-memory 索引（WAL mode 時自動產生）
 ```
 
-> **預設（json backend）只有前三個 JSON 檔與 rip.lock**。`rip.db` / `rip.db-wal` / `rip.db-shm` 只在 `TRANSACTION_LOG_BACKEND=sqlite` 時才會出現。
+> **預設（兩個 backend 均為 json）只有前三個 JSON 檔與 rip.lock**。
+> `rip.db` / `rip.db-wal` / `rip.db-shm` 只在啟用 `TRANSACTION_LOG_BACKEND=sqlite`
+> 或 `APPROVAL_STORE_BACKEND=sqlite`（任一或兩者）時才會出現。
+> 兩個 experimental backend 共用同一個 `rip.db`（不同 table，schema idempotent）。
 
 ### approvals.json
 
@@ -183,8 +200,12 @@ runtime/
 
 ### rip.db / rip.db-wal / rip.db-shm
 
-- **只在 `TRANSACTION_LOG_BACKEND=sqlite` 時才會建立**。預設 json backend 下永不出現。
-- `rip.db`：SQLite transaction log DB，儲存 rename / move transaction 紀錄。
+- **只在 `TRANSACTION_LOG_BACKEND=sqlite` 或 `APPROVAL_STORE_BACKEND=sqlite`（任一或兩者）時才會建立**。兩個 backend 均為預設 json 時，永不出現。
+- `rip.db`：SQLite DB，包含以下 tables（視啟用的 backend 而定）：
+  - `rename_transactions`：Rename transaction log（`TRANSACTION_LOG_BACKEND=sqlite` 時使用）
+  - `move_transactions`：Move transaction log（`TRANSACTION_LOG_BACKEND=sqlite` 時使用）
+  - `approvals`：Approval store（`APPROVAL_STORE_BACKEND=sqlite` 時使用）
+  - Tables 共存，schema idempotent（`CREATE TABLE IF NOT EXISTS`）；其中一個 backend 建立 DB 後，另一個 backend 啟用時會自動新增對應 table。
 - `rip.db-wal`：WAL（Write-Ahead Log）日誌檔，SQLite WAL mode 下自動產生。
 - `rip.db-shm`：WAL shared-memory 索引，WAL mode 下自動產生。
 - 備份時需同時處理 wal / shm，建議使用 `sqlite3 .backup` 指令（見下方「備份」）。
@@ -225,7 +246,7 @@ python -m json.tool runtime/move_transactions.json > /dev/null && echo "OK"
 
 ### 備份 SQLite DB（若使用 sqlite backend）
 
-若 `TRANSACTION_LOG_BACKEND=sqlite`，請使用 SQLite hot backup 指令，而非直接 `cp`：
+若 `TRANSACTION_LOG_BACKEND=sqlite` 或 `APPROVAL_STORE_BACKEND=sqlite`（任一或兩者），請使用 SQLite hot backup 指令，而非直接 `cp`：
 
 ```bash
 # 建議：online hot backup（WAL-safe，不需要停止 RIP process）
@@ -245,8 +266,12 @@ cp runtime/rip.db-shm runtime/rip.db-shm.bak 2>/dev/null || true
 sqlite3 runtime/rip.db "PRAGMA integrity_check;"
 # 預期輸出：ok
 
+# Transaction log tables（TRANSACTION_LOG_BACKEND=sqlite 時）
 sqlite3 runtime/rip.db "SELECT COUNT(*) FROM rename_transactions;"
 sqlite3 runtime/rip.db "SELECT COUNT(*) FROM move_transactions;"
+
+# Approval store table（APPROVAL_STORE_BACKEND=sqlite 時）
+sqlite3 runtime/rip.db "SELECT COUNT(*) FROM approvals;"
 ```
 
 ### 備份 PDF 原始檔案
@@ -411,11 +436,13 @@ TRANSACTION_LOG_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
 
 ### 影響範圍
 
-| 功能 | json backend（預設） | sqlite backend（experimental） |
-|------|---------------------|-------------------------------|
-| Approval store（approvals.json） | JSON 檔案 | 不變，仍 JSON 檔案 |
-| Rename transaction log | rename_transactions.json | runtime/rip.db |
-| Move transaction log | move_transactions.json | runtime/rip.db |
+**注意**：此表格僅說明 `TRANSACTION_LOG_BACKEND` 的影響範圍。Approval store 由 `APPROVAL_STORE_BACKEND`（獨立設定）控制，見下一節。
+
+| 功能 | TRANSACTION_LOG_BACKEND=json（預設） | TRANSACTION_LOG_BACKEND=sqlite（experimental） |
+|------|-------------------------------------|-----------------------------------------------|
+| Approval store | 由 `APPROVAL_STORE_BACKEND` 獨立控制，不受此設定影響 | 同左，不受此設定影響 |
+| Rename transaction log | rename_transactions.json | runtime/rip.db（rename_transactions table） |
+| Move transaction log | move_transactions.json | runtime/rip.db（move_transactions table） |
 | prune_transactions() | ✅ 支援 | ✅ 支援（Phase 19L） |
 | Planning / Help 指令 | 不受影響 | 不受影響 |
 | Destructive command regex | 不變 | 不變 |
@@ -425,7 +452,7 @@ TRANSACTION_LOG_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
 
 **切換到 sqlite backend 前，請先閱讀此節。**
 
-- 目前**沒有** JSON → SQLite migration script（預計 Phase 19I 實作）。
+- 目前**沒有** transaction log JSON → SQLite migration script（已於 Phase 19J 實作；見「[JSON → SQLite Migration（Phase 19J）](#json--sqlite-migrationphase-19j)」）。
 - 若已有 `rename_transactions.json` / `move_transactions.json` 歷史紀錄，切換到 sqlite 後：
   - 舊 JSON transaction history **在 SQLite backend 下完全不可見**。
   - `預覽回滾改名 <tx_id>` → 找不到切換前的 JSON transaction，回覆 `transaction_not_found`。
@@ -487,6 +514,104 @@ rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
 
 ---
 
+## Experimental SQLite Approval Store Backend
+
+> **Status**：Experimental（v0.7.8-alpha）。JSON backend（`approvals.json`）仍為預設。
+> 此 section 說明如何啟用、限制、備份與切換回 JSON。
+> `APPROVAL_STORE_BACKEND` 與 `TRANSACTION_LOG_BACKEND` 完全獨立，可分別設定。
+
+### 啟用方式
+
+在 `.env` 中加入：
+
+```bash
+APPROVAL_STORE_BACKEND=sqlite
+```
+
+或臨時覆寫（單次指令）：
+
+```bash
+APPROVAL_STORE_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
+```
+
+切換後，所有 approval 讀寫（`確認 {id}` / `確認改名 {id}` / `確認搬移 {id}` / `取消 {id}`）
+會改為操作 `runtime/rip.db` 的 `approvals` table。**`approvals.json` 不再被讀寫**（但檔案不刪除）。
+
+### 影響範圍
+
+| 功能 | APPROVAL_STORE_BACKEND=json（預設） | APPROVAL_STORE_BACKEND=sqlite（experimental） |
+|------|-------------------------------------|----------------------------------------------|
+| Approval store | approvals.json | runtime/rip.db（approvals table） |
+| Rename / move transaction logs | 由 `TRANSACTION_LOG_BACKEND` 獨立控制 | 同左，不受此設定影響 |
+| Planning / Help 指令 | 不受影響 | 不受影響 |
+| Destructive command regex | 不變 | 不變 |
+| Runtime lock（rip.lock） | 保留 | 保留 |
+| approvals.json 檔案 | 讀寫 | 不讀不寫（檔案保留，可隨時 fallback） |
+
+### ⚠️ 重要：目前沒有 approvals.json → SQLite migration script
+
+**切換到 `APPROVAL_STORE_BACKEND=sqlite` 前，請先閱讀此節。**
+
+- 目前**沒有** `approvals.json` → SQLite migration script（Transaction log migration 已於 Phase 19J 完成，但 approval migration 尚未實作）。
+- 若已有 `approvals.json` 歷史紀錄，切換到 sqlite 後：
+  - 舊 JSON approval history **在 SQLite backend 下完全不可見**。
+  - `確認 <id>` / `確認改名 <id>` / `確認搬移 <id>` → 找不到切換前的 JSON approval，回覆 `approval not found`。
+  - `取消 <id>` → 同上，找不到，**無法操作切換前的 approval**。
+- **這不是資料刪除**：`approvals.json` 仍完整保留於 `runtime/`。
+- **切回 json backend 後，舊 JSON approval history 立即恢復可用**（見「[Fallback to JSON（Approval）](#fallback-to-json-approval)」）。
+
+**建議**：若環境中有尚未執行（status=pending）或尚未完成（status=approved）的 approval，**暫時不要切換到 sqlite**，等待 migration script 完成（未排期）。
+
+### Backup（SQLite approval backend）
+
+若 `APPROVAL_STORE_BACKEND=sqlite`，`runtime/rip.db` 含 `approvals` table，備份時需一併處理：
+
+```bash
+# 建議：online hot backup（WAL-safe）
+sqlite3 runtime/rip.db ".backup runtime/rip_backup_$(date +%Y%m%d_%H%M%S).db"
+
+# 驗證備份
+sqlite3 runtime/rip_backup_YYYYMMDD_HHMMSS.db "PRAGMA integrity_check;"
+sqlite3 runtime/rip_backup_YYYYMMDD_HHMMSS.db "SELECT COUNT(*) FROM approvals;"
+```
+
+若 `TRANSACTION_LOG_BACKEND=sqlite` 也同時啟用，備份一份 `rip.db` 即涵蓋全部 tables。
+
+### Fallback to JSON（Approval）
+
+若 SQLite approval backend 有問題，隨時可切回 json：
+
+```bash
+# 方式 A：在 .env 改回 json（或移除設定行）
+APPROVAL_STORE_BACKEND=json
+# 方式 B：直接刪除 .env 中的該行（未設定時預設為 json）
+```
+
+- `runtime/rip.db` **不需要刪除**（切回 json 後 RIP 不會讀取 approvals table）。
+- 舊 `approvals.json` history 立即恢復可用。
+- 切換後新執行的 approval 將再次寫入 `approvals.json`。
+- 若要完全重建 SQLite DB（例如 DB 損壞），確認無 RIP process 後：
+
+```bash
+rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
+# 下次啟用任一 sqlite backend 時，schema 會自動重建（initialize_sqlite_schema）
+```
+
+### 同時啟用兩個 SQLite backend
+
+可以同時啟用 `TRANSACTION_LOG_BACKEND=sqlite` 與 `APPROVAL_STORE_BACKEND=sqlite`：
+
+```bash
+TRANSACTION_LOG_BACKEND=sqlite
+APPROVAL_STORE_BACKEND=sqlite
+```
+
+- 兩者共用同一個 `runtime/rip.db`（三個 tables：`rename_transactions` / `move_transactions` / `approvals`）。
+- Schema 初始化 idempotent，順序不影響結果。
+- 備份一份 `rip.db` 即涵蓋全部 SQLite-backed state。
+
+---
+
 ## JSON → SQLite Migration（Phase 19J）
 
 > **Status**：Available（v0.7.7-alpha Phase 19J）。這是一次性的手動工具，不會自動執行。
@@ -499,8 +624,9 @@ rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
 
 **Migration 前請注意**：
 
-- `approvals.json` **不在** migration scope，approval store 仍使用 JSON
-- Approval SQLite backend **尚未實作**
+- 此 migration script 僅處理 **transaction logs**（`rename_transactions.json` / `move_transactions.json`）
+- `approvals.json` **不在** migration scope；approval SQLite backend（`APPROVAL_STORE_BACKEND=sqlite`）目前**尚無 migration script**
+- 若要啟用 `APPROVAL_STORE_BACKEND=sqlite`，請先閱讀「[Experimental SQLite Approval Store Backend](#experimental-sqlite-approval-store-backend)」
 
 ### Migration 前備份（必做）
 
@@ -616,7 +742,7 @@ TRANSACTION_LOG_BACKEND=json
 | 保證 | 說明 |
 |------|------|
 | JSON 原檔不被修改 | migration 對 JSON 側為純讀取，不刪除、不覆寫、不 rename |
-| `approvals.json` 不受影響 | migration 完全不讀寫 approval store |
+| `approvals.json` 不受影響 | migration 完全不讀寫 approval store；approval migration 尚無 script |
 | Idempotent | 重複執行 migration 安全；已存在的 transaction 計入 already_present，不重複寫入 |
 | Dry-run 預設 | 不加 `--apply` 不會建立或修改 `rip.db` |
 | Runtime lock | `--apply` 期間持有 lock，防止與 `確認改名` / `確認搬移` 等指令 race |
@@ -733,9 +859,12 @@ poetry run pytest tests/test_operator_preflight.py -v
 | 確認 runtime 未進 Git | `git ls-files runtime/` |
 | 驗證 JSON 完整性 | `python -m json.tool runtime/approvals.json` |
 | 驗證 SQLite DB 完整性 | `sqlite3 runtime/rip.db "PRAGMA integrity_check;"` |
-| 啟用 SQLite backend | `.env` 中加入 `TRANSACTION_LOG_BACKEND=sqlite` |
-| 切回 JSON backend | `.env` 中改為 `TRANSACTION_LOG_BACKEND=json` 或刪除該行 |
+| 啟用 SQLite transaction log backend | `.env` 中加入 `TRANSACTION_LOG_BACKEND=sqlite` |
+| 切回 JSON transaction log backend | `.env` 中改為 `TRANSACTION_LOG_BACKEND=json` 或刪除該行 |
+| 啟用 SQLite approval backend（experimental）| `.env` 中加入 `APPROVAL_STORE_BACKEND=sqlite` |
+| 切回 JSON approval backend | `.env` 中改為 `APPROVAL_STORE_BACKEND=json` 或刪除該行 |
 | 重建損壞的 SQLite DB | `rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm` |
-| Migration dry-run | `poetry run python scripts/migrate_transaction_logs.py --dry-run` |
-| Migration 執行 | `poetry run python scripts/migrate_transaction_logs.py --apply --backup` |
+| 驗證 approvals table（sqlite backend）| `sqlite3 runtime/rip.db "SELECT COUNT(*) FROM approvals;"` |
+| Migration dry-run（transaction log only）| `poetry run python scripts/migrate_transaction_logs.py --dry-run` |
+| Migration 執行（transaction log only）| `poetry run python scripts/migrate_transaction_logs.py --apply --backup` |
 | Migration JSON report | `poetry run python scripts/migrate_transaction_logs.py --dry-run --json-report` |
