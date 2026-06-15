@@ -89,6 +89,19 @@ CREATE INDEX IF NOT EXISTS idx_rename_actions_tx
 
 CREATE INDEX IF NOT EXISTS idx_move_actions_tx
     ON move_transaction_actions(transaction_id);
+
+CREATE TABLE IF NOT EXISTS approvals (
+    approval_id   TEXT NOT NULL PRIMARY KEY,
+    workflow_id   TEXT NOT NULL,
+    status        TEXT NOT NULL
+                  CHECK(status IN ('pending','approved','rejected','expired')),
+    created_at    TEXT NOT NULL,
+    expires_at    TEXT,
+    payload       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_approvals_status
+    ON approvals(status);
 """
 
 
