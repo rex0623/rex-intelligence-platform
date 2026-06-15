@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.7.9-alpha] — Phase 20G Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.7.9-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.7.9-alpha` |
+| tag object | `62f9a73581dabe230380057970ec1b73c24c8b88` |
+| target commit | `0e241f57a112433a655739877cb7b23a18092af7` |
+| remote tag pushed | ✅ yes |
+
+### Changed Files（Phase 20G）
+
+- `CHANGELOG.md`：Phase 20G 條目新增。
+- `docs/PROJECT_STATUS.md`：Phase 20G 列；Release Readiness Checklist 全數完成（[x]）。
+- `docs/RELEASE_NOTES.md`：v0.7.9-alpha section Tag Confirmation 填入 tag object / target commit；Final Regression CI 更新至 CI #23 green；Commits Since 補 `0e241f5`。
+- `README.md`：banner 更新至 Phase 20G；tag confirmed。
+
+---
+
 ## [v0.7.9-alpha] — 2026-06-15 — Phase 20A / 20B / 20C / 20E Release Checkpoint
 
 本 release checkpoint 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval Manager Backend Factory）、Phase 20C（Operator Docs for SQLite Approval Backend）、Phase 20E（Approval JSON → SQLite Migration Script）四個 phase 的工作。

@@ -44,6 +44,7 @@ v0.7.9-alpha 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval 
 | `bf44493` | feat(approvals): add approval manager backend factory (Phase 20B) |
 | `80e3beb` | docs(operator): document SQLite approval backend |
 | `a74b243` | feat(approvals): add approval SQLite migration script |
+| `0e241f5` | docs(release): prepare v0.7.9-alpha release checkpoint |
 
 ---
 
@@ -67,7 +68,7 @@ v0.7.9-alpha 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval 
 | `poetry run pytest -q` | 938 passed |
 | `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
 | `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
-| GitHub Actions CI | pending |
+| GitHub Actions CI | CI #23 green ✅ |
 
 ---
 
@@ -83,14 +84,14 @@ v0.7.9-alpha 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval 
 
 ---
 
-### Tag Confirmation（Phase 20G — Pending）
+### Tag Confirmation（Phase 20G）
 
 | 欄位 | 值 |
 |------|----|
 | tag | `v0.7.9-alpha` |
-| tag object | — |
-| target commit | — |
-| remote tag pushed | ⬜ pending |
+| tag object | `62f9a73581dabe230380057970ec1b73c24c8b88` |
+| target commit | `0e241f57a112433a655739877cb7b23a18092af7` |
+| remote tag pushed | ✅ yes |
 
 ---
 

@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.9-alpha**（Phase 20A–20E — SQLite approval store + APPROVAL_STORE_BACKEND + approval migration script；Release Checkpoint Prepared / Pending Tag；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
+> **目前版本：v0.7.9-alpha**（Phase 20A–20G — SQLite approval store + APPROVAL_STORE_BACKEND + approval migration script；Tag Confirmed（`62f9a73` → `0e241f5`）；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 

@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.9-alpha（Release Checkpoint Prepared / Pending Tag；Phase 20F；Phase 20A–20E SQLite approval store + approval migration）|
+| **Current Version** | v0.7.9-alpha（Tag Confirmed；Phase 20G；Phase 20A–20E SQLite approval store + approval migration）|
 | **Test Count** | 938 passing（+60 since v0.7.8-alpha tag；+173 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-15（Phase 20F）|
+| **Last Updated** | 2026-06-16（Phase 20G）|
 
 ---
 
@@ -78,6 +78,7 @@
 | 20D | Approval Migration Reconnaissance | ✅ Complete |
 | 20E | Approval JSON → SQLite Migration（`migrate_approvals`）| ✅ Complete |
 | 20F | Release Checkpoint v0.7.9-alpha | ✅ Complete（Docs Ready）|
+| 20G | v0.7.9-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -87,7 +88,7 @@
 - [x] pytest = 938 passed（878 at v0.7.8-alpha tag → 938，+60）
 - [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
 - [x] poetry run rip "說明" success
-- [ ] GitHub Actions CI green（pending this push）
+- [x] GitHub Actions CI #23 green ✅
 - [x] `APPROVAL_STORE_BACKEND` default remains "json"（not changed）
 - [x] `TRANSACTION_LOG_BACKEND` default remains "json"（not changed）
 - [x] SQLite approval backend remains experimental opt-in only
@@ -109,12 +110,13 @@
 - [x] No .github/workflows/ci.yml changes
 - [x] No destructive command regex changes
 - [x] working tree clean（after this commit）
-- [ ] v0.7.9-alpha Git tag created（pending Phase 20G）
-- [ ] v0.7.9-alpha tag pushed to origin（pending Phase 20G）
+- [x] v0.7.9-alpha Git tag created（annotated tag，tag object `62f9a73581dabe230380057970ec1b73c24c8b88`，Phase 20G）
+- [x] v0.7.9-alpha tag pushed to origin（Phase 20G）
+- [x] v0.7.9-alpha tag dereferences to `0e241f57`（`git ls-remote --tags origin v0.7.9-alpha^{}` 驗證，Phase 20G）
 
 ### Recommended Next Phase
 
-- **Phase 20G** — v0.7.9-alpha Tag Confirmation
+- **Phase 21A** — Next feature phase
 
 ---
 
@@ -148,7 +150,7 @@
 
 ### Recommended Next Phase
 
-- **Phase 20G** — v0.7.9-alpha Tag Confirmation（Phase 20F docs ready；pending CI green + tag）
+- **Phase 20G** — v0.7.9-alpha Tag Confirmation（✅ Complete）
 
 ---
 
