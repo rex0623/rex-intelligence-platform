@@ -118,6 +118,103 @@ class ApprovalManager:
         logger.info("Approval rejected", extra={"approval_id": approval_id})
         return approval
 
+    def prune_approvals(
+        self,
+        *,
+        dry_run: bool = True,
+        remove_expired: bool = True,
+        remove_executed: bool = False,
+        remove_rejected: bool = False,
+        max_age_days: Optional[int] = None,
+        now: Optional[datetime] = None,
+    ) -> "ApprovalPruneResult":
+        """Remove expired / executed / rejected / old approvals (Phase 21B).
+
+        Criteria are evaluated in priority order; the first matching criterion
+        determines the sub-bucket for counting:
+          1. expired  (remove_expired=True, default)
+          2. executed (remove_executed=True)
+          3. rejected (remove_rejected=True)
+          4. old      (max_age_days — skips live-pending approvals)
+
+        dry_run=True (default): reads only; _save_store() is never called.
+        dry_run=False: if any approvals are pruned, deletes them from _store
+        and calls _save_store() exactly once.
+        """
+        from app.approvals.schemas import ApprovalPruneResult
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        total_before = len(self._store)
+        age_cutoff = (
+            now - timedelta(days=max_age_days)
+            if max_age_days is not None
+            else None
+        )
+
+        to_prune: list[str] = []
+        pruned_expired = 0
+        pruned_executed = 0
+        pruned_rejected = 0
+        pruned_old = 0
+
+        for approval_id, approval in self._store.items():
+            # 1. Expired: explicit status OR lazy expiry (expires_at passed)
+            is_expired = approval.status == "expired" or (
+                approval.expires_at is not None and approval.expires_at < now
+            )
+            if remove_expired and is_expired:
+                to_prune.append(approval_id)
+                pruned_expired += 1
+                continue
+
+            # 2. Executed: payload carries execution_status == "executed"
+            is_executed = (
+                approval.payload is not None
+                and approval.payload.get("execution_status") == "executed"
+            )
+            if remove_executed and is_executed:
+                to_prune.append(approval_id)
+                pruned_executed += 1
+                continue
+
+            # 3. Rejected
+            if remove_rejected and approval.status == "rejected":
+                to_prune.append(approval_id)
+                pruned_rejected += 1
+                continue
+
+            # 4. Age: only prune if NOT a live-pending (still valid) approval
+            if age_cutoff is not None and approval.created_at < age_cutoff:
+                is_live_pending = approval.status == "pending" and (
+                    approval.expires_at is None or approval.expires_at >= now
+                )
+                if not is_live_pending:
+                    to_prune.append(approval_id)
+                    pruned_old += 1
+
+        pruned_count = len(to_prune)
+        retained_count = total_before - pruned_count
+
+        if not dry_run and to_prune:
+            for aid in to_prune:
+                del self._store[aid]
+            self._save_store()
+
+        return ApprovalPruneResult(
+            dry_run=dry_run,
+            total_before=total_before,
+            total_after=retained_count,
+            pruned_count=pruned_count,
+            retained_count=retained_count,
+            pruned_expired=pruned_expired,
+            pruned_executed=pruned_executed,
+            pruned_rejected=pruned_rejected,
+            pruned_old=pruned_old,
+            pruned_approval_ids=sorted(to_prune),
+        )
+
 
 def _make_singleton() -> ApprovalManager:
     from app.core.config import settings
