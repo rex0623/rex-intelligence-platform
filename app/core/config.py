@@ -67,8 +67,13 @@ class Settings(BaseSettings):
 
     # Persistence backend (Phase 19D — optional; default json)
     # "json"   → JSON flat-file backend (default, production-safe)
-    # "sqlite" → Experimental SQLite backend; no migration yet; prune not supported
+    # "sqlite" → Experimental SQLite backend; prune_transactions() implemented (Phase 19L)
     TRANSACTION_LOG_BACKEND: Literal["json", "sqlite"] = "json"
+
+    # Approval store backend (Phase 20B — optional; default json)
+    # "json"   → JSON flat-file backend (default, production-safe; approvals.json)
+    # "sqlite" → Experimental SQLite backend; shares runtime/rip.db with transaction logs
+    APPROVAL_STORE_BACKEND: Literal["json", "sqlite"] = "json"
 
     model_config = ConfigDict(
         env_file=".env",
@@ -111,7 +116,8 @@ def get_sqlite_db_path() -> Path:
 
     Returns a Path only — does NOT create the file or parent directories.
     The file is created on first use by initialize_sqlite_schema().
-    Only called when TRANSACTION_LOG_BACKEND == "sqlite".
+    Called when TRANSACTION_LOG_BACKEND == "sqlite" or APPROVAL_STORE_BACKEND == "sqlite".
+    Both backends share the same rip.db file (tables coexist, schema is idempotent).
     """
     return get_runtime_dir() / "rip.db"
 

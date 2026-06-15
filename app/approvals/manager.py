@@ -14,21 +14,33 @@ logger = get_logger(__name__)
 
 
 class ApprovalManager:
-    def __init__(self, store_path: Optional[Path | str] = None):
+    def __init__(
+        self,
+        store_path: Optional[Path | str] = None,
+        _store_backend=None,
+    ):
         self.store_path = (
             Path(store_path)
             if store_path is not None
             else get_approval_store_path()
         )
-        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self._backend = _store_backend
+        if self._backend is None:
+            self.store_path.parent.mkdir(parents=True, exist_ok=True)
         self._store: Dict[str, Approval] = {}
         self._load_store()
 
     def _load_store(self) -> None:
-        self._store = JsonApprovalStore.load(self.store_path)
+        if self._backend is not None:
+            self._store = self._backend.load(self.store_path)
+        else:
+            self._store = JsonApprovalStore.load(self.store_path)
 
     def _save_store(self) -> None:
-        JsonApprovalStore.save(self.store_path, self._store)
+        if self._backend is not None:
+            self._backend.save(self.store_path, self._store)
+        else:
+            JsonApprovalStore.save(self.store_path, self._store)
 
     def create_approval(self, workflow_plan: dict, ttl_minutes: int = 60) -> Approval:
         approval_id = str(uuid.uuid4())
@@ -107,4 +119,13 @@ class ApprovalManager:
         return approval
 
 
-approval_manager = ApprovalManager()
+def _make_singleton() -> ApprovalManager:
+    from app.core.config import settings
+    backend = getattr(settings, "APPROVAL_STORE_BACKEND", "json")
+    if backend == "sqlite":
+        from app.core.sqlite_approval_store import SqliteApprovalStore
+        return ApprovalManager(_store_backend=SqliteApprovalStore())
+    return ApprovalManager()
+
+
+approval_manager = _make_singleton()

@@ -5,6 +5,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added（Phase 20B）
+
+- **`app/core/approval_manager_factory.py`**（新增）：
+  - `make_approval_manager()` — 依 `settings.APPROVAL_STORE_BACKEND` 回傳對應 backend 的 `ApprovalManager` 實例
+  - `backend="json"` → 回傳 `ApprovalManager()`（JSON backend；`rip.db` 不建立）
+  - `backend="sqlite"` → 回傳 `ApprovalManager(_store_backend=SqliteApprovalStore())`（SQLite backend）
+  - 未知 backend 值 → raise `ValueError`
+  - 所有 import 均為 local（避免 circular import，且確保 `backend="json"` 時不 import SQLite 模組）
+  - settings 在呼叫時讀取（call time），`monkeypatch.setattr` 有效
+- **`tests/test_approval_manager_factory.py`**（新增）：+11 tests（897 → 908）
+  - backend selection（json / sqlite / unknown ValueError）
+  - rip.db isolation（json 不建立 / sqlite 寫入後建立）
+  - functional smoke（create_approval / get / approve / reject；json + sqlite backend）
+  - factory reads settings at call time（monkeypatch 驗證）
+
+### Added（Phase 20A）
+
+- **`app/core/approval_store_protocol.py`**（新增）：
+  - `@runtime_checkable class ApprovalStoreProtocol(Protocol)` — 定義 `load(store_path) → dict` / `save(store_path, data) → None` 結構性協定（PEP 544 structural subtyping）
+  - instance method 設計：`JsonApprovalStore()` 實例與 `SqliteApprovalStore()` 實例均可注入為 `ApprovalStoreProtocol`
+- **`app/core/sqlite_approval_store.py`**（新增）：
+  - `SqliteApprovalStore` — 滿足 `ApprovalStoreProtocol`；持久化至 `runtime/rip.db` 的 `approvals` table
+  - `load(store_path)` — 讀取 DB 所有 approvals → `Dict[approval_id, Approval]`；`store_path` 忽略（實際路徑由 `get_sqlite_db_path()` 決定）
+  - `save(store_path, data)` — replace-all 語意（DELETE + INSERT in transaction）；`store_path` 忽略
+  - `payload` 以 JSON TEXT blob 儲存；`ensure_ascii=False`（支援中文 / emoji）；`expires_at=None` / `payload=None` 可正確 round-trip
+  - `_get_db_path()` local import（避免 circular；call time 讀取 settings）
+- **`app/core/sqlite_transaction_log.py`**（修改）：
+  - `initialize_sqlite_schema()` 新增 `approvals` table（`approval_id TEXT PK, workflow_id TEXT, status TEXT, created_at TEXT, expires_at TEXT, payload TEXT`）
+  - 新增 `idx_approvals_status` index
+  - 既有 `rename_transactions` / `move_transactions` tables 保留（idempotent，`CREATE TABLE IF NOT EXISTS`）
+- **`app/approvals/manager.py`**（修改）：
+  - `_make_singleton()` — 依 `settings.APPROVAL_STORE_BACKEND` 選擇 backend（`"sqlite"` → `SqliteApprovalStore()`，其他 → JSON 預設）
+  - `ApprovalManager.__init__` 新增 `_store_backend` 參數（可注入任意滿足 `ApprovalStoreProtocol` 的 backend）
+- **`tests/test_sqlite_approval_store.py`**（新增）：+19 tests（878 → 897）
+  - schema 建立 / idempotency / 跨 table 保留
+  - save / load round-trip（單筆 / 多筆 / expires_at=None / payload=None）
+  - 所有 status 值（pending / approved / rejected / expired）round-trip
+  - nested payload / mark_executed payload round-trip
+  - replace-all / save({}) clears all
+  - 不同 instance 共享 DB
+  - `ApprovalStoreProtocol` instanceof 檢查
+  - JSON backend regression（rip.db 不建立）
+  - unicode / emoji payload round-trip
+
+### Not Changed（Phase 20A / 20B）
+
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- 不修改 `JsonApprovalStore`（`app/approvals/store.py`）
+- 不修改 approval / transaction schemas（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+- 不修改 SQLite transaction log 既有邏輯（`prune_transactions()` / migration script 不變）
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改任何 destructive command regex / Mock LINE 指令
+
+---
+
 ## [v0.7.8-alpha] — Phase 19H / 19J / 19L Release Checkpoint
 
 本 release checkpoint 收斂 Phase 19H（Operator Docs）、Phase 19J（SQLite Migration Script）、Phase 19L（SQLite Prune Implementation）三個 phase 的工作。

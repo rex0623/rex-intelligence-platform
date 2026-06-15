@@ -6,8 +6,8 @@
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
 | **Current Version** | v0.7.8-alpha（tag confirmed；Phase 19N；Phase 19L SQLite prune；Phase 19J migration script）|
-| **Test Count** | 878 passing（+113 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-15（Phase 19N）|
+| **Test Count** | 908 passing（+30 since v0.7.8-alpha tag；+143 since v0.7.6-alpha tag）|
+| **Last Updated** | 2026-06-15（Phase 20B）|
 
 ---
 
@@ -72,6 +72,8 @@
 | 19L | SQLite prune_transactions() Implementation | ✅ Complete |
 | 19M | Release Checkpoint v0.7.8-alpha | ✅ Complete（Docs Ready）|
 | 19N | v0.7.8-alpha Tag Confirmation | ✅ Complete |
+| 20A | SQLite Approval Store（`SqliteApprovalStore` + `ApprovalStoreProtocol`） | ✅ Complete |
+| 20B | Approval Manager Backend Factory（`make_approval_manager()`） | ✅ Complete |
 
 ---
 
@@ -103,9 +105,15 @@
 - [x] v0.7.8-alpha tag pushed to origin（Phase 19N）
 - [x] v0.7.8-alpha tag dereferences to `d1201c4`（`git ls-remote --tags origin v0.7.8-alpha^{}` 驗證，Phase 19N）
 
+### In Progress / Recently Completed
+
+- **Phase 20A** — `SqliteApprovalStore` + `ApprovalStoreProtocol` ✅（878 → 897 tests）
+- **Phase 20B** — `make_approval_manager()` factory ✅（897 → 908 tests）
+
 ### Recommended Next Phase
 
-- **Phase 20** — Approval SQLite Backend Reconnaissance（`SqliteApprovalStore` 設計分析）
+- **Phase 20C** — Operator docs for Approval SQLite backend（`OPERATOR_DEPLOYMENT.md` 更新）
+- **Phase 21** — v0.7.9-alpha Release Checkpoint（收斂 Phase 20A / 20B / 20C）
 
 ---
 
