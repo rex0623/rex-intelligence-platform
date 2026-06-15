@@ -2,6 +2,76 @@
 
 ---
 
+## v0.7.8-alpha
+
+**Phase 19H / 19J / 19L — SQLite Operator Docs / Migration Script / Prune Implementation Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.7.8-alpha 收斂 Phase 19H（Operator Docs for Experimental SQLite Backend）、Phase 19J（JSON → SQLite Transaction Log Migration Script）、Phase 19L（SQLite `prune_transactions()` Implementation）三個 phase 的工作，確認 SQLite experimental backend 已具備 prune 支援，JSON backend 預設行為完全不變，並為後續 Approval SQLite backend 建立穩定基準。
+
+---
+
+### Highlights
+
+- **Operator Docs — Experimental SQLite Backend（Phase 19H）** — `docs/OPERATOR_DEPLOYMENT.md` 全面補充 experimental SQLite backend 的 operator 說明：啟用方式、影響範圍表（json vs sqlite）、No migration warning、WAL / busy_timeout / runtime lock 說明、SQLite backup / restore / integrity check 流程、WSL2 注意事項、快速參考條目。
+- **JSON → SQLite Migration Script（Phase 19J）** — 新增 `app/core/transaction_log_migration.py`（migration library）與 `scripts/migrate_transaction_logs.py`（CLI wrapper）；idempotent migration；dry-run 預設；argparse CLI 支援 `--apply` / `--backup` / `--fail-on-corrupt` / `--json-report`；lock-aware（`acquire_runtime_lock()`）；WAL-safe backup；JSON 原檔 read-only。
+- **SQLite `prune_transactions()` Implementation（Phase 19L）** — `SqliteRenameTransactionLog.prune_transactions()` 與 `SqliteMoveTransactionLog.prune_transactions()` 完整實作，對齊 JSON backend 行為：rename prune 支援 `max_transactions` / `max_age_days` / rollbackable protection；move prune 支援 `older_than_days` / `dry_run` / 3-state（protected / retained / pruned）；`corrupted_count` 恆為 0（SQLite schema 保證 validity）；`prune_transactions()` 不進 Protocol（簽名相異）。
+- **JSON backend 完全不變（v0.7.7-alpha → v0.7.8-alpha 升級影響為零）** — `TRANSACTION_LOG_BACKEND` 預設 "json"；不建立 `runtime/rip.db`；`rename_transactions.json` / `move_transactions.json` schema 不變；所有現有 operator 操作行為與 v0.7.7-alpha 完全相同。
+
+---
+
+### SQLite Backend 重要限制（v0.7.8-alpha）
+
+| 限制 | 說明 |
+|------|------|
+| No migration（自動） | 切換到 `sqlite` 後，現有 JSON transaction history 不可見；請使用 `scripts/migrate_transaction_logs.py` 手動 migrate |
+| No Approval SQLite | `ApprovalManager` / `JsonApprovalStore` 不變，approval 仍存 JSON |
+| Experimental only | 不建議在有歷史資料的環境切換 sqlite，除非先執行 migration |
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.7-alpha（Phase 19G Tag） | 816 |
+| Phase 19J（Migration Script） | 855（+39）|
+| Phase 19L（SQLite Prune） | 878（+23）|
+| **v0.7.8-alpha** | **878** |
+
+---
+
+### Final Regression（v0.7.8-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 878 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | #17（pending — Release Checkpoint Prepared）|
+
+---
+
+### Non-Goals（v0.7.8-alpha）
+
+- 不實作 Approval SQLite backend（`ApprovalManager` / `JsonApprovalStore` 不變）
+- 不切換 default backend 至 sqlite
+- 不修改 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema
+
+---
+
+### Tag Status（v0.7.8-alpha）
+
+Release Checkpoint Prepared — tag 尚未建立。等待 GitHub Actions CI #17 green 後建立 annotated tag。
+
+---
+
 ## v0.7.7-alpha
 
 **Phase 19B–19D — Optional SQLite Transaction Log Backend Release Checkpoint**

@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.7-alpha（tag confirmed；Phase 19J SQLite migration script）|
-| **Test Count** | 855 passing（+90 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-14（Phase 19J）|
+| **Current Version** | v0.7.8-alpha（Release Checkpoint Prepared；Phase 19L SQLite prune；Phase 19J migration script）|
+| **Test Count** | 878 passing（+113 since v0.7.6-alpha tag）|
+| **Last Updated** | 2026-06-15（Phase 19M）|
 
 ---
 
@@ -68,22 +68,29 @@
 | 19G | v0.7.7-alpha Tag Confirmation | ✅ Complete |
 | 19H | Operator Docs for Experimental SQLite Backend | ✅ Complete |
 | 19J | SQLite Transaction Log Migration Script | ✅ Complete |
+| 19K | SQLite Prune Reconnaissance | ✅ Complete |
+| 19L | SQLite prune_transactions() Implementation | ✅ Complete |
+| 19M | Release Checkpoint v0.7.8-alpha | ✅ Complete（Docs Ready）|
 
 ---
 
-## Release Readiness Checklist（v0.7.7-alpha）
+## Release Readiness Checklist（v0.7.8-alpha）
 
 - [x] poetry check = All set!
-- [x] pytest = 816 passed（765 at v0.7.6-alpha tag → 816，+51）
+- [x] pytest = 878 passed（816 at v0.7.7-alpha tag → 878，+62）
 - [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
 - [x] poetry run rip "說明" success
-- [x] GitHub Actions CI #11 success（before release checkpoint）
-- [x] Phase 19B persisted in main（`app/core/sqlite_transaction_log.py` + 29 tests）
-- [x] Phase 19D persisted in main（`app/core/transaction_log_factory.py` + TRANSACTION_LOG_BACKEND + 22 tests）
+- [ ] GitHub Actions CI #17 green（pending — Release Checkpoint Prepared）
 - [x] JSON backend remains default（`TRANSACTION_LOG_BACKEND` 預設 "json"）
 - [x] SQLite backend remains optional / experimental（只有明確設定才啟用）
-- [x] No migration script introduced（JSON → SQLite history migration 延後 Phase 19H）
-- [x] No SQLite prune implementation（`prune_transactions()` raise NotImplementedError；延後 Phase 19I）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 更新至 Phase 19H（TRANSACTION_LOG_BACKEND 說明、SQLite backup、no-migration warning、WSL2 note、快速參考 SQLite 條目）
+- [x] `app/core/transaction_log_migration.py` 新增（Phase 19J migration library；39 tests）
+- [x] `scripts/migrate_transaction_logs.py` 新增（Phase 19J CLI wrapper）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 新增 migration section（Phase 19J）
+- [x] `SqliteRenameTransactionLog.prune_transactions()` 實作（Phase 19L）
+- [x] `SqliteMoveTransactionLog.prune_transactions()` 實作（Phase 19L）
+- [x] SQLite prune 25 tests 新增（Phase 19L；855 → 878）
+- [x] `prune_transactions()` 不進 Protocol（簽名相異）
 - [x] No Approval SQLite backend（`ApprovalManager` / `JsonApprovalStore` 不變）
 - [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
 - [x] No pyproject.toml / poetry.lock changes
@@ -91,18 +98,12 @@
 - [x] No destructive command regex changes
 - [x] working tree clean
 - [x] v0.7.7-alpha Git tag created（annotated tag，tag object `80d234676bdacbc8b5dafefa427f59289e471b81`，Phase 19G）
-- [x] v0.7.7-alpha tag pushed to origin（Phase 19G）
-- [x] v0.7.7-alpha tag dereferences to `86c3b9b`（`git ls-remote --tags origin v0.7.7-alpha^{}` 驗證，Phase 19G）
-- [x] `docs/OPERATOR_DEPLOYMENT.md` 更新至 Phase 19H（TRANSACTION_LOG_BACKEND 說明、SQLite backup、no-migration warning、WSL2 note、快速參考 SQLite 條目）
-- [x] `app/core/transaction_log_migration.py` 新增（Phase 19J migration library；39 tests）
-- [x] `scripts/migrate_transaction_logs.py` 新增（Phase 19J CLI wrapper）
-- [x] `docs/OPERATOR_DEPLOYMENT.md` 新增 migration section（Phase 19J）
-- [x] pytest = 855 passed（816 + 39 from Phase 19J）
+- [ ] v0.7.8-alpha Git tag — pending CI green
 
 ### Recommended Next Phase
 
-- **Phase 19K** — SQLite Prune Implementation（`SqliteRenameTransactionLog.prune_transactions()` / `SqliteMoveTransactionLog.prune_transactions()`，~13 tests）
-- **Phase 19L** — Release Checkpoint v0.7.8-alpha（收斂 Phase 19B / 19D / 19H / 19J / 19K）
+- **Phase 19N** — v0.7.8-alpha Tag Confirmation（等待 CI #17 green 後建立 annotated tag）
+- **Phase 20** — Approval SQLite Backend（`SqliteApprovalStore` 實作）
 
 ---
 

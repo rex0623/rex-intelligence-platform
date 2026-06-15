@@ -5,12 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 19J SQLite Transaction Log Migration Script
+## [v0.7.8-alpha] — Phase 19H / 19J / 19L Release Checkpoint
 
-本階段新增 JSON → SQLite transaction log migration library 與 CLI wrapper。
-不修改 TRANSACTION_LOG_BACKEND 預設值、不做 SQLite prune、不做 Approval SQLite migration。
+本 release checkpoint 收斂 Phase 19H（Operator Docs）、Phase 19J（SQLite Migration Script）、Phase 19L（SQLite Prune Implementation）三個 phase 的工作。
+JSON backend 仍為預設值（`TRANSACTION_LOG_BACKEND=json`）；SQLite 為 experimental opt-in。
+不修改 JSON backend / Protocol / schemas / config / CI / destructive regex。Release Checkpoint Prepared（tag 尚未建立）。
 
-### Added
+### Added（Phase 19L）
+
+- **`app/core/sqlite_transaction_log.py`**（修改）：
+  - `SqliteRenameTransactionLog.prune_transactions(max_transactions, max_age_days, now)` — 實作完整 prune 邏輯；跳過 rollbackable transactions（有 success action）；`ON DELETE CASCADE` 自動清除 actions；回傳 `TransactionLogPruneResult`
+  - `SqliteMoveTransactionLog.prune_transactions(older_than_days, dry_run, now)` — 實作完整 prune 邏輯；3-state（protected / retained / pruned）；`dry_run=True` 時不執行 DELETE；`corrupted_count` 恆為 0（SQLite schema 保證 validity）；回傳 `MoveTransactionLogPruneResult`
+  - 新增 `from datetime import datetime, timedelta, timezone` import
+- **`tests/test_sqlite_transaction_log.py`**（修改）：+25 tests（855 → 878）；移除 2 個 NotImplementedError 測試；新增 10 個 rename prune 測試 + 15 個 move prune 測試
+- **`tests/test_transaction_log_factory.py`**（修改）：更新 2 個 factory prune 測試（不再期望 NotImplementedError，改驗證正常執行與正確回傳型別）
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：feature 比較表新增 `prune_transactions()` 欄位（✅ JSON / ✅ SQLite Phase 19L）；移除 `⚠️ SQLite prune_transactions 尚未實作` warning section
+
+### Not Changed（Phase 19L）
+
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- 不修改 JSON backend（`app/filename/transaction_log.py` / `app/folder_intelligence/transaction_log.py`）
+- 不修改 Protocol（`app/core/transaction_log_protocol.py`）；`prune_transactions()` 不進 Protocol（簽名相異）
+- 不修改 schemas（`app/filename/schemas.py` / `app/folder_intelligence/schemas.py`）
+- 不修改 `app/core/config.py` / `app/core/runtime_lock.py`
+- 不修改 `scripts/mock_line.py` / destructive command regex
+- 不做 Approval SQLite backend
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不建立 tag
+
+---
+
+### Added（Phase 19J）
 
 - **`app/core/transaction_log_migration.py`**（新增）：
   - `MigrationResult` dataclass（`source_path / kind / dry_run / migrated_count / already_present_count / corrupted_count / skipped_count / missing_source / errors / warnings`）
@@ -30,7 +55,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`tests/test_transaction_log_migration.py`**（新增）：39 tests（816 → 855）
 - **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：新增 `## JSON → SQLite Migration（Phase 19J）` section；快速參考新增 migration 條目
 
-### Not Changed
+### Not Changed（Phase 19J）
 
 - `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
 - 不修改 `app/core/runtime_lock.py` / `config.py` / `transaction_log_factory.py` / `sqlite_transaction_log.py`
@@ -42,12 +67,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 19H Operator Docs for Experimental SQLite Backend
-
-本階段更新 `docs/OPERATOR_DEPLOYMENT.md`，補充 experimental SQLite transaction log backend 的 operator 說明。
-不修改任何 application code、不做 migration、不做 prune implementation。
-
-### Changed
+### Changed（Phase 19H）
 
 - **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
   - 文件版本更新至 v0.7.7-alpha（Phase 19H）
@@ -63,11 +83,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - 啟用方式（`.env` / 臨時覆寫）
     - 影響範圍表（json vs sqlite）
     - ⚠️ No migration warning（舊 JSON history 不可見、操作影響、保留 JSON 說明）
-    - ⚠️ SQLite prune_transactions 尚未實作說明
+    - ⚠️ SQLite prune_transactions 尚未實作說明（Phase 19L 已移除此 warning）
     - Backup / Fallback to JSON / runtime lock 與 SQLite 關係 / WSL2 注意
   - 快速參考：新增 sqlite backup / integrity check / 啟用 / 切回 / 重建 DB 條目
 
-### Not Changed
+### Not Changed（Phase 19H）
 
 - 不修改 application code / tests / pyproject.toml / poetry.lock / ci.yml
 - 不做 migration script
