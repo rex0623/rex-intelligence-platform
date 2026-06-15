@@ -2,6 +2,98 @@
 
 ---
 
+## v0.7.9-alpha
+
+**Phase 20A / 20B / 20C / 20E — SQLite Approval Store + Approval Migration Script Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.7.9-alpha 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval Manager Backend Factory）、Phase 20C（Operator Docs for SQLite Approval Backend）、Phase 20E（Approval JSON → SQLite Migration Script）四個 phase 的工作，為 approval persistence 建立與 transaction log SQLite backend 對稱的 SQLite opt-in 能力，JSON backend 預設行為完全不變。Phase 20D 為 reconnaissance only，無程式碼異動。
+
+---
+
+### Highlights
+
+- **SQLite Approval Store（Phase 20A）** — 新增 `app/core/approval_store_protocol.py`：`@runtime_checkable class ApprovalStoreProtocol(Protocol)`（PEP 544 structural subtyping），定義 `load(store_path) → dict` / `save(store_path, data) → None`。新增 `app/core/sqlite_approval_store.py`：`SqliteApprovalStore` 持久化至 `runtime/rip.db` 的 `approvals` table（與 transaction log SQLite backend 共享同一 DB）；`payload` 以 JSON TEXT blob 儲存（`ensure_ascii=False`）；`expires_at=None` / `payload=None` 可正確 round-trip。`initialize_sqlite_schema()` 新增 `approvals` table DDL（`CREATE TABLE IF NOT EXISTS`，idempotent）。
+- **Approval Manager Backend Factory（Phase 20B）** — 新增 `app/core/approval_manager_factory.py`：`make_approval_manager()` factory 依 `settings.APPROVAL_STORE_BACKEND` 回傳對應 backend 的 `ApprovalManager` 實例；local import 設計確保 backend="json" 時不 import SQLite 模組；settings 在呼叫時讀取（call time）。新增 `APPROVAL_STORE_BACKEND: Literal["json","sqlite"] = "json"` 至 `app/core/config.py`；`ApprovalManager.__init__` 新增 `_store_backend` 注入參數。
+- **Operator Docs for SQLite Approval Backend（Phase 20C）** — `docs/OPERATOR_DEPLOYMENT.md` 新增「Experimental SQLite Approval Store Backend」section（啟用方式 / feature 比較表 / ⚠️ warning / backup / fallback / dual-backend 說明）；`.env` 範例補 `APPROVAL_STORE_BACKEND=json`。
+- **Approval JSON → SQLite Migration（Phase 20E）** — 新增 `app/core/approval_migration.py`（migration library）與 `scripts/migrate_approvals.py`（CLI wrapper）；idempotent（`INSERT OR IGNORE` by `approval_id` PRIMARY KEY）；dry-run 預設（不建立 rip.db、不修改 approvals.json）；`--apply` 模式 acquire_runtime_lock()；`--backup` WAL-safe backup；exit codes：0 / 1（lock busy）/ 2（corrupt + fail-on-corrupt）/ 3（unexpected error）；migration 不自動切換 `APPROVAL_STORE_BACKEND`。
+- **JSON backend 完全不變（v0.7.8-alpha → v0.7.9-alpha 升級影響為零）** — `APPROVAL_STORE_BACKEND` 預設 "json"；`TRANSACTION_LOG_BACKEND` 預設 "json"；`approvals.json` / `rename_transactions.json` / `move_transactions.json` schema 不變；所有現有 operator 操作行為與 v0.7.8-alpha 完全相同。
+
+---
+
+### SQLite Approval Backend 重要限制（v0.7.9-alpha）
+
+| 限制 | 說明 |
+|------|------|
+| Experimental opt-in only | 需主動設定 `APPROVAL_STORE_BACKEND=sqlite`；預設仍為 `"json"` |
+| Migration 不自動切換 | `scripts/migrate_approvals.py --apply` 後仍需手動設定 `APPROVAL_STORE_BACKEND=sqlite` |
+| save() replace-all 語意 | `SqliteApprovalStore.save()` 使用 DELETE+INSERT（replace-all）；migration 使用 raw SQL `INSERT OR IGNORE` |
+| 共享 rip.db | `APPROVAL_STORE_BACKEND=sqlite` 與 `TRANSACTION_LOG_BACKEND=sqlite` 共享 `runtime/rip.db`；tables 共存（idempotent DDL） |
+
+---
+
+### Commits Since v0.7.8-alpha
+
+| Commit | 說明 |
+|--------|------|
+| `1e36e6f` | docs(release): confirm v0.7.8-alpha tag |
+| `34cbca8` | feat(approvals): add SQLite approval store |
+| `bf44493` | feat(approvals): add approval manager backend factory (Phase 20B) |
+| `80e3beb` | docs(operator): document SQLite approval backend |
+| `a74b243` | feat(approvals): add approval SQLite migration script |
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.8-alpha tag | 878 |
+| Phase 20A（SqliteApprovalStore）| 897（+19）|
+| Phase 20B（factory）| 908（+11）|
+| Phase 20E（migration）| 938（+30）|
+| **v0.7.9-alpha** | **938** |
+
+---
+
+### Final Regression（v0.7.9-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 938 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | pending |
+
+---
+
+### Non-Goals（v0.7.9-alpha）
+
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- 不修改 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+- 不修改 `JsonApprovalStore`（`app/approvals/store.py`）
+- Phase 20D 為 reconnaissance only（無 commit，無 file changes）
+
+---
+
+### Tag Confirmation（Phase 20G — Pending）
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.7.9-alpha` |
+| tag object | — |
+| target commit | — |
+| remote tag pushed | ⬜ pending |
+
+---
+
 ## v0.7.8-alpha
 
 **Phase 19H / 19J / 19L — SQLite Operator Docs / Migration Script / Prune Implementation Release Checkpoint**

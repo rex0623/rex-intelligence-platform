@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.8-alpha（tag confirmed；Phase 19N；Phase 19L SQLite prune；Phase 19J migration script）|
+| **Current Version** | v0.7.9-alpha（Release Checkpoint Prepared / Pending Tag；Phase 20F；Phase 20A–20E SQLite approval store + approval migration）|
 | **Test Count** | 938 passing（+60 since v0.7.8-alpha tag；+173 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-15（Phase 20E）|
+| **Last Updated** | 2026-06-15（Phase 20F）|
 
 ---
 
@@ -77,6 +77,44 @@
 | 20C | Operator Docs for SQLite Approval Backend | ✅ Complete |
 | 20D | Approval Migration Reconnaissance | ✅ Complete |
 | 20E | Approval JSON → SQLite Migration（`migrate_approvals`）| ✅ Complete |
+| 20F | Release Checkpoint v0.7.9-alpha | ✅ Complete（Docs Ready）|
+
+---
+
+## Release Readiness Checklist（v0.7.9-alpha）
+
+- [x] poetry check = All set!
+- [x] pytest = 938 passed（878 at v0.7.8-alpha tag → 938，+60）
+- [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
+- [x] poetry run rip "說明" success
+- [ ] GitHub Actions CI green（pending this push）
+- [x] `APPROVAL_STORE_BACKEND` default remains "json"（not changed）
+- [x] `TRANSACTION_LOG_BACKEND` default remains "json"（not changed）
+- [x] SQLite approval backend remains experimental opt-in only
+- [x] `app/core/approval_store_protocol.py` 新增（Phase 20A；`ApprovalStoreProtocol` @runtime_checkable Protocol）
+- [x] `app/core/sqlite_approval_store.py` 新增（Phase 20A；`SqliteApprovalStore`）
+- [x] `app/core/sqlite_transaction_log.py` 修改（Phase 20A；新增 `approvals` table DDL）
+- [x] `tests/test_sqlite_approval_store.py` 新增（Phase 20A；+19 tests，878 → 897）
+- [x] `app/core/approval_manager_factory.py` 新增（Phase 20B；`make_approval_manager()` factory）
+- [x] `app/core/config.py` 修改（Phase 20B；`APPROVAL_STORE_BACKEND` setting）
+- [x] `app/approvals/manager.py` 修改（Phase 20B；`_store_backend` kwarg）
+- [x] `tests/test_approval_manager_factory.py` 新增（Phase 20B；+11 tests，897 → 908）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 修改（Phase 20C；SQLite approval backend section；Phase 20E；approval migration section）
+- [x] `app/core/approval_migration.py` 新增（Phase 20E；migration library；`INSERT OR IGNORE` idempotency）
+- [x] `scripts/migrate_approvals.py` 新增（Phase 20E；CLI wrapper；lock-aware；WAL-safe backup）
+- [x] `tests/test_approval_migration.py` 新增（Phase 20E；+30 tests，908 → 938）
+- [x] Migration does NOT auto-switch `APPROVAL_STORE_BACKEND`（operator must set manually after --apply）
+- [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
+- [x] No pyproject.toml / poetry.lock changes
+- [x] No .github/workflows/ci.yml changes
+- [x] No destructive command regex changes
+- [x] working tree clean（after this commit）
+- [ ] v0.7.9-alpha Git tag created（pending Phase 20G）
+- [ ] v0.7.9-alpha tag pushed to origin（pending Phase 20G）
+
+### Recommended Next Phase
+
+- **Phase 20G** — v0.7.9-alpha Tag Confirmation
 
 ---
 
@@ -110,7 +148,7 @@
 
 ### Recommended Next Phase
 
-- **Phase 21** — v0.7.9-alpha Release Checkpoint（收斂 Phase 20A / 20B / 20C / 20D / 20E）
+- **Phase 20G** — v0.7.9-alpha Tag Confirmation（Phase 20F docs ready；pending CI green + tag）
 
 ---
 

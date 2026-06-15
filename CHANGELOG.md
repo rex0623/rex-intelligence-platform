@@ -5,7 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [v0.7.9-alpha] — 2026-06-15 — Phase 20A / 20B / 20C / 20E Release Checkpoint
+
+本 release checkpoint 收斂 Phase 20A（SQLite Approval Store）、Phase 20B（Approval Manager Backend Factory）、Phase 20C（Operator Docs for SQLite Approval Backend）、Phase 20E（Approval JSON → SQLite Migration Script）四個 phase 的工作。
+Phase 20D 為 reconnaissance only（無 commit）。
+JSON backend 仍為兩個後端的預設值；SQLite approval backend 為 experimental opt-in。
+不修改任何 destructive command regex / JSON schema / Protocol / pyproject.toml / poetry.lock / CI workflow。
 
 ### Added（Phase 20E）
 
@@ -43,17 +48,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - 更新「Experimental SQLite Approval Store Backend」⚠️ warning（移除「尚無 migration script」，改為指引使用 scripts/migrate_approvals.py）
   - 快速參考表補上 approval migration 操作列
 
-### Not Changed（Phase 20E）
+### Added（Phase 20C）
 
-- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
-- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
-- 不修改 `SqliteApprovalStore`（save/load 語意不變；migration 使用 raw SQL）
-- 不修改 `JsonApprovalStore`、`ApprovalManager`、`Approval` schema
-- 不修改 `transaction_log_migration.py`（只 import `_backup_file`）
-- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
-- 不修改任何 destructive command regex / Mock LINE 指令
-
----
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
+  - 文件版本更新至 v0.7.8-alpha（Phase 20C）
+  - 概覽補充 `APPROVAL_STORE_BACKEND` 與 `TRANSACTION_LOG_BACKEND` 為獨立設定的說明
+  - `.env` 範例新增 `APPROVAL_STORE_BACKEND=json`（含警告注釋）
+  - `runtime/` 目錄說明：rip.db description 更新（同時說明 rename_transactions / move_transactions / approvals tables）
+  - SQLite transaction log feature 表：補充 APPROVAL_STORE_BACKEND 為獨立設定的 note
+  - 新增「Experimental SQLite Approval Store Backend」section（啟用方式 / feature 比較表 / ⚠️ warning / backup / fallback / dual-backend 說明）
 
 ### Added（Phase 20B）
 
@@ -64,6 +67,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - 未知 backend 值 → raise `ValueError`
   - 所有 import 均為 local（避免 circular import，且確保 `backend="json"` 時不 import SQLite 模組）
   - settings 在呼叫時讀取（call time），`monkeypatch.setattr` 有效
+- **`app/core/config.py`**（修改）：
+  - `APPROVAL_STORE_BACKEND: Literal["json", "sqlite"] = "json"` — approval 後端選擇旗標（預設 "json"）
+- **`app/approvals/manager.py`**（修改）：
+  - `_make_singleton()` — 依 `settings.APPROVAL_STORE_BACKEND` 選擇 backend
+  - `ApprovalManager.__init__` 新增 `_store_backend` 參數（可注入任意滿足 `ApprovalStoreProtocol` 的 backend）
 - **`tests/test_approval_manager_factory.py`**（新增）：+11 tests（897 → 908）
   - backend selection（json / sqlite / unknown ValueError）
   - rip.db isolation（json 不建立 / sqlite 寫入後建立）
@@ -82,12 +90,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `payload` 以 JSON TEXT blob 儲存；`ensure_ascii=False`（支援中文 / emoji）；`expires_at=None` / `payload=None` 可正確 round-trip
   - `_get_db_path()` local import（避免 circular；call time 讀取 settings）
 - **`app/core/sqlite_transaction_log.py`**（修改）：
-  - `initialize_sqlite_schema()` 新增 `approvals` table（`approval_id TEXT PK, workflow_id TEXT, status TEXT, created_at TEXT, expires_at TEXT, payload TEXT`）
+  - `initialize_sqlite_schema()` 新增 `approvals` table（`approval_id TEXT PK, workflow_id TEXT, status TEXT CHECK(…), created_at TEXT, expires_at TEXT, payload TEXT`）
   - 新增 `idx_approvals_status` index
   - 既有 `rename_transactions` / `move_transactions` tables 保留（idempotent，`CREATE TABLE IF NOT EXISTS`）
-- **`app/approvals/manager.py`**（修改）：
-  - `_make_singleton()` — 依 `settings.APPROVAL_STORE_BACKEND` 選擇 backend（`"sqlite"` → `SqliteApprovalStore()`，其他 → JSON 預設）
-  - `ApprovalManager.__init__` 新增 `_store_backend` 參數（可注入任意滿足 `ApprovalStoreProtocol` 的 backend）
 - **`tests/test_sqlite_approval_store.py`**（新增）：+19 tests（878 → 897）
   - schema 建立 / idempotency / 跨 table 保留
   - save / load round-trip（單筆 / 多筆 / expires_at=None / payload=None）
@@ -99,15 +104,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - JSON backend regression（rip.db 不建立）
   - unicode / emoji payload round-trip
 
-### Not Changed（Phase 20A / 20B）
+### Not Changed（v0.7.9-alpha）
 
-- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
-- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`（SQLite approval backend 為 experimental opt-in）
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`（SQLite transaction log backend 為 experimental opt-in）
 - 不修改 `JsonApprovalStore`（`app/approvals/store.py`）
-- 不修改 approval / transaction schemas（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
-- 不修改 SQLite transaction log 既有邏輯（`prune_transactions()` / migration script 不變）
-- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 approval / transaction JSON schemas（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+- Migration 不會自動切換 `APPROVAL_STORE_BACKEND`（需手動設定）
+- 不修改 `transaction_log_migration.py`（只 import `_backup_file`）
 - 不修改任何 destructive command regex / Mock LINE 指令
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- Phase 20D 為 reconnaissance only（無 commit，無 file changes）
+
+### Test Count（v0.7.8-alpha → v0.7.9-alpha）
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.8-alpha tag | 878 |
+| Phase 20A（SqliteApprovalStore） | 897（+19）|
+| Phase 20B（factory） | 908（+11）|
+| Phase 20E（migration） | 938（+30）|
+| **v0.7.9-alpha** | **938** |
 
 ---
 

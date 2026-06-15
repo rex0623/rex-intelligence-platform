@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.7.8-alpha**（Phase 19L — SQLite prune support；Phase 19J — migration script；Phase 19N Tag Confirmed；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
+> **目前版本：v0.7.9-alpha**（Phase 20A–20E — SQLite approval store + APPROVAL_STORE_BACKEND + approval migration script；Release Checkpoint Prepared / Pending Tag；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,29 +117,31 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.7.7-alpha（Phase 19G — Tag Confirmed）
+**目前版本**：v0.7.9-alpha（Phase 20A–20E — Release Checkpoint Prepared / Pending Tag）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
-**v0.7.7-alpha** 收斂 Phase 19B / 19D 的 optional SQLite transaction log backend 工作，包含：
-- Phase 19B：`SqliteRenameTransactionLog` / `SqliteMoveTransactionLog` SQLite backend 實作（`app/core/sqlite_transaction_log.py`）
-- Phase 19D：`TRANSACTION_LOG_BACKEND` 旗標接入 production runtime；`app/core/transaction_log_factory.py` factory；`default_move_transaction_log()` 與三個 mock_line rename 實例化改用 factory 路由
+**v0.7.9-alpha** 收斂 Phase 20A / 20B / 20C / 20E 的 SQLite approval store 工作，包含：
+- Phase 20A：`ApprovalStoreProtocol`（`@runtime_checkable Protocol`）+ `SqliteApprovalStore`（持久化至 `runtime/rip.db` `approvals` table）
+- Phase 20B：`make_approval_manager()` factory；`APPROVAL_STORE_BACKEND: Literal["json","sqlite"] = "json"` 設定；`ApprovalManager._store_backend` 注入參數
+- Phase 20C：`docs/OPERATOR_DEPLOYMENT.md` 新增 `APPROVAL_STORE_BACKEND` 說明、「Experimental SQLite Approval Store Backend」section
+- Phase 20E：`app/core/approval_migration.py` migration library；`scripts/migrate_approvals.py` CLI；idempotent（`INSERT OR IGNORE`）；dry-run 預設；lock-aware；WAL-safe backup
 
-**SQLite backend 重要說明**：
-- `TRANSACTION_LOG_BACKEND=json`（預設）→ JSON flat-file backend，production-safe，行為與 v0.7.6-alpha 完全相同
-- `TRANSACTION_LOG_BACKEND=sqlite`（experimental opt-in）→ SQLite backend，不建立 `runtime/rip.db` 除非主動設定
-- **現有 JSON transaction 歷史不會自動 migrate**：切換到 sqlite 後，舊 JSON history 在 SQLite backend 下不可見（rollback / preview 查不到舊 transaction）；Migration 延後至 Phase 19H
-- `prune_transactions()` 在 SQLite backend 下 raise `NotImplementedError`；SQLite prune 延後至 Phase 19I
+**SQLite approval backend 重要說明**：
+- `APPROVAL_STORE_BACKEND=json`（預設）→ JSON flat-file backend，行為與 v0.7.8-alpha 完全相同
+- `APPROVAL_STORE_BACKEND=sqlite`（experimental opt-in）→ SQLite backend，不建立 `runtime/rip.db` 除非主動設定
+- **Migration 不會自動切換 backend**：`scripts/migrate_approvals.py --apply` 後仍需手動設定 `APPROVAL_STORE_BACKEND=sqlite`
+- `TRANSACTION_LOG_BACKEND` 與 `APPROVAL_STORE_BACKEND` 互相獨立
 
-**Final regression**（Phase 19F）：
+**Final regression**（Phase 20E）：
 - `poetry check`：All set!
-- `poetry run pytest -q`：816 passed（+51 since v0.7.6-alpha tag）
+- `poetry run pytest -q`：938 passed（+60 since v0.7.8-alpha tag）
 - `poetry build`：rex_intelligence_platform-0.1.0 ✅
 - `poetry run rip "說明"`：正常 ✅
 
 **package artifact 版本**（0.1.0）為 packaging metadata，RIP release source of truth 為 git tag / release docs。
 
-**歷史紀錄**：v0.7.5-alpha（commit d96f657，Phase 17I）包含 Phase 17A–17G 工作（console_scripts / runtime lock / operator runbook / preflight / packaging / CI）；726 tests。v0.7.4-alpha（Phase 16）包含 approval workflow、rollback 完整流程與 PDF intelligence 核心功能。
+**歷史紀錄**：v0.7.8-alpha（Phase 19N）收斂 Phase 19H / 19J / 19L（SQLite transaction log operator docs / migration / prune）；878 tests。v0.7.7-alpha（Phase 19G）收斂 Phase 19B / 19D（SQLite transaction log backend）；816 tests。v0.7.6-alpha（Phase 18H）收斂 Phase 18B / 18C / 18E（persistence refactors）；765 tests。v0.7.5-alpha（commit d96f657，Phase 17I）包含 Phase 17A–17G 工作（console_scripts / runtime lock / operator runbook / preflight / packaging / CI）；726 tests。v0.7.4-alpha（Phase 16）包含 approval workflow、rollback 完整流程與 PDF intelligence 核心功能。
 
 **適用場景**：
 - 本機文件整理與安全流程驗證
