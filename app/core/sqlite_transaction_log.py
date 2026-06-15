@@ -13,8 +13,8 @@ Design notes:
   JSON backend (RenameTransactionLog / MoveTransactionLog).
 - JSON backend remains the default and only production backend. This module
   is experimental and not connected to any runtime default path.
-- prune_transactions() is not implemented (not in Protocol; Rename/Move
-  signatures diverge). Raises NotImplementedError if called directly.
+- prune_transactions() is implemented (Phase 19L). Rename/Move signatures
+  diverge (as in the JSON backends), so prune is not part of any Protocol.
 - WAL mode note: PRAGMA journal_mode=WAL may not function correctly on
   Windows filesystem paths (e.g. /mnt/c/ in WSL2 DrvFs/NTFS). Use Linux
   filesystem paths (e.g. inside the repo or /tmp) for reliable WAL support.
@@ -24,12 +24,21 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
-    from app.filename.schemas import RenameTransaction, RenameTransactionAction
-    from app.folder_intelligence.schemas import MoveTransaction, MoveTransactionAction
+    from app.filename.schemas import (
+        RenameTransaction,
+        RenameTransactionAction,
+        TransactionLogPruneResult,
+    )
+    from app.folder_intelligence.schemas import (
+        MoveTransaction,
+        MoveTransactionAction,
+        MoveTransactionLogPruneResult,
+    )
 
 _SCHEMA_VERSION = 1
 _BUSY_TIMEOUT_MS = 5000
@@ -140,7 +149,8 @@ class SqliteRenameTransactionLog:
     Experimental: not for production use. The JSON backend
     (RenameTransactionLog) remains the default and only production backend.
 
-    prune_transactions() is not implemented and raises NotImplementedError.
+    prune_transactions() is implemented (Phase 19L); signature mirrors the
+    JSON RenameTransactionLog backend.
     All DB file operations require an explicit db_path passed to __init__.
     """
 
@@ -270,9 +280,96 @@ class SqliteRenameTransactionLog:
         self.save_transaction(tx)
         return tx
 
-    def prune_transactions(self, *args, **kwargs) -> None:  # type: ignore[return]
-        raise NotImplementedError(
-            "prune_transactions not implemented for SQLite backend"
+    def prune_transactions(
+        self,
+        max_transactions: int | None = None,
+        max_age_days: int | None = None,
+        now: datetime | None = None,
+    ) -> TransactionLogPruneResult:
+        """Prune old rename transactions from SQLite (Phase 19L).
+
+        Mirrors RenameTransactionLog.prune_transactions() (Phase 14F):
+          - max_age_days: prune transactions older than N days.
+          - max_transactions: keep at most N most-recent; prune the rest.
+          - No criteria → no-op (returns counts, no DELETE executed).
+          - Transactions with any action status='success' are never pruned
+            (counted in kept_rollbackable_count).
+          - ON DELETE CASCADE removes child actions automatically.
+          - corrupted_count: not applicable; SQLite schema enforces validity.
+          - No runtime lock needed: SQLite WAL + busy_timeout handle concurrency.
+        """
+        from app.filename.schemas import TransactionLogPruneResult
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        def _aware(dt: datetime) -> datetime:
+            if dt.tzinfo is not None:
+                return dt
+            return datetime(
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second, dt.microsecond,
+                tzinfo=timezone.utc,
+            )
+
+        with _connection(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT transaction_id, created_at FROM rename_transactions"
+                " ORDER BY created_at ASC, transaction_id ASC"
+            ).fetchall()
+            total_before = len(rows)
+
+            if not rows or (max_transactions is None and max_age_days is None):
+                return TransactionLogPruneResult(
+                    total_before=total_before,
+                    total_after=total_before,
+                )
+
+            rollbackable_ids = {
+                row["transaction_id"]
+                for row in conn.execute(
+                    "SELECT DISTINCT transaction_id FROM rename_transaction_actions"
+                    " WHERE status='success'"
+                ).fetchall()
+            }
+
+            candidate_ids: set[str] = set()
+
+            if max_age_days is not None:
+                cutoff = now - timedelta(days=max_age_days)
+                for row in rows:
+                    if _aware(datetime.fromisoformat(row["created_at"])) < cutoff:
+                        candidate_ids.add(row["transaction_id"])
+
+            if max_transactions is not None and total_before > max_transactions:
+                excess = total_before - max_transactions
+                for row in rows[:excess]:
+                    candidate_ids.add(row["transaction_id"])
+
+            prune_ids: list[str] = []
+            kept_rollbackable = 0
+            for row in rows:
+                tx_id = row["transaction_id"]
+                if tx_id not in candidate_ids:
+                    continue
+                if tx_id in rollbackable_ids:
+                    kept_rollbackable += 1
+                else:
+                    prune_ids.append(tx_id)
+
+            if prune_ids:
+                conn.execute(
+                    "DELETE FROM rename_transactions WHERE transaction_id IN"
+                    f" ({','.join('?' * len(prune_ids))})",
+                    prune_ids,
+                )
+
+        return TransactionLogPruneResult(
+            total_before=total_before,
+            total_after=total_before - len(prune_ids),
+            pruned_count=len(prune_ids),
+            kept_rollbackable_count=kept_rollbackable,
+            pruned_transaction_ids=prune_ids,
         )
 
 
@@ -285,7 +382,8 @@ class SqliteMoveTransactionLog:
     Experimental: not for production use. The JSON backend
     (MoveTransactionLog) remains the default and only production backend.
 
-    prune_transactions() is not implemented and raises NotImplementedError.
+    prune_transactions() is implemented (Phase 19L); signature mirrors the
+    JSON MoveTransactionLog backend.
     All DB file operations require an explicit db_path passed to __init__.
     """
 
@@ -415,7 +513,87 @@ class SqliteMoveTransactionLog:
         self.save_transaction(tx)
         return tx
 
-    def prune_transactions(self, *args, **kwargs) -> None:  # type: ignore[return]
-        raise NotImplementedError(
-            "prune_transactions not implemented for SQLite backend"
+    def prune_transactions(
+        self,
+        older_than_days: int = 30,
+        dry_run: bool = False,
+        now: datetime | None = None,
+    ) -> MoveTransactionLogPruneResult:
+        """Prune old move transactions from SQLite (Phase 19L).
+
+        Mirrors MoveTransactionLog.prune_transactions() (Phase 15J):
+          - older_than_days: age threshold (default 30 days).
+          - dry_run=True: compute and return result without deleting.
+          - protected: any action status='success' → never pruned, even if old.
+          - retained: no success action, not yet expired → kept, listed.
+          - pruned: no success action, expired → deleted (unless dry_run).
+          - corrupted_count / corrupted_entries: always 0; SQLite schema
+            enforces row validity, eliminating the JSON corrupted-entry concept.
+          - ON DELETE CASCADE removes child actions automatically.
+          - No runtime lock needed: SQLite WAL + busy_timeout handle concurrency.
+        """
+        from app.folder_intelligence.schemas import MoveTransactionLogPruneResult
+
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        def _aware(dt: datetime) -> datetime:
+            if dt.tzinfo is not None:
+                return dt
+            return datetime(
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second, dt.microsecond,
+                tzinfo=timezone.utc,
+            )
+
+        cutoff = now - timedelta(days=older_than_days)
+
+        with _connection(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT transaction_id, created_at FROM move_transactions"
+                " ORDER BY created_at ASC, transaction_id ASC"
+            ).fetchall()
+            before_count = len(rows)
+
+            protected_set = {
+                row["transaction_id"]
+                for row in conn.execute(
+                    "SELECT DISTINCT transaction_id FROM move_transaction_actions"
+                    " WHERE status='success'"
+                ).fetchall()
+            }
+
+            prune_ids: list[str] = []
+            retained_ids: list[str] = []
+            protected_ids: list[str] = []
+
+            for row in rows:
+                tx_id = row["transaction_id"]
+                if tx_id in protected_set:
+                    protected_ids.append(tx_id)
+                    continue
+                if _aware(datetime.fromisoformat(row["created_at"])) < cutoff:
+                    prune_ids.append(tx_id)
+                else:
+                    retained_ids.append(tx_id)
+
+            if prune_ids and not dry_run:
+                conn.execute(
+                    "DELETE FROM move_transactions WHERE transaction_id IN"
+                    f" ({','.join('?' * len(prune_ids))})",
+                    prune_ids,
+                )
+
+        return MoveTransactionLogPruneResult(
+            before_count=before_count,
+            after_count=before_count - len(prune_ids),
+            pruned_count=len(prune_ids),
+            retained_count=len(retained_ids),
+            protected_count=len(protected_ids),
+            corrupted_count=0,
+            corrupted_entries=0,
+            dry_run=dry_run,
+            pruned_transaction_ids=prune_ids,
+            retained_transaction_ids=retained_ids,
+            protected_transaction_ids=protected_ids,
         )

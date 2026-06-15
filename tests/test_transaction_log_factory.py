@@ -277,21 +277,27 @@ def test_mock_line_imports_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_prune_not_available_on_sqlite_rename_factory_result(tmp_path, monkeypatch):
-    """backend='sqlite' 時 rename log.prune_transactions() 必須 raise NotImplementedError。"""
+def test_prune_works_on_sqlite_rename_factory_result(tmp_path, monkeypatch):
+    """backend='sqlite' 時 rename log.prune_transactions() 正常執行（Phase 19L）。"""
+    from app.filename.schemas import TransactionLogPruneResult
+
     monkeypatch.setattr(settings, "RUNTIME_DIR", str(tmp_path))
     monkeypatch.setattr(settings, "TRANSACTION_LOG_BACKEND", "sqlite")
 
     log = make_rename_transaction_log()
-    with pytest.raises(NotImplementedError):
-        log.prune_transactions(max_transactions=5)
+    result = log.prune_transactions(max_transactions=5)
+    assert isinstance(result, TransactionLogPruneResult)
+    assert result.pruned_count == 0
 
 
-def test_prune_not_available_on_sqlite_move_factory_result(tmp_path, monkeypatch):
-    """backend='sqlite' 時 move log.prune_transactions() 必須 raise NotImplementedError。"""
+def test_prune_works_on_sqlite_move_factory_result(tmp_path, monkeypatch):
+    """backend='sqlite' 時 move log.prune_transactions() 正常執行（Phase 19L）。"""
+    from app.folder_intelligence.schemas import MoveTransactionLogPruneResult
+
     monkeypatch.setattr(settings, "RUNTIME_DIR", str(tmp_path))
     monkeypatch.setattr(settings, "TRANSACTION_LOG_BACKEND", "sqlite")
 
     log = make_move_transaction_log()
-    with pytest.raises(NotImplementedError):
-        log.prune_transactions(older_than_days=30)
+    result = log.prune_transactions(older_than_days=30)
+    assert isinstance(result, MoveTransactionLogPruneResult)
+    assert result.pruned_count == 0

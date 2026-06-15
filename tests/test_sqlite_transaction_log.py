@@ -1,11 +1,11 @@
-"""Phase 19B 測試：Experimental SQLite transaction log backend.
+"""Phase 19B / 19L 測試：Experimental SQLite transaction log backend.
 
 驗證重點：
 - SqliteRenameTransactionLog 滿足 RenameTransactionLogProtocol（isinstance True）
 - SqliteMoveTransactionLog 滿足 MoveTransactionLogProtocol（isinstance True）
 - 所有操作行為與 JSON backend 合約相容（save/load/list/update/mark）
 - action order 以 AUTOINCREMENT id 保留（ORDER BY id ASC）
-- prune_transactions 明確 raise NotImplementedError
+- prune_transactions 對齊 JSON backend（Phase 19L）
 - 不建立 runtime/rip.db
 - JSON default backend 不受影響
 - 不 import sqlalchemy
@@ -14,6 +14,7 @@
 
 import ast
 import importlib.util
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -27,8 +28,18 @@ from app.core.transaction_log_protocol import (
     MoveTransactionLogProtocol,
     RenameTransactionLogProtocol,
 )
-from app.filename.schemas import RenameTransaction, RenameTransactionAction
-from app.folder_intelligence.schemas import MoveTransaction, MoveTransactionAction
+from app.filename.schemas import (
+    RenameTransaction,
+    RenameTransactionAction,
+    TransactionLogPruneResult,
+)
+from app.folder_intelligence.schemas import (
+    MoveTransaction,
+    MoveTransactionAction,
+    MoveTransactionLogPruneResult,
+)
+
+_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -238,13 +249,177 @@ def test_sqlite_rename_actions_preserve_order(tmp_path: Path):
         assert action.original_path == f"/src/z{i}.pdf"
 
 
-def test_sqlite_rename_prune_raises_not_implemented(tmp_path: Path):
+# ---------------------------------------------------------------------------
+# Rename prune tests (Phase 19L — mirrors test_transaction_log_rotation.py)
+# ---------------------------------------------------------------------------
+
+
+def _rename_tx(
+    db_path: Path,
+    name: str,
+    status: str,
+    age_days: int,
+) -> RenameTransaction:
+    tx = RenameTransaction(
+        plan_id=f"plan-{name}",
+        created_at=_NOW - timedelta(days=age_days),
+        actions=[
+            RenameTransactionAction(
+                original_path=f"/src/{name}_orig.pdf",
+                new_path=f"/dst/{name}_new.pdf",
+                status=status,
+                rollback_from=f"/dst/{name}_new.pdf",
+                rollback_to=f"/src/{name}_orig.pdf",
+            )
+        ],
+    )
+    return tx
+
+
+def _rename_log(tmp_path: Path, txs: list[RenameTransaction]) -> SqliteRenameTransactionLog:
     log = SqliteRenameTransactionLog(tmp_path / "test.db")
-    with pytest.raises(
-        NotImplementedError,
-        match="prune_transactions not implemented for SQLite backend",
-    ):
-        log.prune_transactions()
+    for tx in txs:
+        log.save_transaction(tx)
+    return log
+
+
+def test_sqlite_rename_prune_by_age_removes_old(tmp_path: Path):
+    old = _rename_tx(tmp_path, "old", "rolled_back", age_days=60)
+    recent = _rename_tx(tmp_path, "recent", "rolled_back", age_days=1)
+    log = _rename_log(tmp_path, [old, recent])
+
+    result = log.prune_transactions(max_age_days=30, now=_NOW)
+
+    assert result.total_before == 2
+    assert result.total_after == 1
+    assert result.pruned_count == 1
+    assert result.pruned_transaction_ids == [old.transaction_id]
+    assert log.load_transaction(old.transaction_id) is None
+    assert log.load_transaction(recent.transaction_id) is not None
+
+
+def test_sqlite_rename_prune_never_removes_rollbackable(tmp_path: Path):
+    old_rb = _rename_tx(tmp_path, "rb", "success", age_days=365)
+    old_done = _rename_tx(tmp_path, "done", "rolled_back", age_days=365)
+    log = _rename_log(tmp_path, [old_rb, old_done])
+
+    result = log.prune_transactions(max_age_days=30, now=_NOW)
+
+    assert result.pruned_count == 1
+    assert result.kept_rollbackable_count == 1
+    assert log.load_transaction(old_rb.transaction_id) is not None
+    assert log.load_transaction(old_done.transaction_id) is None
+
+
+def test_sqlite_rename_prune_keeps_mixed_status_with_success(tmp_path: Path):
+    tx = RenameTransaction(
+        plan_id="plan-mixed",
+        created_at=_NOW - timedelta(days=100),
+        actions=[
+            RenameTransactionAction(
+                original_path="/src/a.pdf", new_path="/dst/a.pdf", status="rolled_back"
+            ),
+            RenameTransactionAction(
+                original_path="/src/b.pdf", new_path="/dst/b.pdf", status="success"
+            ),
+        ],
+    )
+    log = _rename_log(tmp_path, [tx])
+
+    result = log.prune_transactions(max_age_days=30, now=_NOW)
+
+    assert result.pruned_count == 0
+    assert result.kept_rollbackable_count == 1
+    assert log.load_transaction(tx.transaction_id) is not None
+
+
+def test_sqlite_rename_prune_by_max_transactions_keeps_newest(tmp_path: Path):
+    txs = [_rename_tx(tmp_path, f"t{i}", "rolled_back", age_days=10 - i) for i in range(5)]
+    log = _rename_log(tmp_path, txs)
+
+    result = log.prune_transactions(max_transactions=2, now=_NOW)
+
+    assert result.total_after == 2
+    assert result.pruned_count == 3
+    remaining = {t.transaction_id for t in log.list_transactions()}
+    assert remaining == {txs[3].transaction_id, txs[4].transaction_id}
+
+
+def test_sqlite_rename_prune_max_transactions_skips_rollbackable(tmp_path: Path):
+    oldest_rb = _rename_tx(tmp_path, "rb", "success", age_days=10)
+    middle = _rename_tx(tmp_path, "mid", "rolled_back", age_days=5)
+    newest = _rename_tx(tmp_path, "new", "rolled_back", age_days=1)
+    log = _rename_log(tmp_path, [oldest_rb, middle, newest])
+
+    result = log.prune_transactions(max_transactions=1, now=_NOW)
+
+    assert result.pruned_count == 1
+    assert result.kept_rollbackable_count == 1
+    assert result.pruned_transaction_ids == [middle.transaction_id]
+    remaining = {t.transaction_id for t in log.list_transactions()}
+    assert remaining == {oldest_rb.transaction_id, newest.transaction_id}
+
+
+def test_sqlite_rename_prune_no_criteria_is_noop(tmp_path: Path):
+    log = _rename_log(tmp_path, [_rename_tx(tmp_path, "t", "rolled_back", age_days=365)])
+
+    result = log.prune_transactions(now=_NOW)
+
+    assert result.pruned_count == 0
+    assert result.total_before == result.total_after == 1
+
+
+def test_sqlite_rename_prune_combined_age_and_count(tmp_path: Path):
+    too_old = _rename_tx(tmp_path, "old", "rolled_back", age_days=90)
+    t1 = _rename_tx(tmp_path, "t1", "rolled_back", age_days=3)
+    t2 = _rename_tx(tmp_path, "t2", "rolled_back", age_days=2)
+    t3 = _rename_tx(tmp_path, "t3", "rolled_back", age_days=1)
+    log = _rename_log(tmp_path, [too_old, t1, t2, t3])
+
+    result = log.prune_transactions(max_transactions=2, max_age_days=30, now=_NOW)
+
+    assert result.total_after == 2
+    remaining = {t.transaction_id for t in log.list_transactions()}
+    assert remaining == {t2.transaction_id, t3.transaction_id}
+
+
+def test_sqlite_rename_prune_empty_db_is_noop(tmp_path: Path):
+    log = SqliteRenameTransactionLog(tmp_path / "test.db")
+
+    result = log.prune_transactions(max_age_days=30, max_transactions=5, now=_NOW)
+
+    assert result.total_before == 0
+    assert result.total_after == 0
+    assert result.pruned_count == 0
+
+
+def test_sqlite_rename_prune_result_is_correct_type(tmp_path: Path):
+    log = _rename_log(tmp_path, [_rename_tx(tmp_path, "t", "rolled_back", age_days=60)])
+
+    result = log.prune_transactions(max_age_days=30, now=_NOW)
+
+    assert isinstance(result, TransactionLogPruneResult)
+    assert hasattr(result, "total_before")
+    assert hasattr(result, "total_after")
+    assert hasattr(result, "pruned_count")
+    assert hasattr(result, "kept_rollbackable_count")
+    assert hasattr(result, "pruned_transaction_ids")
+
+
+def test_sqlite_rename_prune_cascade_deletes_actions(tmp_path: Path):
+    import sqlite3
+    tx = _rename_tx(tmp_path, "old", "rolled_back", age_days=60)
+    log = _rename_log(tmp_path, [tx])
+
+    log.prune_transactions(max_age_days=30, now=_NOW)
+
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    action_count = conn.execute(
+        "SELECT COUNT(*) FROM rename_transaction_actions WHERE transaction_id=?",
+        (tx.transaction_id,),
+    ).fetchone()[0]
+    conn.close()
+    assert action_count == 0, "ON DELETE CASCADE must remove orphaned actions"
 
 
 # ---------------------------------------------------------------------------
@@ -355,13 +530,207 @@ def test_sqlite_move_actions_preserve_order(tmp_path: Path):
         assert action.original_path == f"/src/z{i}.pdf"
 
 
-def test_sqlite_move_prune_raises_not_implemented(tmp_path: Path):
+# ---------------------------------------------------------------------------
+# Move prune tests (Phase 19L — mirrors test_move_transaction_log_rotation.py)
+# ---------------------------------------------------------------------------
+
+
+def _move_tx(
+    statuses: list[str],
+    age_days: int = 0,
+    plan_id: str = "plan-1",
+) -> MoveTransaction:
+    return MoveTransaction(
+        plan_id=plan_id,
+        created_at=_NOW - timedelta(days=age_days),
+        actions=[
+            MoveTransactionAction(
+                original_path=f"/inbox/f{i}.pdf",
+                new_path=f"/電費單/f{i}.pdf",
+                status=status,
+                rollback_from=f"/電費單/f{i}.pdf",
+                rollback_to=f"/inbox/f{i}.pdf",
+            )
+            for i, status in enumerate(statuses)
+        ],
+    )
+
+
+def _move_log(tmp_path: Path, txs: list[MoveTransaction]) -> SqliteMoveTransactionLog:
     log = SqliteMoveTransactionLog(tmp_path / "test.db")
-    with pytest.raises(
-        NotImplementedError,
-        match="prune_transactions not implemented for SQLite backend",
-    ):
-        log.prune_transactions()
+    for tx in txs:
+        log.save_transaction(tx)
+    return log
+
+
+def test_sqlite_move_prune_empty_db_is_noop(tmp_path: Path):
+    log = SqliteMoveTransactionLog(tmp_path / "test.db")
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.before_count == 0
+    assert result.after_count == 0
+    assert result.pruned_count == 0
+    assert result.retained_count == 0
+    assert result.protected_count == 0
+
+
+def test_sqlite_move_prune_keeps_protected_even_if_old(tmp_path: Path):
+    tx = _move_tx(["success", "rolled_back"], age_days=365)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_count == 0
+    assert result.protected_count == 1
+    assert tx.transaction_id in result.protected_transaction_ids
+    assert log.load_transaction(tx.transaction_id) is not None
+
+
+def test_sqlite_move_prune_deletes_old_rolled_back(tmp_path: Path):
+    tx = _move_tx(["rolled_back", "rolled_back"], age_days=60)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_count == 1
+    assert tx.transaction_id in result.pruned_transaction_ids
+    assert log.load_transaction(tx.transaction_id) is None
+
+
+def test_sqlite_move_prune_retains_recent(tmp_path: Path):
+    tx = _move_tx(["rolled_back"], age_days=5)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_count == 0
+    assert result.retained_count == 1
+    assert tx.transaction_id in result.retained_transaction_ids
+    assert log.load_transaction(tx.transaction_id) is not None
+
+
+def test_sqlite_move_prune_deletes_old_failed(tmp_path: Path):
+    tx = _move_tx(["failed", "failed"], age_days=60)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_count == 1
+    assert log.load_transaction(tx.transaction_id) is None
+
+
+def test_sqlite_move_prune_deletes_old_pending(tmp_path: Path):
+    tx = _move_tx(["pending"], age_days=60)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_count == 1
+    assert log.load_transaction(tx.transaction_id) is None
+
+
+def test_sqlite_move_prune_dry_run_does_not_delete(tmp_path: Path):
+    tx = _move_tx(["rolled_back"], age_days=60)
+    log = _move_log(tmp_path, [tx])
+
+    result = log.prune_transactions(older_than_days=30, dry_run=True, now=_NOW)
+
+    assert result.dry_run is True
+    assert result.pruned_count == 1
+    assert tx.transaction_id in result.pruned_transaction_ids
+    assert log.load_transaction(tx.transaction_id) is not None, "dry_run must not delete"
+
+
+def test_sqlite_move_prune_dry_run_after_count_is_predicted(tmp_path: Path):
+    prunable = _move_tx(["rolled_back"], age_days=60)
+    retained = _move_tx(["rolled_back"], age_days=5)
+    log = _move_log(tmp_path, [prunable, retained])
+
+    result = log.prune_transactions(older_than_days=30, dry_run=True, now=_NOW)
+
+    assert result.dry_run is True
+    assert result.before_count == 2
+    assert result.after_count == 1, "after_count must reflect predicted result"
+    assert log.list_transactions().__len__() == 2, "DB unchanged in dry_run"
+
+
+def test_sqlite_move_prune_corrupted_always_zero(tmp_path: Path):
+    log = _move_log(tmp_path, [_move_tx(["rolled_back"], age_days=60)])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.corrupted_count == 0
+    assert result.corrupted_entries == 0
+
+
+def test_sqlite_move_prune_result_counts_correct(tmp_path: Path):
+    protected = _move_tx(["success"], age_days=90)
+    prunable = _move_tx(["rolled_back"], age_days=90)
+    retained = _move_tx(["failed"], age_days=1)
+    log = _move_log(tmp_path, [protected, prunable, retained])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.before_count == 3
+    assert result.pruned_count == 1
+    assert result.protected_count == 1
+    assert result.retained_count == 1
+    assert result.after_count == 2
+    assert result.corrupted_count == 0
+
+
+def test_sqlite_move_prune_protected_ids_reported(tmp_path: Path):
+    protected = _move_tx(["success"], age_days=90)
+    prunable = _move_tx(["rolled_back"], age_days=90)
+    log = _move_log(tmp_path, [protected, prunable])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.protected_transaction_ids == [protected.transaction_id]
+
+
+def test_sqlite_move_prune_pruned_ids_reported(tmp_path: Path):
+    prunable = _move_tx(["rolled_back"], age_days=90)
+    retained = _move_tx(["rolled_back"], age_days=5)
+    log = _move_log(tmp_path, [prunable, retained])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.pruned_transaction_ids == [prunable.transaction_id]
+
+
+def test_sqlite_move_prune_retained_ids_reported(tmp_path: Path):
+    retained = _move_tx(["failed"], age_days=1)
+    log = _move_log(tmp_path, [retained])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert result.retained_transaction_ids == [retained.transaction_id]
+
+
+def test_sqlite_move_prune_result_is_correct_type(tmp_path: Path):
+    log = _move_log(tmp_path, [_move_tx(["rolled_back"], age_days=60)])
+
+    result = log.prune_transactions(older_than_days=30, now=_NOW)
+
+    assert isinstance(result, MoveTransactionLogPruneResult)
+
+
+def test_sqlite_move_prune_cascade_deletes_actions(tmp_path: Path):
+    import sqlite3
+    tx = _move_tx(["rolled_back"], age_days=60)
+    log = _move_log(tmp_path, [tx])
+
+    log.prune_transactions(older_than_days=30, now=_NOW)
+
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    action_count = conn.execute(
+        "SELECT COUNT(*) FROM move_transaction_actions WHERE transaction_id=?",
+        (tx.transaction_id,),
+    ).fetchone()[0]
+    conn.close()
+    assert action_count == 0, "ON DELETE CASCADE must remove orphaned actions"
 
 
 # ---------------------------------------------------------------------------

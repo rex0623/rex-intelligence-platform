@@ -416,6 +416,7 @@ TRANSACTION_LOG_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
 | Approval store（approvals.json） | JSON 檔案 | 不變，仍 JSON 檔案 |
 | Rename transaction log | rename_transactions.json | runtime/rip.db |
 | Move transaction log | move_transactions.json | runtime/rip.db |
+| prune_transactions() | ✅ 支援 | ✅ 支援（Phase 19L） |
 | Planning / Help 指令 | 不受影響 | 不受影響 |
 | Destructive command regex | 不變 | 不變 |
 | Runtime lock（rip.lock） | 保留 | 保留 |
@@ -434,13 +435,6 @@ TRANSACTION_LOG_BACKEND=sqlite poetry run rip "確認改名 <approval_id>"
 - **切回 json backend 後，舊 JSON history 立即恢復可用**（見「[Fallback to JSON](#fallback-to-json)」）。
 
 **建議**：若環境中已有重要的 JSON transaction history（例如有尚未回滾的 `success` action），**暫時不要切換到 sqlite**，等待 migration script 完成（Phase 19I）。
-
-### ⚠️ SQLite prune_transactions 尚未實作
-
-- SQLite backend 的 `prune_transactions()` 目前 raise `NotImplementedError`。
-- `mock_line` operator commands 目前**沒有 prune 指令**，日常操作（確認 / 預覽 / 回滾）完全不受影響。
-- 若需要清理 SQLite transaction log，目前只能手動操作 DB 或切換回 json backend 後使用 JSON prune API。
-- SQLite prune 實作預計留至後續 phase。
 
 ### Backup（SQLite backend）
 
@@ -506,7 +500,6 @@ rm -f runtime/rip.db runtime/rip.db-wal runtime/rip.db-shm
 **Migration 前請注意**：
 
 - `approvals.json` **不在** migration scope，approval store 仍使用 JSON
-- SQLite prune（`prune_transactions()`）**尚未實作**，migration 後 SQLite 沒有 prune 功能
 - Approval SQLite backend **尚未實作**
 
 ### Migration 前備份（必做）

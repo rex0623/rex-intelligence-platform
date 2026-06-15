@@ -6,9 +6,8 @@ instance selected by settings.TRANSACTION_LOG_BACKEND.
 Supported backends:
   "json"   (default) — JSON flat-file backend; production-safe; all existing
                        behaviour preserved; runtime/rip.db never created.
-  "sqlite" (experimental) — SQLite backend; no migration script yet;
-                       prune_transactions() raises NotImplementedError;
-                       creates runtime/rip.db on first use.
+  "sqlite" (experimental) — SQLite backend; prune_transactions() implemented
+                       (Phase 19L); creates runtime/rip.db on first use.
 
 Design notes:
 - All imports are local (inside functions) to avoid circular imports and to
@@ -39,7 +38,7 @@ def make_rename_transaction_log() -> RenameTransactionLogProtocol:
     backend="sqlite" (experimental):
         Returns SqliteRenameTransactionLog(get_sqlite_db_path()).
         Creates runtime/rip.db on first call.
-        prune_transactions() is not implemented — raises NotImplementedError.
+        prune_transactions() implemented (Phase 19L).
         No migration from JSON backend. Existing JSON history is not visible.
 
     Raises ValueError for unknown backend values.
@@ -71,7 +70,7 @@ def make_move_transaction_log() -> MoveTransactionLogProtocol:
     backend="sqlite" (experimental):
         Returns SqliteMoveTransactionLog(get_sqlite_db_path()).
         Creates runtime/rip.db on first call.
-        prune_transactions() is not implemented — raises NotImplementedError.
+        prune_transactions() implemented (Phase 19L).
         No migration from JSON backend. Existing JSON history is not visible.
 
     Raises ValueError for unknown backend values.
