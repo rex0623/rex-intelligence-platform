@@ -5,6 +5,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.8.0-alpha] — 2026-06-16 — Phase 21B / 21C Release Checkpoint
+
+本 release checkpoint 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C（Operator Docs for Approval Prune）兩個 phase 的工作。
+
+**v0.8.0-alpha 是 SQLite optional persistence 能力矩陣收斂 checkpoint**：transaction log（rename/move）與 approval store 兩個 persistence 領域，原本在 Phase 18A/18D/18F reconnaissance 階段被規劃為「v0.8.0-alpha candidate」；至本次為止兩者皆已具備完整對稱的能力矩陣 — backend 實作、operator docs、JSON → SQLite migration script、prune/cleanup，四項皆已齊備。本次 minor version bump 標誌這個既定能力矩陣的收斂完成，而非單一 phase 群組的零散 patch 修補。
+
+JSON backend 仍為兩個後端（`APPROVAL_STORE_BACKEND` / `TRANSACTION_LOG_BACKEND`）的預設值；SQLite 仍為 experimental opt-in。
+
+### Added（Phase 21B）
+
+- **`app/approvals/manager.py`**（修改）：
+  - `ApprovalManager.prune_approvals(*, dry_run=True, remove_expired=True, remove_executed=False, remove_rejected=False, max_age_days=None, now=None) → ApprovalPruneResult`
+  - 判斷順序：expired（預設）→ executed（opt-in）→ rejected（opt-in）→ old / max-age-days（opt-in）；每筆 approval 只計入第一個符合的類別
+  - `dry_run=True`（預設）：純讀取，`_save_store()` 不會被呼叫
+  - `dry_run=False`：若有任何 approval 被 prune，刪除後呼叫 `_save_store()` 一次
+  - Live-pending approvals（status=pending 且尚未過期）不會被 `max_age_days` 規則清除，無論建立時間多舊
+- **`app/approvals/schemas.py`**（修改）：
+  - 新增 `ApprovalPruneResult` dataclass（`dry_run / total_before / total_after / pruned_count / retained_count / pruned_expired / pruned_executed / pruned_rejected / pruned_old / pruned_approval_ids`）
+- **`scripts/prune_approvals.py`**（新增）：
+  - `--dry-run`（預設）/ `--apply`（互斥）
+  - `--remove-executed` / `--remove-rejected` / `--max-age-days N`：opt-in flags
+  - `--json-report`：machine-readable JSON 輸出
+  - 透過 `make_approval_manager()` 讀取 `APPROVAL_STORE_BACKEND`，JSON 與 SQLite approval backend 共用同一 CLI
+  - `--apply` 期間 acquire_runtime_lock()；lock busy → exit code 1，不重試
+  - Exit codes：0 成功（含 nothing to prune）/ 1 lock busy / 3 unexpected error
+- **`tests/test_approval_prune.py`**（新增）+ **`tests/test_cli_prune_approvals.py`**（新增）：+32 tests（938 → 970）
+
+### Added（Phase 21C）
+
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
+  - 新增「Approval Prune / Cleanup」section：用途 / 觸發條件表 / JSON 與 SQLite backend 共用說明 / dry-run 預設 / `--apply` 寫入與 runtime lock / 7 個範例指令 / `--json-report` 範例輸出 / 安全限制表 / exit codes
+  - 快速參考表新增 4 筆 prune 相關指令
+
+### Not Changed / Non-Goals（v0.8.0-alpha）
+
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- SQLite（transaction log 與 approval store）仍為 experimental opt-in，本次未變更為 default
+- approval prune 不會自動排程；`scripts/prune_approvals.py` 為純手動工具
+- `scripts/mock_line.py` 未新增 prune 對話指令
+- 不修改任何 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+
+### Test Count（v0.7.9-alpha → v0.8.0-alpha）
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.9-alpha tag | 938 |
+| Phase 21B（prune_approvals）| 970（+32）|
+| Phase 21C（operator docs，純文件）| 970（+0）|
+| **v0.8.0-alpha** | **970** |
+
+---
+
 ## [v0.7.9-alpha] — Phase 20G Tag Confirmation
 
 本階段為純文件 tag confirmation。v0.7.9-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。

@@ -2,6 +2,95 @@
 
 ---
 
+## v0.8.0-alpha
+
+**Phase 21B / 21C — Approval Prune / Expiry Cleanup + Operator Docs Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.8.0-alpha 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C（Operator Docs for Approval Prune）兩個 phase 的工作。
+
+**為何是 v0.8.0-alpha，而不是 v0.7.10-alpha**：SQLite optional persistence 原本在 Phase 18A/18D/18F reconnaissance 階段即被規劃為「v0.8.0-alpha candidate」（見 `docs/PROJECT_STATUS.md` 歷史記錄與 Phase 18A reconnaissance notes）。至本次為止，transaction log（rename/move）與 approval store 兩個 persistence 領域，皆已具備完整對稱的能力矩陣：
+
+| 能力 | Transaction Log | Approval Store |
+|------|------|------|
+| SQLite backend 實作 | ✅ Phase 19B/19D（v0.7.7）| ✅ Phase 20A/20B（v0.7.9）|
+| Operator docs | ✅ Phase 19H（v0.7.8）| ✅ Phase 20C（v0.7.9）|
+| JSON → SQLite migration script | ✅ Phase 19J（v0.7.8）| ✅ Phase 20E（v0.7.9）|
+| Prune / cleanup | ✅ Phase 19L（v0.7.8）| ✅ **Phase 21B（本次）**|
+| Prune operator docs | ✅（v0.7.8）| ✅ **Phase 21C（本次）**|
+
+本次 checkpoint 補上表格右欄最後一格，完成這個既定能力矩陣的收斂，因此採用 minor version bump（v0.8.0-alpha），而非單一 phase 群組的零散 patch 修補（v0.7.10-alpha）。
+
+---
+
+### Highlights
+
+1. **Approval Prune / Expiry Cleanup（Phase 21B）** — 新增 `ApprovalManager.prune_approvals()`（`app/approvals/manager.py`），支援 expired（預設清除）/ executed（opt-in）/ rejected（opt-in）/ max-age-days（opt-in）四類清除；判斷順序固定，每筆 approval 只計入第一個符合的類別；live-pending approvals 不會被 `max_age_days` 誤刪。新增 `ApprovalPruneResult` dataclass（`app/approvals/schemas.py`）。
+2. **`prune_approvals.py` CLI（Phase 21B）** — 新增 `scripts/prune_approvals.py`：`--dry-run`（預設）/ `--apply`（互斥）；`--remove-executed` / `--remove-rejected` / `--max-age-days N` opt-in flags；`--json-report` machine-readable 輸出；透過 `make_approval_manager()` 讀取 `APPROVAL_STORE_BACKEND`，JSON 與 SQLite approval backend 共用同一 CLI；`--apply` 期間 acquire_runtime_lock()。
+3. **Operator Docs for Approval Prune（Phase 21C）** — `docs/OPERATOR_DEPLOYMENT.md` 新增「Approval Prune / Cleanup」section（用途 / 觸發條件表 / dry-run 預設 / `--apply` 與 runtime lock / 7 個範例指令 / 安全限制表 / exit codes）；快速參考表新增 4 筆 prune 相關指令。
+4. **SQLite Persistence Matrix Completion** — Transaction log 與 approval store 兩個 persistence 領域，至本次為止皆已完成 backend / docs / migration / prune 四項能力，達成功能對稱。JSON backend 行為完全不變。
+
+---
+
+### Commits Since v0.7.9-alpha
+
+| Commit | 說明 |
+|--------|------|
+| `4023f69` | feat(approvals): add approval prune cleanup |
+| `2d0e20e` | docs(operator): document approval prune cleanup |
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.7.9-alpha tag | 938 |
+| Phase 21B（prune_approvals）| 970（+32）|
+| Phase 21C（operator docs，純文件）| 970（+0）|
+| **v0.8.0-alpha** | **970** |
+
+---
+
+### Final Regression（v0.8.0-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 970 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | CI #26 green ✅ |
+
+---
+
+### Non-Goals（v0.8.0-alpha）
+
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- SQLite（transaction log 與 approval store）仍為 experimental opt-in
+- approval prune 不會自動排程；`scripts/prune_approvals.py` 為純手動工具
+- `scripts/mock_line.py` 未新增 prune 對話指令
+- 不修改 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+
+---
+
+### Tag Confirmation（Pending）
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.8.0-alpha`（尚未建立） |
+| tag object | pending |
+| target commit | pending |
+| remote tag pushed | ⏳ pending |
+
+---
+
 ## v0.7.9-alpha
 
 **Phase 20A / 20B / 20C / 20E — SQLite Approval Store + Approval Migration Script Release Checkpoint**

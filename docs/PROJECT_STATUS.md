@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.7.9-alpha（Tag Confirmed；Phase 20G；Phase 20A–20E SQLite approval store + approval migration）|
-| **Test Count** | 938 passing（+60 since v0.7.8-alpha tag；+173 since v0.7.6-alpha tag）|
-| **Last Updated** | 2026-06-16（Phase 20G）|
+| **Current Version** | v0.8.0-alpha（Release Checkpoint Prepared / Pending Tag；Phase 21E；Phase 21B–21C Approval Prune / Expiry Cleanup）|
+| **Test Count** | 970 passing（+32 since v0.7.9-alpha tag；+92 since v0.7.8-alpha tag）|
+| **Last Updated** | 2026-06-16（Phase 21E）|
 
 ---
 
@@ -79,6 +79,42 @@
 | 20E | Approval JSON → SQLite Migration（`migrate_approvals`）| ✅ Complete |
 | 20F | Release Checkpoint v0.7.9-alpha | ✅ Complete（Docs Ready）|
 | 20G | v0.7.9-alpha Tag Confirmation | ✅ Complete |
+| 21B | Approval Prune / Expiry Cleanup（`ApprovalManager.prune_approvals()` + `scripts/prune_approvals.py`） | ✅ Complete |
+| 21C | Operator Docs for Approval Prune | ✅ Complete |
+| 21D | v0.8.0-alpha Release Checkpoint Reconnaissance | ✅ Complete |
+| 21E | v0.8.0-alpha Release Checkpoint Implementation | ✅ Complete（Docs Ready）|
+
+---
+
+## Release Readiness Checklist（v0.8.0-alpha）
+
+- [x] poetry check = All set!
+- [x] pytest = 970 passed（938 at v0.7.9-alpha tag → 970，+32）
+- [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
+- [x] poetry run rip "說明" success
+- [ ] GitHub Actions CI green（pending this push）
+- [x] `APPROVAL_STORE_BACKEND` default remains "json"（not changed）
+- [x] `TRANSACTION_LOG_BACKEND` default remains "json"（not changed）
+- [x] SQLite（transaction log 與 approval store）remains experimental opt-in only
+- [x] `app/approvals/manager.py` 修改（Phase 21B；`prune_approvals()` 實作；expired/executed/rejected/old 四類，判斷順序固定）
+- [x] `app/approvals/schemas.py` 修改（Phase 21B；新增 `ApprovalPruneResult` dataclass）
+- [x] `scripts/prune_approvals.py` 新增（Phase 21B；dry-run 預設；`--apply` lock-aware；`--remove-executed` / `--remove-rejected` / `--max-age-days` opt-in；`--json-report`）
+- [x] `tests/test_approval_prune.py` 新增 + `tests/test_cli_prune_approvals.py` 新增（Phase 21B；+32 tests，938 → 970）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 修改（Phase 21C；「Approval Prune / Cleanup」section；快速參考表新增 4 筆指令）
+- [x] Live-pending approvals 不會被 `--max-age-days` 誤刪
+- [x] approval prune 不會自動排程（純手動工具）
+- [x] `scripts/mock_line.py` 未新增 prune 對話指令
+- [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
+- [x] No pyproject.toml / poetry.lock changes
+- [x] No .github/workflows/ci.yml changes
+- [x] No destructive command regex changes
+- [x] working tree clean（after this commit）
+- [ ] v0.8.0-alpha Git tag created（pending Phase 21F）
+- [ ] v0.8.0-alpha tag pushed to origin（pending Phase 21F）
+
+### Recommended Next Phase
+
+- **Phase 21F** — v0.8.0-alpha Tag Confirmation（Phase 21E docs ready；pending CI green + tag）
 
 ---
 
