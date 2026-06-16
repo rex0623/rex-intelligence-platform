@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.8.1-alpha] — Phase 22F Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.8.1-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.8.1-alpha` |
+| tag object | `efc44339333a21bd883faea07cdcd7cd1e346cb1` |
+| target commit | `07e2421699263a6de58e325aca9b44a615be5cb6` |
+| remote tag pushed | ✅ yes |
+
+### Changed Files（Phase 22F）
+
+- `CHANGELOG.md`：Phase 22F 條目新增。
+- `docs/PROJECT_STATUS.md`：Phase 22F 列；Release Readiness Checklist 全數完成（[x]）；Recommended Next Phase 更新為 Phase 23A。
+- `docs/RELEASE_NOTES.md`：v0.8.1-alpha section Tag Confirmation 填入 tag object / target commit；Final Regression CI 更新至 CI #31 green；Commits Since 補 `07e2421`。
+- `README.md`：banner 更新至 Phase 22F；tag confirmed。
+
+---
+
 ## [v0.8.1-alpha] — 2026-06-16 — Phase 22B / 22C Release Checkpoint
 
 本 release checkpoint 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 22C（Operator Docs for Runtime Status Diagnostics）兩個 phase 的工作。

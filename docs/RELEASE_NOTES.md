@@ -37,6 +37,7 @@ v0.8.1-alpha 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 
 |--------|------|
 | `eea2360` | feat(runtime): add read-only runtime status diagnostics |
 | `0a91cee` | docs(operator): document runtime status diagnostics |
+| `07e2421` | docs(release): prepare v0.8.1-alpha release checkpoint |
 
 ---
 
@@ -59,7 +60,7 @@ v0.8.1-alpha 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 
 | `poetry run pytest -q` | 989 passed |
 | `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
 | `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
-| GitHub Actions CI | CI #30 green ✅ |
+| GitHub Actions CI | CI #31 green ✅ |
 
 ---
 
@@ -78,14 +79,14 @@ v0.8.1-alpha 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 
 
 ---
 
-### Tag Confirmation（Pending）
+### Tag Confirmation（Phase 22F）
 
 | 欄位 | 值 |
 |------|----|
-| tag | `v0.8.1-alpha`（尚未建立） |
-| tag object | pending |
-| target commit | pending |
-| remote tag pushed | ⏳ pending |
+| tag | `v0.8.1-alpha` |
+| tag object | `efc44339333a21bd883faea07cdcd7cd1e346cb1` |
+| target commit | `07e2421699263a6de58e325aca9b44a615be5cb6` |
+| remote tag pushed | ✅ yes |
 
 ---
 
