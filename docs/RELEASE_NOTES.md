@@ -2,6 +2,93 @@
 
 ---
 
+## v0.8.1-alpha
+
+**Phase 22B / 22C — Runtime Status / Diagnostics Command + Operator Docs Release Checkpoint**
+
+---
+
+### Purpose
+
+v0.8.1-alpha 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 22C（Operator Docs for Runtime Status Diagnostics）兩個 phase 的工作。
+
+**為何是 v0.8.1-alpha，而不是 v0.9.0-alpha**：
+
+- runtime status diagnostics 是單一、自我完整的 read-only operator visibility 工具，不是跨多 phase 的能力矩陣收斂
+- 沒有任何 default 行為改變（`APPROVAL_STORE_BACKEND` / `TRANSACTION_LOG_BACKEND` 皆維持 `"json"`）
+- 沒有新增 mock_line command surface（對話介面完全不變）
+- 不涉及 SQLite default readiness、schema migration 等大主題
+- v0.8.0-alpha 的 minor bump 是因為它收斂了一個早被預先宣告的能力矩陣（SQLite optional persistence：transaction log 與 approval store 的 backend/docs/migration/prune 四項對齊）；本次不具備同等規模與性質，因此採用 patch bump。v0.9.0-alpha 留給未來真正夠重的主題。
+
+---
+
+### Highlights
+
+1. **Runtime Status / Diagnostics Command（Phase 22B）** — 新增 `app/core/runtime_status.py`（`collect_runtime_status()`）與 `scripts/runtime_status.py` CLI；純讀取，不寫入、不建立 `runtime/rip.db`、不呼叫 `initialize_sqlite_schema()`、不取得 runtime lock。
+2. **JSON / SQLite backend visibility** — 回報目前 `TRANSACTION_LOG_BACKEND` / `APPROVAL_STORE_BACKEND` 設定值、`RUNTIME_DIR`、三個 runtime JSON 檔案（`approvals.json` / `rename_transactions.json` / `move_transactions.json`）是否存在與大小；`runtime/rip.db` 存在時額外回報 `schema_version` 與 `rename_transactions` / `move_transactions` / `approvals` 三個 table 的 row count；缺表時回報 `None`，不 crash。
+3. **`--json-report` support** — `scripts/runtime_status.py` 支援機器可讀輸出；CLI 無 `--apply` flag，無法執行任何寫入或 destructive 操作。
+4. **Operator Docs for Runtime Status Diagnostics（Phase 22C）** — `docs/OPERATOR_DEPLOYMENT.md` 新增「Runtime Status / Diagnostics」section（用途 / JSON 與 SQLite backend 皆可使用 / 安全保證 / 範例指令）；快速參考表新增 2 筆指令。
+
+---
+
+### Commits Since v0.8.0-alpha
+
+| Commit | 說明 |
+|--------|------|
+| `eea2360` | feat(runtime): add read-only runtime status diagnostics |
+| `0a91cee` | docs(operator): document runtime status diagnostics |
+
+---
+
+### Test Count
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.8.0-alpha tag | 970 |
+| Phase 22B（runtime_status）| 989（+19）|
+| Phase 22C（operator docs，純文件）| 989（+0）|
+| **v0.8.1-alpha** | **989** |
+
+---
+
+### Final Regression（v0.8.1-alpha readiness）
+
+| 指令 | 結果 |
+|------|------|
+| `poetry check` | All set! |
+| `poetry run pytest -q` | 989 passed |
+| `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
+| `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
+| GitHub Actions CI | CI #30 green ✅ |
+
+---
+
+### Non-Goals（v0.8.1-alpha）
+
+- runtime status 為純讀取（read-only），不寫入任何檔案
+- 不做 SQLite integrity check / `VACUUM` / backup / restore
+- 不判斷資料是否 corrupted（只回報 exists / size / row count）
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`（不切換 default）
+- SQLite 仍為 experimental opt-in
+- `scripts/mock_line.py` 未新增 runtime status 對話指令
+- 不修改 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+
+---
+
+### Tag Confirmation（Pending）
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.8.1-alpha`（尚未建立） |
+| tag object | pending |
+| target commit | pending |
+| remote tag pushed | ⏳ pending |
+
+---
+
 ## v0.8.0-alpha
 
 **Phase 21B / 21C — Approval Prune / Expiry Cleanup + Operator Docs Release Checkpoint**

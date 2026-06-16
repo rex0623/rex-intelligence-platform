@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.8.0-alpha（Tag Confirmed；Phase 21F；Phase 21B–21C Approval Prune / Expiry Cleanup）|
-| **Test Count** | 970 passing（+32 since v0.7.9-alpha tag；+92 since v0.7.8-alpha tag）|
-| **Last Updated** | 2026-06-16（Phase 21F）|
+| **Current Version** | v0.8.1-alpha（Release Checkpoint Prepared / Pending Tag；Phase 22E；Phase 22B–22C Runtime Status / Diagnostics Command）|
+| **Test Count** | 989 passing（+19 since v0.8.0-alpha tag；+51 since v0.7.9-alpha tag）|
+| **Last Updated** | 2026-06-16（Phase 22E）|
 
 ---
 
@@ -84,6 +84,40 @@
 | 21D | v0.8.0-alpha Release Checkpoint Reconnaissance | ✅ Complete |
 | 21E | v0.8.0-alpha Release Checkpoint Implementation | ✅ Complete（Docs Ready）|
 | 21F | v0.8.0-alpha Tag Confirmation | ✅ Complete |
+| 22B | Runtime Status / Diagnostics Command（`collect_runtime_status()` + `scripts/runtime_status.py`） | ✅ Complete |
+| 22C | Operator Docs for Runtime Status Diagnostics | ✅ Complete |
+| 22D | v0.8.1-alpha Release Checkpoint Reconnaissance | ✅ Complete |
+| 22E | v0.8.1-alpha Release Checkpoint Implementation | ✅ Complete（Docs Ready）|
+
+---
+
+## Release Readiness Checklist（v0.8.1-alpha）
+
+- [x] poetry check = All set!
+- [x] pytest = 989 passed（970 at v0.8.0-alpha tag → 989，+19）
+- [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
+- [x] poetry run rip "說明" success
+- [ ] GitHub Actions CI green（pending this push）
+- [x] `APPROVAL_STORE_BACKEND` default remains "json"（not changed）
+- [x] `TRANSACTION_LOG_BACKEND` default remains "json"（not changed）
+- [x] SQLite（transaction log 與 approval store）remains experimental opt-in only
+- [x] `app/core/runtime_status.py` 新增（Phase 22B；`collect_runtime_status()`；純讀取，不寫入、不建立 rip.db、不呼叫 initialize_sqlite_schema()、不取 runtime lock）
+- [x] `scripts/runtime_status.py` 新增（Phase 22B；CLI wrapper；human-readable + `--json-report`；無 `--apply`）
+- [x] `tests/test_runtime_status.py` 新增 + `tests/test_cli_runtime_status.py` 新增（Phase 22B；+19 tests，970 → 989）
+- [x] `docs/OPERATOR_DEPLOYMENT.md` 修改（Phase 22C；「Runtime Status / Diagnostics」section；快速參考表新增 2 筆指令）
+- [x] runtime status 不做 integrity check / VACUUM / backup / restore，不判斷 corrupted
+- [x] `scripts/mock_line.py` 未新增 runtime status 對話指令
+- [x] No runtime JSON schema changes（approvals.json / rename_transactions.json / move_transactions.json 格式不變）
+- [x] No pyproject.toml / poetry.lock changes
+- [x] No .github/workflows/ci.yml changes
+- [x] No destructive command regex changes
+- [x] working tree clean（after this commit）
+- [ ] v0.8.1-alpha Git tag created（pending Phase 22F）
+- [ ] v0.8.1-alpha tag pushed to origin（pending Phase 22F）
+
+### Recommended Next Phase
+
+- **Phase 22F** — v0.8.1-alpha Tag Confirmation（Phase 22E docs ready；pending CI green + tag）
 
 ---
 

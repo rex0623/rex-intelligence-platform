@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.8.1-alpha] — 2026-06-16 — Phase 22B / 22C Release Checkpoint
+
+本 release checkpoint 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 22C（Operator Docs for Runtime Status Diagnostics）兩個 phase 的工作。
+
+**v0.8.1-alpha 是 patch bump**：runtime status diagnostics 是單一、自我完整的 read-only operator visibility 工具，沒有改變任何 default 行為、沒有新增 mock_line command surface、不涉及 SQLite default readiness 或 schema migration 等大主題；不像 v0.8.0-alpha 那樣收斂一個跨多 phase、且早被預先宣告的能力矩陣。v0.9.0-alpha 留給未來真正夠重的主題。
+
+`APPROVAL_STORE_BACKEND` / `TRANSACTION_LOG_BACKEND` 仍為兩個後端的預設值（`"json"`）；SQLite 仍為 experimental opt-in。
+
+### Added（Phase 22B）
+
+- **`app/core/runtime_status.py`**（新增）：
+  - `collect_runtime_status() → RuntimeStatus`：純讀取函式，回報目前 `settings.TRANSACTION_LOG_BACKEND` / `settings.APPROVAL_STORE_BACKEND`、`RUNTIME_DIR`
+  - 回報 `approvals.json` / `rename_transactions.json` / `move_transactions.json` 是否存在與檔案大小（bytes），不解析內容
+  - 回報 `runtime/rip.db` 是否存在；存在時讀取 `schema_version`，以及 `rename_transactions` / `move_transactions` / `approvals` 三個 table 的 row count
+  - `rip.db` 不存在時直接回報 `exists=False`，不會觸發建檔；缺表時對應欄位回報 `None`，不 raise
+  - 全程不呼叫 `acquire_runtime_lock()`、不呼叫 `initialize_sqlite_schema()`、不寫入任何檔案
+- **`scripts/runtime_status.py`**（新增）：
+  - CLI wrapper；預設輸出 human-readable summary；支援 `--json-report`
+  - 無 `--apply` flag，無法執行任何 destructive 或寫入操作
+  - Exit codes：0 成功 / 1 unexpected error
+- **`tests/test_runtime_status.py`**（新增）+ **`tests/test_cli_runtime_status.py`**（新增）：+19 tests（970 → 989）
+
+### Added（Phase 22C）
+
+- **`docs/OPERATOR_DEPLOYMENT.md`**（修改）：
+  - 新增「Runtime Status / Diagnostics」section：用途 / JSON 與 SQLite backend 皆可使用 / 安全保證 / 範例指令 / 人類可讀與 `--json-report` 輸出範例
+  - 快速參考表新增 2 筆 runtime status 指令
+
+### Not Changed / Non-Goals（v0.8.1-alpha）
+
+- runtime status 為純讀取（read-only），不寫入任何檔案
+- 不做 SQLite integrity check / `VACUUM` / backup / restore
+- 不判斷資料是否 corrupted（只回報 exists / size / row count）
+- `APPROVAL_STORE_BACKEND` 預設值仍為 `"json"`
+- `TRANSACTION_LOG_BACKEND` 預設值仍為 `"json"`
+- SQLite 仍為 experimental opt-in，本次未變更為 default
+- `scripts/mock_line.py` 未新增 runtime status 對話指令
+- 不修改任何 destructive command regex
+- 不修改 `pyproject.toml` / `poetry.lock` / `.github/workflows/ci.yml`
+- 不修改 runtime JSON schema（`approvals.json` / `rename_transactions.json` / `move_transactions.json` 格式不變）
+
+### Test Count（v0.8.0-alpha → v0.8.1-alpha）
+
+| 里程碑 | Tests |
+|--------|-------|
+| v0.8.0-alpha tag | 970 |
+| Phase 22B（runtime_status）| 989（+19）|
+| Phase 22C（operator docs，純文件）| 989（+0）|
+| **v0.8.1-alpha** | **989** |
+
+---
+
 ## [v0.8.0-alpha] — Phase 21F Tag Confirmation
 
 本階段為純文件 tag confirmation。v0.8.0-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。

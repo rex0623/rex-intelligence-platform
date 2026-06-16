@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.8.0-alpha**（Phase 21B–21F — Approval Prune / Expiry Cleanup + Operator Docs；Tag Confirmed（`96fb43b` → `3947c34`）；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
+> **目前版本：v0.8.1-alpha**（Phase 22B–22C — Runtime Status / Diagnostics Command + Operator Docs；Release Checkpoint Prepared / Pending Tag；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,32 +117,31 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.8.0-alpha（Phase 21F — Tag Confirmed）
+**目前版本**：v0.8.1-alpha（Phase 22B–22C — Release Checkpoint Prepared / Pending Tag）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 
-**v0.8.0-alpha** 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C（Operator Docs for Approval Prune）的工作，包含：
-- Phase 21B：`ApprovalManager.prune_approvals()`（`app/approvals/manager.py`）+ `ApprovalPruneResult` schema（`app/approvals/schemas.py`）；`scripts/prune_approvals.py` CLI，支援 expired（預設）/ executed（opt-in）/ rejected（opt-in）/ max-age-days（opt-in）四類清除
-- Phase 21C：`docs/OPERATOR_DEPLOYMENT.md` 新增「Approval Prune / Cleanup」section（用途 / 安全限制 / 範例指令 / exit codes）；快速參考表補上 prune 操作列
+**v0.8.1-alpha** 收斂 Phase 22B（Runtime Status / Diagnostics Command）、Phase 22C（Operator Docs for Runtime Status Diagnostics）的工作，包含：
+- Phase 22B：`app/core/runtime_status.py`（`collect_runtime_status()`）+ `scripts/runtime_status.py` CLI；回報目前 `TRANSACTION_LOG_BACKEND` / `APPROVAL_STORE_BACKEND` 設定、三個 runtime JSON 檔案 exists/size、`runtime/rip.db` exists/`schema_version`/三個 table row count；支援 `--json-report`
+- Phase 22C：`docs/OPERATOR_DEPLOYMENT.md` 新增「Runtime Status / Diagnostics」section（用途 / 安全保證 / 範例指令）；快速參考表補上 2 筆 runtime status 指令
 
-**為何是 v0.8.0-alpha 而非 v0.7.10-alpha**：SQLite optional persistence 在 Phase 18A/18D/18F reconnaissance 階段即被規劃為「v0.8.0-alpha candidate」。至本次為止，transaction log（rename/move）與 approval store 兩個 persistence 領域，皆已具備完整對稱的能力矩陣：backend 實作、operator docs、JSON → SQLite migration script、prune/cleanup，四項皆已齊備。本次 checkpoint 標誌這個既定能力矩陣收斂完成，而非單一 phase 群組的零散修補。
+**為何是 v0.8.1-alpha 而非 v0.9.0-alpha**：runtime status diagnostics 是單一、自我完整的 read-only operator visibility 工具，沒有改變任何 default 行為，沒有新增 mock_line command surface，也不涉及 SQLite default readiness / schema migration 等大主題；規模與性質屬於 patch 級增量，不像 v0.8.0-alpha 那樣收斂一個跨多 phase、且早被預先宣告的能力矩陣（SQLite optional persistence）。v0.9.0-alpha 留給未來真正夠重的主題。
 
-**Approval prune 重要說明**：
-- 預設 dry-run，不修改 `approvals.json` 或 `runtime/rip.db`
-- `--apply` 才會真正寫入，且會取得 runtime lock（`rip.lock`）
-- JSON 與 SQLite approval backend 共用同一 CLI（依 `APPROVAL_STORE_BACKEND` 自動選擇）
-- `--remove-executed` / `--remove-rejected` / `--max-age-days` 皆為 opt-in
+**Runtime status 重要說明**：
+- 純讀取（read-only），不寫入任何檔案，不建立 `runtime/rip.db`，不呼叫 `initialize_sqlite_schema()`，不取得 runtime lock
+- 不做 SQLite integrity check / `VACUUM` / backup / restore，也不判斷資料是否 corrupted（只回報 exists / size / row count）
+- JSON 與 SQLite backend 皆可使用
 - 不會自動排程；`scripts/mock_line.py` 未新增對應對話指令
 
-**Final regression**（Phase 21E）：
+**Final regression**（Phase 22E）：
 - `poetry check`：All set!
-- `poetry run pytest -q`：970 passed（+32 since v0.7.9-alpha tag）
+- `poetry run pytest -q`：989 passed（+19 since v0.8.0-alpha tag）
 - `poetry build`：rex_intelligence_platform-0.1.0 ✅
 - `poetry run rip "說明"`：正常 ✅
 
 **package artifact 版本**（0.1.0）為 packaging metadata，RIP release source of truth 為 git tag / release docs。
 
-**歷史紀錄**：v0.7.9-alpha（Phase 20G）收斂 Phase 20A / 20B / 20C / 20E（SQLite approval store + approval migration）；938 tests。v0.7.8-alpha（Phase 19N）收斂 Phase 19H / 19J / 19L（SQLite transaction log operator docs / migration / prune）；878 tests。v0.7.7-alpha（Phase 19G）收斂 Phase 19B / 19D（SQLite transaction log backend）；816 tests。v0.7.6-alpha（Phase 18H）收斂 Phase 18B / 18C / 18E（persistence refactors）；765 tests。v0.7.5-alpha（commit d96f657，Phase 17I）包含 Phase 17A–17G 工作（console_scripts / runtime lock / operator runbook / preflight / packaging / CI）；726 tests。v0.7.4-alpha（Phase 16）包含 approval workflow、rollback 完整流程與 PDF intelligence 核心功能。
+**歷史紀錄**：v0.8.0-alpha（Phase 21F）收斂 Phase 21B / 21C（Approval Prune / Expiry Cleanup + Operator Docs；SQLite optional persistence 能力矩陣收斂）；970 tests。v0.7.9-alpha（Phase 20G）收斂 Phase 20A / 20B / 20C / 20E（SQLite approval store + approval migration）；938 tests。v0.7.8-alpha（Phase 19N）收斂 Phase 19H / 19J / 19L（SQLite transaction log operator docs / migration / prune）；878 tests。v0.7.7-alpha（Phase 19G）收斂 Phase 19B / 19D（SQLite transaction log backend）；816 tests。v0.7.6-alpha（Phase 18H）收斂 Phase 18B / 18C / 18E（persistence refactors）；765 tests。v0.7.5-alpha（commit d96f657，Phase 17I）包含 Phase 17A–17G 工作（console_scripts / runtime lock / operator runbook / preflight / packaging / CI）；726 tests。v0.7.4-alpha（Phase 16）包含 approval workflow、rollback 完整流程與 PDF intelligence 核心功能。
 
 **適用場景**：
 - 本機文件整理與安全流程驗證
