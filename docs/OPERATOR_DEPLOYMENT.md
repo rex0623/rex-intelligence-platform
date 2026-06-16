@@ -1093,6 +1093,100 @@ poetry run pytest tests/test_operator_preflight.py -v
 
 ---
 
+## Runtime Status / Diagnostics（Phase 22B/22C）
+
+> **Status**：Available（Phase 22B/22C）。`scripts/runtime_status.py` 是**純讀取診斷工具**，不會自動排程執行；operator 自行決定何時查看。
+
+### 用途
+
+`scripts/runtime_status.py` 一次性回報目前 RIP runtime 的設定與檔案狀態，取代「手動翻 `.env` + 手動跑 `sqlite3`」的舊流程。可查看：
+
+- `TRANSACTION_LOG_BACKEND` / `APPROVAL_STORE_BACKEND` 目前設定值
+- `RUNTIME_DIR`（runtime 目錄路徑）
+- `approvals.json` / `rename_transactions.json` / `move_transactions.json` 是否存在，以及檔案大小（bytes）
+- `runtime/rip.db` 是否存在
+- `rip.db` 內的 `schema_version`
+- `rip.db` 內 `rename_transactions` / `move_transactions` / `approvals` 三個 table 的 row count
+
+### JSON 與 SQLite backend 都可使用
+
+不論目前 `TRANSACTION_LOG_BACKEND` / `APPROVAL_STORE_BACKEND` 設定為 `json` 或 `sqlite`，`scripts/runtime_status.py` 都可直接執行：
+
+- JSON backend 下：回報三個 JSON 檔案的 exists / size；`rip.db` 通常回報 `exists=False`（除非曾經切換過 SQLite backend）
+- SQLite backend 下：額外回報 `rip.db` 的 `schema_version` 與三個 table 的 row count
+
+### 安全保證
+
+`scripts/runtime_status.py` / `app/core/runtime_status.collect_runtime_status()`：
+
+- **不會寫入**任何 runtime 檔案
+- **不會建立** `runtime/rip.db`（`rip.db` 不存在時直接回報 `exists=False`，不會觸發建檔）
+- **不會呼叫** `initialize_sqlite_schema()`
+- **不會呼叫** `acquire_runtime_lock()`（不取得 `rip.lock`，可與其他 RIP 指令同時執行）
+- **不會修改** `TRANSACTION_LOG_BACKEND` / `APPROVAL_STORE_BACKEND` 等任何設定
+
+> **限制**：此工具只回報 exists / size / row count，**不做** SQLite integrity check、**不做** `VACUUM`、**不做** backup / restore，也**不判斷**資料是否 corrupted。需要完整性檢查或備份時，仍請依「備份」「還原」章節與「Experimental SQLite Transaction Log Backend」章節的手動指令（`sqlite3 ... "PRAGMA integrity_check;"` 等）。
+
+### 範例指令
+
+```bash
+# 人類可讀摘要
+poetry run python scripts/runtime_status.py
+
+# 機器可讀輸出（JSON）
+poetry run python scripts/runtime_status.py --json-report
+```
+
+範例人類可讀輸出：
+
+```
+RIP runtime status
+  transaction log backend     : json
+  approval store backend      : json
+  runtime dir                 : /path/to/repo/runtime
+
+  approvals.json              : exists (2166194 bytes)
+  rename_transactions.json    : not found
+  move_transactions.json      : not found
+
+  runtime/rip.db              : not found
+```
+
+範例 `--json-report` 輸出：
+
+```json
+{
+  "transaction_log_backend": "json",
+  "approval_store_backend": "json",
+  "runtime_dir": "/path/to/repo/runtime",
+  "approvals_json": {
+    "path": "/path/to/repo/runtime/approvals.json",
+    "exists": true,
+    "size_bytes": 2166194
+  },
+  "rename_transactions_json": {
+    "path": "/path/to/repo/runtime/rename_transactions.json",
+    "exists": false,
+    "size_bytes": null
+  },
+  "move_transactions_json": {
+    "path": "/path/to/repo/runtime/move_transactions.json",
+    "exists": false,
+    "size_bytes": null
+  },
+  "sqlite": {
+    "exists": false,
+    "db_path": "/path/to/repo/runtime/rip.db",
+    "schema_version": null,
+    "rename_transactions_count": null,
+    "move_transactions_count": null,
+    "approvals_count": null
+  }
+}
+```
+
+---
+
 ## 快速參考
 
 | 情境 | 指令 |
@@ -1122,3 +1216,5 @@ poetry run pytest tests/test_operator_preflight.py -v
 | Approval prune apply（僅 expired） | `poetry run python scripts/prune_approvals.py --apply` |
 | Approval prune apply（含 executed/rejected/old） | `poetry run python scripts/prune_approvals.py --apply --remove-executed --remove-rejected --max-age-days 30` |
 | Approval prune JSON report | `poetry run python scripts/prune_approvals.py --dry-run --json-report` |
+| 查看 runtime status（人類可讀） | `poetry run python scripts/runtime_status.py` |
+| 查看 runtime status（JSON） | `poetry run python scripts/runtime_status.py --json-report` |
