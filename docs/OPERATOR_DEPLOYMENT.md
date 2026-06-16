@@ -748,6 +748,117 @@ APPROVAL_STORE_BACKEND=json
 
 ---
 
+## Approval Prune / Cleanup
+
+> **Status**：Available（v0.7.9-alpha Phase 21B/21C）。`scripts/prune_approvals.py` 是手動工具，不會自動排程執行；operator 需自行決定何時執行（或自行串接外部排程器）。
+
+### 用途
+
+approvals 存量會隨時間累積（expired / executed / rejected / 長期歷史），prune 用於清除不再需要的 approval 紀錄，避免 `approvals.json` 或 `runtime/rip.db` 的 `approvals` table 無限成長。可清除的類別：
+
+| 類別 | 觸發條件 | 預設行為 |
+|------|----------|----------|
+| Expired | `status == "expired"`，或 `expires_at` 已過期 | 預設清除（`remove_expired=True`） |
+| Executed | `payload.execution_status == "executed"` | opt-in，需 `--remove-executed` |
+| Rejected | `status == "rejected"` | opt-in，需 `--remove-rejected` |
+| Old（依年齡）| 建立時間早於 `--max-age-days` 指定的天數 | opt-in，需 `--max-age-days N` |
+
+判斷順序為 expired → executed → rejected → old；每筆 approval 只會被計入第一個符合的類別，不會重複計算。
+
+### 同時支援 JSON 與 SQLite approval backend
+
+`scripts/prune_approvals.py` 透過 `make_approval_manager()` 讀取 `APPROVAL_STORE_BACKEND`，不需要針對 backend 切換指令：
+
+- `APPROVAL_STORE_BACKEND=json`（預設）→ 清理 `runtime/approvals.json`
+- `APPROVAL_STORE_BACKEND=sqlite`（experimental）→ 清理 `runtime/rip.db` 的 `approvals` table
+
+兩種 backend 共用同一個 CLI 與相同的 flag。
+
+### 預設行為：Dry-run
+
+不加任何 apply flag 時，預設即為 dry-run：
+
+```bash
+poetry run python scripts/prune_approvals.py
+```
+
+Dry-run 只讀取並回報會被清除的筆數，**不會修改** `approvals.json`，也不會修改 `runtime/rip.db`。
+
+### `--apply` 才會真正寫入
+
+```bash
+poetry run python scripts/prune_approvals.py --apply
+```
+
+- `--apply` 才會實際刪除符合條件的 approval，並寫回 store（JSON 重寫整份檔案，或 SQLite 執行 DELETE）。
+- `--apply` 期間會呼叫 `acquire_runtime_lock()`，取得 `rip.lock`；持有 lock 期間無法同時執行其他 RIP 指令（包括 `確認改名` / `確認搬移` 等）。
+- 若 lock 被其他 process 持有，CLI 會回報 `RuntimeLockBusy` 並以 exit code 1 結束，不會重試。
+
+### 範例指令
+
+```bash
+# 1. Dry-run（預設）— 只清除 expired，不寫入
+poetry run python scripts/prune_approvals.py
+
+# 2. Apply — 只清除 expired approvals
+poetry run python scripts/prune_approvals.py --apply
+
+# 3. Apply — 額外清除 executed approvals
+poetry run python scripts/prune_approvals.py --apply --remove-executed
+
+# 4. Apply — 額外清除 rejected approvals
+poetry run python scripts/prune_approvals.py --apply --remove-rejected
+
+# 5. Apply — 額外清除超過 30 天的舊 approvals（不影響 live pending）
+poetry run python scripts/prune_approvals.py --apply --max-age-days 30
+
+# 6. 組合：apply + executed + rejected + max-age-days
+poetry run python scripts/prune_approvals.py --apply \
+    --remove-executed --remove-rejected --max-age-days 30
+
+# 7. 機器可讀輸出（dry-run 或 apply 皆可加）
+poetry run python scripts/prune_approvals.py --dry-run --json-report
+```
+
+範例 `--json-report` 輸出：
+
+```json
+{
+  "dry_run": true,
+  "total_before": 12,
+  "total_after": 9,
+  "pruned_count": 3,
+  "retained_count": 9,
+  "pruned_expired": 3,
+  "pruned_executed": 0,
+  "pruned_rejected": 0,
+  "pruned_old": 0,
+  "pruned_approval_ids": ["aid-1", "aid-2", "aid-3"]
+}
+```
+
+### 安全限制
+
+| 限制 | 說明 |
+|------|------|
+| Live pending 不會被 `--max-age-days` 誤刪 | 即使建立時間早於指定天數，只要狀態仍是 pending 且尚未過期，就不會被 old 規則清除 |
+| `--remove-executed` 為 opt-in | 不加此 flag 時，executed approvals 會被保留 |
+| `--remove-rejected` 為 opt-in | 不加此 flag 時，rejected approvals 會被保留 |
+| 不提供 `mock_line` 指令 | prune 僅透過 `scripts/prune_approvals.py` 執行；`scripts/mock_line.py` 沒有對應的對話指令，且本次 phase 不新增 |
+| 不會自動排程 | prune 是手動工具；若需要定期清理，operator 需自行串接 cron 等外部排程機制 |
+| Dry-run 預設 | 不加 `--apply` 不會修改 `approvals.json` 或 `runtime/rip.db` |
+| Runtime lock | `--apply` 期間持有 `rip.lock`，避免與其他 RIP 指令 race |
+
+### Exit codes
+
+| Code | 情況 |
+|------|------|
+| 0 | 成功（dry-run 或 apply，包括 nothing to prune） |
+| 1 | Runtime lock busy |
+| 3 | Unexpected error |
+
+---
+
 ## JSON → SQLite Migration（Phase 19J）
 
 > **Status**：Available（v0.7.7-alpha Phase 19J）。這是一次性的手動工具，不會自動執行。
@@ -1007,3 +1118,7 @@ poetry run pytest tests/test_operator_preflight.py -v
 | Approval migration dry-run | `poetry run python scripts/migrate_approvals.py --dry-run` |
 | Approval migration 執行 | `poetry run python scripts/migrate_approvals.py --apply --backup` |
 | Approval migration JSON report | `poetry run python scripts/migrate_approvals.py --dry-run --json-report` |
+| Approval prune dry-run（預設） | `poetry run python scripts/prune_approvals.py` |
+| Approval prune apply（僅 expired） | `poetry run python scripts/prune_approvals.py --apply` |
+| Approval prune apply（含 executed/rejected/old） | `poetry run python scripts/prune_approvals.py --apply --remove-executed --remove-rejected --max-age-days 30` |
+| Approval prune JSON report | `poetry run python scripts/prune_approvals.py --dry-run --json-report` |
