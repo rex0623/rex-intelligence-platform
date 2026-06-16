@@ -2,7 +2,7 @@
 
 本專案是一個以 PDF intelligence、Approval workflow、Rename/Move safe execution 為核心的本機文件智慧整理平台。
 
-> **目前版本：v0.8.0-alpha**（Phase 21B–21C — Approval Prune / Expiry Cleanup + Operator Docs；Release Checkpoint Prepared / Pending Tag；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
+> **目前版本：v0.8.0-alpha**（Phase 21B–21F — Approval Prune / Expiry Cleanup + Operator Docs；Tag Confirmed（`96fb43b` → `3947c34`）；詳見 [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) ｜ [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) ｜ [CHANGELOG.md](CHANGELOG.md) ｜ [docs/OPERATOR_DEPLOYMENT.md](docs/OPERATOR_DEPLOYMENT.md)）
 
 [![CI](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rex0623/rex-intelligence-platform/actions/workflows/ci.yml)
 
@@ -117,7 +117,7 @@ poetry run rip "產生搬移計畫"
 
 ### Release Checkpoint Notes
 
-**目前版本**：v0.8.0-alpha（Phase 21B–21C — Release Checkpoint Prepared / Pending Tag）
+**目前版本**：v0.8.0-alpha（Phase 21F — Tag Confirmed）
 
 **Release Notes**：[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 

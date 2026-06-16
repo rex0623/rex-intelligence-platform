@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Project** | Rex Intelligence Platform (RIP) |
-| **Current Version** | v0.8.0-alpha（Release Checkpoint Prepared / Pending Tag；Phase 21E；Phase 21B–21C Approval Prune / Expiry Cleanup）|
+| **Current Version** | v0.8.0-alpha（Tag Confirmed；Phase 21F；Phase 21B–21C Approval Prune / Expiry Cleanup）|
 | **Test Count** | 970 passing（+32 since v0.7.9-alpha tag；+92 since v0.7.8-alpha tag）|
-| **Last Updated** | 2026-06-16（Phase 21E）|
+| **Last Updated** | 2026-06-16（Phase 21F）|
 
 ---
 
@@ -83,6 +83,7 @@
 | 21C | Operator Docs for Approval Prune | ✅ Complete |
 | 21D | v0.8.0-alpha Release Checkpoint Reconnaissance | ✅ Complete |
 | 21E | v0.8.0-alpha Release Checkpoint Implementation | ✅ Complete（Docs Ready）|
+| 21F | v0.8.0-alpha Tag Confirmation | ✅ Complete |
 
 ---
 
@@ -92,7 +93,7 @@
 - [x] pytest = 970 passed（938 at v0.7.9-alpha tag → 970，+32）
 - [x] poetry build success（rex_intelligence_platform-0.1.0.tar.gz）
 - [x] poetry run rip "說明" success
-- [ ] GitHub Actions CI green（pending this push）
+- [x] GitHub Actions CI #27 green ✅
 - [x] `APPROVAL_STORE_BACKEND` default remains "json"（not changed）
 - [x] `TRANSACTION_LOG_BACKEND` default remains "json"（not changed）
 - [x] SQLite（transaction log 與 approval store）remains experimental opt-in only
@@ -109,12 +110,13 @@
 - [x] No .github/workflows/ci.yml changes
 - [x] No destructive command regex changes
 - [x] working tree clean（after this commit）
-- [ ] v0.8.0-alpha Git tag created（pending Phase 21F）
-- [ ] v0.8.0-alpha tag pushed to origin（pending Phase 21F）
+- [x] v0.8.0-alpha Git tag created（annotated tag，tag object `96fb43b9ca12fd6bbd441ecc728b485c6cd375f8`，Phase 21F）
+- [x] v0.8.0-alpha tag pushed to origin（Phase 21F）
+- [x] v0.8.0-alpha tag dereferences to `3947c346`（`git ls-remote --tags origin v0.8.0-alpha^{}` 驗證，Phase 21F）
 
 ### Recommended Next Phase
 
-- **Phase 21F** — v0.8.0-alpha Tag Confirmation（Phase 21E docs ready；pending CI green + tag）
+- **Phase 22A** — Post-v0.8.0 Planning Reconnaissance
 
 ---
 

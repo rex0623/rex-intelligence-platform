@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v0.8.0-alpha] — Phase 21F Tag Confirmation
+
+本階段為純文件 tag confirmation。v0.8.0-alpha annotated tag 已建立並 push 至 origin，無程式碼變動、無測試新增。
+
+### Tag Confirmed
+
+| 欄位 | 值 |
+|------|----|
+| tag | `v0.8.0-alpha` |
+| tag object | `96fb43b9ca12fd6bbd441ecc728b485c6cd375f8` |
+| target commit | `3947c346ee71415dbfeef20bd049c3e76f5ee727` |
+| remote tag pushed | ✅ yes |
+
+### Changed Files（Phase 21F）
+
+- `CHANGELOG.md`：Phase 21F 條目新增。
+- `docs/PROJECT_STATUS.md`：Phase 21F 列；Release Readiness Checklist 全數完成（[x]）；Recommended Next Phase 更新為 Phase 22A。
+- `docs/RELEASE_NOTES.md`：v0.8.0-alpha section Tag Confirmation 填入 tag object / target commit；Final Regression CI 更新至 CI #27 green；Commits Since 補 `3947c34`。
+- `README.md`：banner 更新至 Phase 21F；tag confirmed。
+
+---
+
 ## [v0.8.0-alpha] — 2026-06-16 — Phase 21B / 21C Release Checkpoint
 
 本 release checkpoint 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C（Operator Docs for Approval Prune）兩個 phase 的工作。

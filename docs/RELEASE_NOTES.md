@@ -41,6 +41,7 @@ v0.8.0-alpha 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C�
 |--------|------|
 | `4023f69` | feat(approvals): add approval prune cleanup |
 | `2d0e20e` | docs(operator): document approval prune cleanup |
+| `3947c34` | docs(release): prepare v0.8.0-alpha release checkpoint |
 
 ---
 
@@ -63,7 +64,7 @@ v0.8.0-alpha 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C�
 | `poetry run pytest -q` | 970 passed |
 | `poetry build` | `rex_intelligence_platform-0.1.0.tar.gz` ✅ |
 | `poetry run rip "說明"` | 正常回覆指令說明 ✅ |
-| GitHub Actions CI | CI #26 green ✅ |
+| GitHub Actions CI | CI #27 green ✅ |
 
 ---
 
@@ -80,14 +81,14 @@ v0.8.0-alpha 收斂 Phase 21B（Approval Prune / Expiry Cleanup）、Phase 21C�
 
 ---
 
-### Tag Confirmation（Pending）
+### Tag Confirmation（Phase 21F）
 
 | 欄位 | 值 |
 |------|----|
-| tag | `v0.8.0-alpha`（尚未建立） |
-| tag object | pending |
-| target commit | pending |
-| remote tag pushed | ⏳ pending |
+| tag | `v0.8.0-alpha` |
+| tag object | `96fb43b9ca12fd6bbd441ecc728b485c6cd375f8` |
+| target commit | `3947c346ee71415dbfeef20bd049c3e76f5ee727` |
+| remote tag pushed | ✅ yes |
 
 ---
 
